@@ -1,0 +1,31 @@
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { Toaster } from 'react-hot-toast';
+import "./globals.css";
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "GoldenPegasus | IT Consulting & Database Management",
+  description: "GoldenPegasus IT Consulting & Services LLC — A secure, role-based SaaS platform for managing employee, marketing, and client data with real-time updates.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" className="dark">
+      <body
+        className={`${inter.variable} antialiased bg-black text-white`}
+      >
+        <Toaster position="top-right" toastOptions={{ style: { background: '#1a1a1a', color: '#fff', border: '1px solid #2a2a2a' } }} />
+        {children}
+      </body>
+    </html>
+  );
+}
