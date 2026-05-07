@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import BackHomeNav from '@/components/BackHomeNav'
+import { isPasswordPwned } from '@/lib/utils/password-security'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -21,7 +22,22 @@ export default function ResetPasswordPage() {
     setError('')
     if (password !== confirm) { setError('Passwords do not match.'); return }
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
+    
     setLoading(true)
+
+    // Check if password has been leaked
+    try {
+      const isPwned = await isPasswordPwned(password)
+      if (isPwned) {
+        setError('This password has been found in a data breach and is unsafe to use. Please choose a different, more secure password.')
+        setLoading(false)
+        return
+      }
+    } catch (err) {
+      // Fail open if check fails
+      console.error('Password check failed:', err)
+    }
+
     const supabase = createClient()
     const { error: updateError } = await supabase.auth.updateUser({ password })
     if (updateError) {
