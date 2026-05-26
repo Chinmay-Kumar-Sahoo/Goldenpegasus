@@ -1,0 +1,13 @@
+<svg width="360" height="96" viewBox="0 0 360 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">Golden Pegasus logo</title>
+  <g transform="translate(6 18)">
+    <path d="M4 35.5L15.2 26.2L20.8 14.5L56.8 41.3L83 16.7L65.6 45.1L31.3 54.2L20.8 37.6L4 40.7L4 35.5Z" stroke="#F8C823" stroke-width="5.5" stroke-linejoin="round"/>
+    <path d="M22.3 37.6L65.5 21.8" stroke="#F8C823" stroke-width="5.5" stroke-linecap="round"/>
+    <path d="M31.5 46.8L68.6 36.8" stroke="#F8C823" stroke-width="5.5" stroke-linecap="round"/>
+    <path d="M40.3 54.1L63.7 48.2" stroke="#F8C823" stroke-width="5.5" stroke-linecap="round"/>
+    <path d="M15.2 26.2L8.2 25.3L4 35.5" stroke="#F8C823" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="196" y="31" fill="#F8C823" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800" text-anchor="middle" letter-spacing=".8">GOLDEN</text>
+  <text x="204" y="64" fill="#F8C823" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="38" font-weight="900" text-anchor="middle" letter-spacing="-1">PEGASUS</text>
+  <path d="M203 52L220 40L211.5 55H224L204 75L212.5 60H200L203 52Z" fill="#F4F4F5"/>
+</svg>

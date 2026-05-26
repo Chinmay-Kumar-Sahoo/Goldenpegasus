@@ -29,7 +29,9 @@ export default function BackHomeNav() {
     <div className="flex items-center gap-2 mb-6">
       {/* Back Button */}
       <button
+        type="button"
         onClick={handleBack}
+        suppressHydrationWarning
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] text-[#a1a1aa] hover:text-white hover:border-[#3a3a3a] hover:bg-[#222222] transition-all duration-200 text-xs font-medium group"
         aria-label="Go back"
       >

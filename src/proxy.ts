@@ -33,8 +33,10 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Protected admin routes
-  if (pathname.startsWith('/admin')) {
+  // Protected admin routes (but exclude standalone public pages)
+  if (pathname.startsWith('/admin') &&
+      pathname !== '/admin-login' &&
+      pathname !== '/admin-change-password') {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }

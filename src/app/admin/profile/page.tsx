@@ -27,6 +27,8 @@ export default function AdminProfilePage() {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -80,7 +82,33 @@ export default function AdminProfilePage() {
     }, { onConflict: 'user_id' })
 
     if (empError) { setError(empError.message); setSaving(false); return }
-    setSuccess('Profile updated successfully!')
+
+    // Update password if provided
+    if (newPassword) {
+      if (newPassword !== confirmPassword) {
+        setError('Passwords do not match.')
+        setSaving(false)
+        return
+      }
+      if (newPassword.length < 8) {
+        setError('Password must be at least 8 characters.')
+        setSaving(false)
+        return
+      }
+
+      const { error: authError } = await supabase.auth.updateUser({ password: newPassword })
+      if (authError) {
+        setError(`Password update failed: ${authError.message}`)
+        setSaving(false)
+        return
+      }
+      // Also ensure must_change_password is false if they manually updated it
+      await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id)
+    }
+
+    setSuccess('Profile and security settings updated successfully!')
+    setNewPassword('')
+    setConfirmPassword('')
     setSaving(false)
   }
 
@@ -124,7 +152,7 @@ export default function AdminProfilePage() {
                   { label: 'Admin ID', name: 'employee_id', type: 'text', placeholder: 'ADM-001' },
                   { label: 'Designation', name: 'designation', type: 'text', placeholder: 'Administrator' },
                   { label: 'Contact', name: 'contact', type: 'text', placeholder: '+1 234 567 8900' },
-                  { label: 'Company ID', name: 'company_id', type: 'text', placeholder: 'GP-123' },
+                  { label: 'Company ID', name: 'company_id', type: 'text', placeholder: 'GPEG-123' },
                   { label: 'Date of Birth', name: 'date_of_birth', type: 'date', placeholder: '' },
                 ].map(field => (
                   <div key={field.name}>
@@ -141,12 +169,31 @@ export default function AdminProfilePage() {
               </div>
             </div>
 
+            <div className="border-t border-[#2a2a2a] pt-5">
+              <div className="text-xs font-semibold text-[#ef4444] uppercase tracking-wider mb-4">Security & Password</div>
+              <p className="text-xs text-[#71717a] mb-4">You can update your password at any time. Leave blank to keep current password.</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">New Password</label>
+                  <input type="password" name="newPassword" placeholder="••••••••"
+                    onChange={e => setNewPassword(e.target.value)}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-500/60" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Confirm New Password</label>
+                  <input type="password" name="confirmPassword" placeholder="••••••••"
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-500/60" />
+                </div>
+              </div>
+            </div>
+
             {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
             {success && <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-green-400">{success}</div>}
 
             <button type="submit" disabled={saving}
               className="w-full bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold py-3 rounded-xl text-sm transition-all">
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? 'Saving...' : 'Save All Changes'}
             </button>
           </form>
         </div>

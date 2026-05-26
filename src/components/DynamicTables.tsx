@@ -54,10 +54,12 @@ export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boole
   useEffect(() => {
     setTimeout(() => {
       fetchTables()
-      supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id || null))
-      if (isAdmin) {
-        supabase.from('profiles').select('id, full_name, email').then(({ data }) => setAllUsers(data || []))
-      }
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        setCurrentUserId(user?.id || null)
+        if (user) {
+          supabase.from('profiles').select('id, full_name, email').then(({ data }) => setAllUsers(data || []))
+        }
+      })
     }, 0)
 
     // Subscribe to realtime changes
@@ -99,12 +101,34 @@ export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boole
   const openTable = async (table: DynamicTable) => {
     setActiveTable(table)
     setRecordsLoading(true)
-    const { data } = await supabase.from('dynamic_table_records').select('*').eq('table_id', table.id).order('created_at', { ascending: false })
+    const { data, error: err } = await supabase.from('dynamic_table_records').select('*').eq('table_id', table.id).order('created_at', { ascending: false })
+    if (err) toast.error('Failed to load records: ' + err.message)
     setRecords(data || [])
     setRecordsLoading(false)
+
+    // Owners & admins load all permissions for the table (to manage them)
     if (isAdmin || table.owner_id === currentUserId) {
-      const { data: perms } = await supabase.from('table_permissions').select('*, profiles(full_name, email)').eq('table_id', table.id)
-      setPermissions((perms || []) as Permission[])
+      console.log('Fetching permissions for table:', table.id, 'User:', currentUserId)
+      const { data: perms, error: pErr } = await supabase
+        .from('table_permissions')
+        .select('*')
+        .eq('table_id', table.id)
+      if (pErr) {
+        console.error('Error fetching perms:', pErr)
+        toast.error('Failed to load permissions: ' + pErr.message)
+      } else if (perms) {
+        console.log('Permissions loaded:', perms.length)
+        setPermissions(perms as Permission[])
+      }
+    } else {
+      // Non-owners: load only their own permission so canEditData() works
+      const { data: myPerm } = await supabase
+        .from('table_permissions')
+        .select('*')
+        .eq('table_id', table.id)
+        .eq('user_id', currentUserId)
+        .maybeSingle()
+      setPermissions(myPerm ? [myPerm as Permission] : [])
     }
   }
 
@@ -172,21 +196,82 @@ export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boole
 
   const handleGrantPermission = async (userId: string, permission: string) => {
     if (!activeTable) return
-    const existing = permissions.find(p => p.user_id === userId)
-    if (existing) {
-      await supabase.from('table_permissions').update({ permission }).eq('id', existing.id)
-    } else {
+
+    // STEP 1: Immediately update UI (optimistic update - never gets overwritten)
+    setPermissions(prev => {
+      const filtered = prev.filter(p => p.user_id !== userId)
+      if (permission) {
+        return [...filtered, {
+          id: 'optimistic-' + Date.now(),
+          table_id: activeTable.id,
+          user_id: userId,
+          permission
+        }]
+      }
+      return filtered
+    })
+
+    // STEP 2: Persist to database in background
+    setSaving(true)
+    try {
+      const { data: existing } = await supabase
+        .from('table_permissions')
+        .select('id')
+        .eq('table_id', activeTable.id)
+        .eq('user_id', userId)
+        .maybeSingle()
+
       const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('table_permissions').insert({ table_id: activeTable.id, user_id: userId, permission, granted_by: user?.id })
+
+      if (existing) {
+        if (!permission) {
+          await supabase.from('table_permissions').delete().eq('id', existing.id)
+        } else {
+          const { error: updateErr } = await supabase
+            .from('table_permissions')
+            .update({ permission, granted_by: user?.id })
+            .eq('id', existing.id)
+          if (updateErr) throw updateErr
+        }
+      } else if (permission) {
+        const { error: insertErr } = await supabase
+          .from('table_permissions')
+          .insert({
+            table_id: activeTable.id,
+            user_id: userId,
+            permission,
+            granted_by: user?.id
+          })
+        if (insertErr) throw insertErr
+      }
+
+      // NOTE: Do NOT re-fetch from DB here — RLS may block SELECT and return []
+      // which would wipe out our optimistic state. UI is already correct.
+      toast.success(permission ? `Permission set to ${permission}` : 'Access revoked')
+
+    } catch (err: any) {
+      console.error('Permission error:', err)
+      toast.error('Failed: ' + (err.message || 'Unknown error'))
+      // On failure only: revert the optimistic update
+      setPermissions(prev => prev.filter(p => p.user_id !== userId))
+    } finally {
+      setSaving(false)
     }
-    toast.success(`Permission updated to ${permission}`)
-    openTable(activeTable)
   }
 
-  const handleRevokePermission = async (permId: string) => {
-    await supabase.from('table_permissions').delete().eq('id', permId)
-    toast.success('Permission revoked')
-    if (activeTable) openTable(activeTable)
+  const handleRevokePermission = async (userId: string) => {
+    if (!activeTable) return
+    // Optimistically remove from UI
+    setPermissions(prev => prev.filter(p => p.user_id !== userId))
+    const { data: existing } = await supabase
+      .from('table_permissions')
+      .select('id')
+      .eq('table_id', activeTable.id)
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (existing) {
+      await supabase.from('table_permissions').delete().eq('id', existing.id)
+    }
   }
 
   const addField = () => setFields([...fields, { name: `field${fields.length + 1}`, label: `Field ${fields.length + 1}`, type: 'text', required: false }])
@@ -198,6 +283,14 @@ export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boole
   }
 
   const canManageTable = (table: DynamicTable) => isAdmin || table.owner_id === currentUserId
+  const canEditData = (table: DynamicTable) => {
+    if (canManageTable(table)) return true
+    return permissions.some(p => p.user_id === currentUserId && p.permission === 'edit')
+  }
+  const hasAnyAccess = (table: DynamicTable) => {
+    if (canManageTable(table)) return true
+    return permissions.some(p => p.user_id === currentUserId)
+  }
 
   return (
     <div>
@@ -257,14 +350,14 @@ export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boole
                 </div>
                 <div className="flex gap-2">
                   {canManageTable(activeTable) && (
-                    <>
-                      <button onClick={() => setShowPermModal(true)} className="text-xs border border-[#2a2a2a] hover:bg-[#1a1a1a] text-[#a1a1aa] hover:text-white px-3 py-1.5 rounded-lg transition-all">
-                        🔐 Permissions
-                      </button>
-                      <button onClick={() => openRecordModal()} className="text-xs bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-3 py-1.5 rounded-lg transition-all">
-                        + Add Row
-                      </button>
-                    </>
+                    <button onClick={() => setShowPermModal(true)} className="text-xs border border-[#2a2a2a] hover:bg-[#1a1a1a] text-[#a1a1aa] hover:text-white px-3 py-1.5 rounded-lg transition-all">
+                      🔐 Permissions
+                    </button>
+                  )}
+                  {canEditData(activeTable) && (
+                    <button onClick={() => openRecordModal()} className="text-xs bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-3 py-1.5 rounded-lg transition-all">
+                      + Add Row
+                    </button>
                   )}
                 </div>
               </div>
@@ -277,7 +370,7 @@ export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boole
                         <th key={f.name} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap">{f.label}</th>
                       ))}
                       <th className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">Added</th>
-                      {canManageTable(activeTable) && <th className="px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">Actions</th>}
+                      {canEditData(activeTable) && <th className="px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -298,16 +391,14 @@ export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boole
                             <td key={f.name} className="px-4 py-3 text-sm text-[#a1a1aa]">{String(rec.data[f.name] || '—')}</td>
                           ))}
                           <td className="px-4 py-3 text-xs text-[#71717a]">{new Date(rec.created_at).toLocaleDateString()}</td>
-                          {canManageTable(activeTable) && (
-                            <td className="px-4 py-3">
-                              {(rec.owner_id === currentUserId || isAdmin) && (
-                                <div className="flex gap-2">
-                                  <button onClick={() => openRecordModal(rec)} className="text-xs border border-[#2a2a2a] hover:bg-[#22c55e]/10 hover:text-[#22c55e] px-2 py-1 rounded-lg transition-all text-[#a1a1aa]">Edit</button>
-                                  <button onClick={() => handleDeleteRecord(rec.id)} className="text-xs border border-[#2a2a2a] hover:bg-red-500/10 hover:text-red-400 px-2 py-1 rounded-lg transition-all text-[#a1a1aa]">Del</button>
-                                </div>
-                              )}
-                            </td>
-                          )}
+                          <td className="px-4 py-3">
+                            {canEditData(activeTable) && (
+                              <div className="flex gap-2">
+                                <button onClick={() => openRecordModal(rec)} className="text-xs border border-[#2a2a2a] hover:bg-[#22c55e]/10 hover:text-[#22c55e] px-2 py-1 rounded-lg transition-all text-[#a1a1aa]">Edit</button>
+                                <button onClick={() => handleDeleteRecord(rec.id)} className="text-xs border border-[#2a2a2a] hover:bg-red-500/10 hover:text-red-400 px-2 py-1 rounded-lg transition-all text-[#a1a1aa]">Del</button>
+                              </div>
+                            )}
+                          </td>
                         </tr>
                       ))
                     )}
@@ -417,14 +508,19 @@ export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boole
       )}
 
       {/* Permissions Modal */}
-      {showPermModal && activeTable && isAdmin && (
+      {showPermModal && activeTable && canManageTable(activeTable) && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-white mb-2">Manage Permissions</h2>
-            <p className="text-sm text-[#71717a] mb-6">{activeTable.table_name}</p>
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-sm text-[#71717a]">{activeTable.table_name}</p>
+              <div className="text-[10px] text-[#22c55e] bg-[#22c55e]/10 px-2 py-0.5 rounded-full">
+                {permissions.length} perms loaded
+              </div>
+            </div>
             <div className="space-y-3">
               {allUsers.filter(u => u.id !== currentUserId).map(user => {
-                const perm = permissions.find(p => p.user_id === user.id)
+                const perm = permissions.find(p => p.user_id?.toLowerCase() === user.id?.toLowerCase())
                 return (
                   <div key={user.id} className="flex items-center justify-between gap-3 bg-[#1a1a1a] rounded-xl p-3">
                     <div className="min-w-0">
@@ -432,12 +528,22 @@ export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boole
                       <div className="text-xs text-[#71717a] truncate">{user.email}</div>
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
-                      <select value={perm?.permission || ''} onChange={e => e.target.value ? handleGrantPermission(user.id, e.target.value) : handleRevokePermission(perm!.id)}
-                        className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2 py-1 text-xs text-white focus:outline-none">
-                        <option value="">No Access</option>
-                        <option value="view">View</option>
-                        <option value="edit">Edit</option>
-                      </select>
+                  <select
+                    value={perm?.permission || ''}
+                    onChange={e => {
+                      const val = e.target.value
+                      if (val) {
+                        handleGrantPermission(user.id, val)
+                      } else {
+                        handleRevokePermission(user.id)
+                      }
+                    }}
+                    className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
+                  >
+                    <option value="">No Access</option>
+                    <option value="view">View</option>
+                    <option value="edit">Edit</option>
+                  </select>
                     </div>
                   </div>
                 )

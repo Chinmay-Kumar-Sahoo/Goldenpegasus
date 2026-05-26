@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import PageHeader from '@/components/PageHeader'
+import { formatDateTime } from '@/lib/format'
 
 export const metadata = { title: 'Audit Logs | Admin | GoldenPegasus' }
 
@@ -30,7 +31,7 @@ export default async function AuditLogsPage() {
               ) : (
                 logs.map(log => (
                   <tr key={log.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                    <td className="px-4 py-3 text-xs text-[#71717a] whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-xs text-[#71717a] whitespace-nowrap">{formatDateTime(log.created_at)}</td>
                     <td className="px-4 py-3 text-sm text-white">{(log.profiles as {full_name?: string})?.full_name || 'System'}</td>
                     <td className="px-4 py-3"><span className="text-xs bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 px-2 py-0.5 rounded-md">{log.action}</span></td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{log.entity_type || '—'}</td>

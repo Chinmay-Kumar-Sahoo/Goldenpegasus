@@ -127,7 +127,7 @@ export default function ProfilePage() {
                   { label: 'Employee ID', name: 'employee_id', type: 'text', placeholder: 'EMP-001' },
                   { label: 'Designation', name: 'designation', type: 'text', placeholder: 'Software Engineer' },
                   { label: 'Contact', name: 'contact', type: 'text', placeholder: '+1 234 567 8900' },
-                  { label: 'Company ID', name: 'company_id', type: 'text', placeholder: 'GP-123' },
+                  { label: 'Company ID', name: 'company_id', type: 'text', placeholder: 'GPEG-123' },
                   { label: 'Date of Birth', name: 'date_of_birth', type: 'date', placeholder: '' },
                 ].map(field => (
                   <div key={field.name}>

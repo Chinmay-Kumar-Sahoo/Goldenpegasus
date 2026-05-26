@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
+import BrandLogo from '@/components/BrandLogo'
 
 interface NavItem {
   label: string
@@ -21,7 +22,7 @@ const adminNav: NavItem[] = [
   { label: 'Overview', href: '/admin', icon: '📊' },
   { label: 'Employees', href: '/admin/employees', icon: '👥' },
   { label: 'All Marketing', href: '/admin/marketing', icon: '📈' },
-  { label: 'Client Records', href: '/admin/clients', icon: '🤝' },
+  { label: 'Candidate Records', href: '/admin/clients', icon: '🤝' },
   { label: 'Dynamic Tables', href: '/admin/tables', icon: '🏗️' },
   { label: 'Audit Logs', href: '/admin/audit', icon: '📋' },
   { label: 'Register Admin', href: '/admin/register', icon: '➕' },
@@ -33,7 +34,7 @@ const employeeNav: NavItem[] = [
   { label: 'Personal Details', href: '/dashboard/profile', icon: '👤' },
   { label: 'All Marketing', href: '/dashboard/marketing', icon: '📊' },
   { label: 'My Marketing', href: '/dashboard/my-marketing', icon: '📈' },
-  { label: 'My Clients', href: '/dashboard/clients', icon: '🤝' },
+  { label: 'My Candidates', href: '/dashboard/clients', icon: '🤝' },
   { label: 'Custom Tables', href: '/dashboard/tables', icon: '🏗️' },
 ]
 
@@ -49,7 +50,11 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
     setLoggingOut(true)
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push('/login')
+    if (role === 'admin') {
+      router.push('/admin-login')
+    } else {
+      router.push('/login')
+    }
   }
 
   const isActive = (href: string) => {
@@ -63,7 +68,7 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
       <div className="p-4 border-b border-[#2a2a2a] flex items-center justify-between">
         {!collapsed && (
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#22c55e] flex items-center justify-center font-bold text-black text-xs flex-shrink-0">GP</div>
+            <BrandLogo variant="mark" size="sm" />
             <div>
               <div className="font-bold text-white text-xs leading-tight">GoldenPegasus</div>
               <div className="text-[10px] text-[#22c55e] leading-tight font-medium truncate max-w-[120px]">{userName || role}</div>
@@ -71,7 +76,7 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
           </Link>
         )}
         {collapsed && (
-          <div className="w-8 h-8 rounded-lg bg-[#22c55e] flex items-center justify-center font-bold text-black text-xs mx-auto">GP</div>
+          <BrandLogo href="/" variant="mark" size="sm" className="mx-auto" />
         )}
         <button onClick={() => setCollapsed(!collapsed)} className="text-[#71717a] hover:text-white ml-auto transition-colors p-1">
           {collapsed ? '→' : '←'}

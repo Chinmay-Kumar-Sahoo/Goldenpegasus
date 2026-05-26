@@ -7,10 +7,24 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) redirect('/login')
+  if (!user) redirect('/admin-login')
+  
+  // Strictly enforce email confirmation
+  if (!user.email_confirmed_at) {
+    redirect('/admin-login?error=Please confirm your admin email address first.')
+  }
 
-  const { data: profile } = await supabase.from('profiles').select('full_name, email, role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') redirect('/dashboard')
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('full_name, email, role, must_change_password').eq('id', user.id).single()
+  const { data: adminProfile } = await supabase.from('admin_profiles').select('status').eq('user_id', user.id).maybeSingle()
+  
+  if (profileError || !profile || profile.role !== 'admin' || adminProfile?.status === 'disabled') {
+    redirect('/login')
+  }
+
+  // If new admin hasn't changed their password yet, force them to the change-password page
+  if (profile?.must_change_password) {
+    redirect('/admin-change-password')
+  }
 
   // Robust name fetching
   const displayName = profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Administrator'

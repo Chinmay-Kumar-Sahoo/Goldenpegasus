@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import { Toaster } from 'react-hot-toast';
 import "./globals.css";
 
@@ -23,6 +24,24 @@ export default function RootLayout({
       <body
         className={`${inter.variable} antialiased bg-black text-white`}
       >
+        <Script id="hydration-extension-attribute-cleanup" strategy="beforeInteractive">
+          {`
+            (function () {
+              var attributes = ['fdprocessedid', 'data-new-gr-c-s-check-loaded', 'data-gr-ext-installed', 'cz-shortcut-listen'];
+              function clean(root) {
+                if (!root || !root.querySelectorAll) return;
+                attributes.forEach(function (attr) {
+                  if (root.removeAttribute) root.removeAttribute(attr);
+                  root.querySelectorAll('[' + attr + ']').forEach(function (node) {
+                    node.removeAttribute(attr);
+                  });
+                });
+              }
+              clean(document.documentElement);
+              clean(document.body);
+            })();
+          `}
+        </Script>
         <Toaster position="top-right" toastOptions={{ style: { background: '#1a1a1a', color: '#fff', border: '1px solid #2a2a2a' } }} />
         {children}
       </body>

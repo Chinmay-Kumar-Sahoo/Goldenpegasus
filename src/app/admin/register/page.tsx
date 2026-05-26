@@ -56,7 +56,7 @@ export default function RegisterAdminPage() {
         throw new Error(data.error || 'Failed to register admin')
       }
 
-      setMessage(`Successfully registered admin: ${form.email}`)
+      setMessage(`Admin signup created. A verification email has been sent to ${form.email}. The admin can sign in after confirming their email.`)
       setForm({ fullName: '', email: '', password: '', confirmPassword: '' })
     } catch (err: any) {
       setError(err.message)
@@ -69,7 +69,7 @@ export default function RegisterAdminPage() {
     <div className="p-6 max-w-2xl mx-auto">
       <PageHeader 
         title="Register New Admin" 
-        subtitle="Create a new administrative account. This user will have full access to the system."
+        subtitle="Create an alternate admin account. Email verification is required before access is enabled."
       />
 
       <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-6 mt-6">
@@ -110,7 +110,7 @@ export default function RegisterAdminPage() {
           <div className="pt-2">
             <button type="submit" disabled={loading}
               className="w-full bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold py-3 rounded-xl text-sm transition-all duration-200">
-              {loading ? 'Creating account...' : 'Create Admin Account'}
+              {loading ? 'Creating account...' : 'Send Admin Verification'}
             </button>
           </div>
         </form>

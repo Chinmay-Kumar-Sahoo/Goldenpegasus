@@ -1,5 +1,8 @@
 import Link from 'next/link'
-import PublicSearch from '@/components/PublicSearch'
+import BrandLogo from '@/components/BrandLogo'
+
+
+export const dynamic = 'force-dynamic'
 
 export default function HomePage() {
   return (
@@ -7,27 +10,21 @@ export default function HomePage() {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-[#2a2a2a] bg-[#0a0a0a]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#22c55e] flex items-center justify-center font-bold text-black text-sm">GP</div>
-            <div>
-              <div className="font-bold text-white text-sm leading-tight">GoldenPegasus</div>
-              <div className="text-[10px] text-[#71717a] leading-tight">IT Consulting & Services LLC</div>
-            </div>
-          </div>
+          <BrandLogo href="/" size="md" subtitle="IT Consulting & Services LLC" />
           <div className="hidden md:flex items-center gap-8">
-            <a href="#search" className="text-sm text-[#a1a1aa] hover:text-[#22c55e] transition-colors">Search</a>
+            
             <a href="#features" className="text-sm text-[#a1a1aa] hover:text-[#22c55e] transition-colors">Features</a>
             <a href="#about" className="text-sm text-[#a1a1aa] hover:text-[#22c55e] transition-colors">About</a>
             <a href="#security" className="text-sm text-[#a1a1aa] hover:text-[#22c55e] transition-colors">Security</a>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/admin-login" className="text-sm text-[#a1a1aa] hover:text-[#22c55e] transition-colors px-4 py-2">
+          <div className="flex items-center gap-2">
+            <Link href="/admin-login" className="hidden sm:block text-xs bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-red-500/20">
               Admin Login
             </Link>
-            <Link href="/login" className="text-sm text-[#a1a1aa] hover:text-white transition-colors px-4 py-2 rounded-lg border border-[#2a2a2a] hover:border-[#3a3a3a]">
-              Log In
+            <Link href="/login" className="text-xs bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-green-500/20">
+              Employee Login
             </Link>
-            <Link href="/signup" className="text-sm bg-[#22c55e] hover:bg-[#16a34a] text-black font-semibold px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-green-500/20">
+            <Link href="/signup" className="text-xs border border-[#2a2a2a] hover:border-[#3a3a3a] text-white font-semibold px-4 py-2 rounded-lg transition-all duration-200 ml-1">
               Get Started
             </Link>
           </div>
@@ -35,10 +32,10 @@ export default function HomePage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6 text-center relative">
-        {/* Background glow */}
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-[#22c55e]/5 rounded-full blur-3xl pointer-events-none" />
-
+      <section
+        className="pt-32 pb-20 px-6 text-center relative bg-cover bg-center"
+        style={{ backgroundImage: "linear-gradient(180deg, rgba(10,10,10,.42), #0a0a0a 88%), url('/golden-pegasus-landing-bg.svg')" }}
+      >
         <div className="max-w-5xl mx-auto relative">
           <div className="inline-flex items-center gap-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-full px-4 py-1.5 text-xs text-[#22c55e] font-medium mb-8">
             <span className="w-1.5 h-1.5 bg-[#22c55e] rounded-full animate-pulse" />
@@ -57,10 +54,10 @@ export default function HomePage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/signup" className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-8 py-4 rounded-xl text-base transition-all duration-200 hover:shadow-xl hover:shadow-green-500/25 hover:-translate-y-0.5">
-              Start for Free →
+              Start Free Trial →
             </Link>
-            <Link href="/login" className="border border-[#2a2a2a] hover:border-[#22c55e]/50 text-white font-semibold px-8 py-4 rounded-xl text-base transition-all duration-200 hover:bg-[#1a1a1a]">
-              Sign In
+            <Link href="#features" className="border border-[#2a2a2a] hover:border-[#3a3a3a] text-white font-semibold px-8 py-4 rounded-xl text-base transition-all duration-200 hover:bg-[#1a1a1a]">
+              View Features
             </Link>
           </div>
         </div>
@@ -83,8 +80,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Public Search Section */}
-      <PublicSearch />
+
 
       {/* Features Section */}
       <section id="features" className="py-24 px-6">
@@ -174,7 +170,7 @@ export default function HomePage() {
       <footer className="border-t border-[#2a2a2a] py-8 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded bg-[#22c55e] flex items-center justify-center text-black font-bold text-xs">GP</div>
+            <BrandLogo href="/" variant="mark" size="sm" />
             <span className="text-sm text-[#71717a]">© 2025 GoldenPegasus IT Consulting & Services LLC. All rights reserved.</span>
           </div>
           <div className="flex gap-6 text-sm text-[#71717a]">

@@ -1,0 +1,32 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1920" height="1080" fill="#080808"/>
+  <defs>
+    <radialGradient id="goldGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1320 305) rotate(134) scale(790 430)">
+      <stop stop-color="#F8C823" stop-opacity=".28"/>
+      <stop offset=".46" stop-color="#B88912" stop-opacity=".1"/>
+      <stop offset="1" stop-color="#080808" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="greenGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(615 250) rotate(49) scale(560 320)">
+      <stop stop-color="#22C55E" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#080808" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lineFade" x1="420" y1="760" x2="1680" y2="160" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8C823" stop-opacity="0"/>
+      <stop offset=".45" stop-color="#F8C823" stop-opacity=".32"/>
+      <stop offset="1" stop-color="#F8C823" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#goldGlow)"/>
+  <rect width="1920" height="1080" fill="url(#greenGlow)"/>
+  <path d="M1420 212L1694 78L1528 338L1241 424L1132 306L1420 212Z" stroke="#F8C823" stroke-opacity=".18" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M1160 309L1510 146" stroke="#F8C823" stroke-opacity=".18" stroke-width="18" stroke-linecap="round"/>
+  <path d="M1251 422L1588 318" stroke="#F8C823" stroke-opacity=".13" stroke-width="18" stroke-linecap="round"/>
+  <path d="M1329 504L1545 442" stroke="#F8C823" stroke-opacity=".1" stroke-width="18" stroke-linecap="round"/>
+  <path d="M424 766C686 617 960 546 1244 503C1450 472 1598 393 1742 274" stroke="url(#lineFade)" stroke-width="2"/>
+  <path d="M366 865C687 682 1019 612 1347 555C1509 527 1649 462 1812 344" stroke="url(#lineFade)" stroke-width="2"/>
+  <g opacity=".2">
+    <path d="M0 840H1920" stroke="#FFFFFF" stroke-opacity=".08"/>
+    <path d="M0 900H1920" stroke="#FFFFFF" stroke-opacity=".05"/>
+    <path d="M0 960H1920" stroke="#FFFFFF" stroke-opacity=".04"/>
+  </g>
+</svg>

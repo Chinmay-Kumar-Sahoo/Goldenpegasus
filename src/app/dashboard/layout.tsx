@@ -9,7 +9,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('full_name, email, role').eq('id', user.id).single()
+  // Strictly enforce email confirmation
+  if (!user.email_confirmed_at) {
+    redirect('/login?error=Please confirm your email address first.')
+  }
+
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('full_name, email, role').eq('id', user.id).single()
+  
+  if (profileError || !profile) {
+    redirect('/login?error=Account setup incomplete. Please contact support.')
+  }
   
   // Robust name fetching
   const displayName = profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Employee'

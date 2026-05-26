@@ -15,11 +15,15 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, {
+                ...options,
+                path: '/',
+                sameSite: 'lax',
+                secure: process.env.NODE_ENV === 'production',
+              })
             )
           } catch {
             // The `setAll` method is called from a Server Component.
-            // This can be ignored if you have middleware refreshing sessions.
           }
         },
       },

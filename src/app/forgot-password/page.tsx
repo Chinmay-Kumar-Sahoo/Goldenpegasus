@@ -1,89 +1,180 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import BackHomeNav from '@/components/BackHomeNav'
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import BackHomeNav from "@/components/BackHomeNav";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  // Initialize page and check for pre-filled email
+  useEffect(() => {
+    const initializePage = async () => {
+      if (typeof window === "undefined") return;
+
+      let userEmail = "";
+
+      // Try to get logged-in user's email from Supabase
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user?.email) {
+        userEmail = user.email;
+        setEmail(userEmail);
+      }
+
+      // Also check localStorage for email from signup
+      const storedEmail = localStorage.getItem("signup_email");
+      if (storedEmail && !userEmail) {
+        setEmail(storedEmail);
+      }
+    };
+
+    initializePage();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    const supabase = createClient()
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-    if (resetError) {
-      setError(resetError.message)
-    } else {
-      setSent(true)
+    e.preventDefault();
+    setError("");
+    setMessage("");
+
+    if (!email) {
+      setError("Please enter your email address.");
+      return;
     }
-    setLoading(false)
-  }
+
+    setLoading(true);
+
+    const supabase = createClient();
+
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        {
+          redirectTo: `${window.location.origin}/auth/verify`,
+        },
+      );
+
+      if (resetError) {
+        setError(resetError.message);
+        setLoading(false);
+        return;
+      }
+
+      setSubmitted(true);
+      setMessage(
+        `Password reset link sent! Check your email at ${email} for the reset link. The link expires in 24 hours.`,
+      );
+      setLoading(false);
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred.");
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-4 py-12">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-[#22c55e]/5 rounded-full blur-3xl pointer-events-none" />
+
       <div className="w-full max-w-md relative">
         <div className="flex justify-center">
           <BackHomeNav />
         </div>
+
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[#22c55e] flex items-center justify-center font-bold text-black">GP</div>
-            <span className="font-bold text-white">GoldenPegasus</span>
-          </Link>
+          <BrandLogo href="/" size="md" className="mb-6" />
           <h1 className="text-2xl font-bold text-white">Reset your password</h1>
-          <p className="text-sm text-[#71717a] mt-1">Enter your email to receive a reset link</p>
+          <p className="text-sm text-[#71717a] mt-1">
+            {submitted
+              ? "Check your email for the reset link"
+              : "Enter your email to receive a reset link"}
+          </p>
         </div>
 
         <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-8">
-          {sent ? (
-            <div className="text-center">
-              <div className="w-16 h-16 bg-[#22c55e]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📧</div>
-              <h2 className="text-lg font-semibold text-white mb-2">Check your email</h2>
-              <p className="text-sm text-[#71717a]">
-                We&apos;ve sent a password reset link to <span className="text-white font-medium">{email}</span>.
-                The link will expire in 1 hour.
+          {submitted ? (
+            <div className="text-center space-y-4">
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-green-400">
+                {message}
+              </div>
+              <p className="text-sm text-[#a1a1aa]">
+                Click the link in your email to reset your password. The link
+                expires in 24 hours.
               </p>
-              <Link href="/login" className="inline-block mt-6 text-sm text-[#22c55e] hover:text-[#4ade80] transition-colors">
-                ← Back to login
-              </Link>
+              {email && (
+                <div className="pt-4">
+                  <p className="text-xs text-[#71717a] mb-3">Email sent to:</p>
+                  <p className="text-sm font-mono text-[#22c55e] bg-[#1a1a1a] px-4 py-2 rounded-xl break-all">
+                    {email}
+                  </p>
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  setSubmitted(false);
+                  setEmail("");
+                  setMessage("");
+                }}
+                className="w-full mt-6 bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold py-3 rounded-xl text-sm transition-all duration-200 hover:shadow-lg hover:shadow-green-500/20"
+              >
+                Send Another Link
+              </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5" htmlFor="forgot-email">Email address</label>
+                <label
+                  className="block text-sm font-medium text-[#a1a1aa] mb-1.5"
+                  htmlFor="email"
+                >
+                  Email address
+                </label>
                 <input
-                  id="forgot-email"
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  placeholder="you@example.com"
+                  placeholder="your@email.com"
                   className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60 focus:ring-1 focus:ring-[#22c55e]/30 transition-all"
                 />
               </div>
+
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">
+                  {error}
+                </div>
               )}
-              <button type="submit" disabled={loading}
-                className="w-full bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold py-3 rounded-xl text-sm transition-all duration-200">
-                {loading ? 'Sending...' : 'Send Reset Link'}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold py-3 rounded-xl text-sm transition-all duration-200 hover:shadow-lg hover:shadow-green-500/20"
+              >
+                {loading ? "Sending..." : "Send Reset Link"}
               </button>
-              <div className="text-center">
-                <Link href="/login" className="text-sm text-[#71717a] hover:text-[#22c55e] transition-colors">← Back to login</Link>
-              </div>
             </form>
           )}
         </div>
+
+        <p className="text-center text-sm text-[#71717a] mt-6">
+          Remember your password?{" "}
+          <Link
+            href="/login"
+            className="text-[#22c55e] hover:text-[#4ade80] font-medium transition-colors"
+          >
+            Sign in
+          </Link>
+        </p>
       </div>
     </div>
-  )
+  );
 }

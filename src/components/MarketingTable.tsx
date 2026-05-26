@@ -26,7 +26,48 @@ interface MarketingRecord {
   interviewer_email: string | null
   notes: string | null
   created_at: string
+  employee_name?: string | null
+  last_reminder_sent_at?: string | null
 }
+
+type MarketingImportField =
+  | 'name'
+  | 'date'
+  | 'recruiter_name'
+  | 'recruiter_email'
+  | 'organization_name'
+  | 'implementation_partner'
+  | 'end_client'
+  | 'status'
+  | 'project_start_date'
+  | 'project_end_date'
+  | 'interview_date'
+  | 'interview_type'
+  | 'client_name'
+  | 'client_email'
+  | 'implementation_poc_email'
+  | 'interviewer_email'
+  | 'notes'
+
+const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDate?: boolean }> = [
+  { key: 'name', labels: ['Name', 'Candidate Name'] },
+  { key: 'date', labels: ['Date'], isDate: true },
+  { key: 'status', labels: ['Status'] },
+  { key: 'recruiter_name', labels: ['Recruiter', 'Recruiter Name'] },
+  { key: 'recruiter_email', labels: ['Recruiter Email'] },
+  { key: 'organization_name', labels: ['Organization', 'Organization Name'] },
+  { key: 'implementation_partner', labels: ['Implementation Partner'] },
+  { key: 'end_client', labels: ['End Client'] },
+  { key: 'interview_date', labels: ['Interview Date'], isDate: true },
+  { key: 'interview_type', labels: ['Interview Type'] },
+  { key: 'project_start_date', labels: ['Project Start Date'], isDate: true },
+  { key: 'project_end_date', labels: ['Project End Date'], isDate: true },
+  { key: 'client_name', labels: ['Client Name'] },
+  { key: 'client_email', labels: ['Client Email'] },
+  { key: 'implementation_poc_email', labels: ['Implementation POC Email'] },
+  { key: 'interviewer_email', labels: ['Interviewer Email'] },
+  { key: 'notes', labels: ['Notes'] },
+]
 
 const STATUS_COLORS: Record<string, string> = {
   active: 'bg-green-500/10 text-green-400 border-green-500/20',
@@ -36,8 +77,10 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function MarketingPage({ isAdmin = false, readOnly = false }: { isAdmin?: boolean; readOnly?: boolean }) {
+  const showEmployeeColumn = isAdmin || readOnly
   const supabaseRef = useRef(createClient())
   const supabase = supabaseRef.current
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [records, setRecords] = useState<MarketingRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -45,6 +88,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<MarketingRecord | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -67,7 +111,49 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
       query = query.eq('owner_id', userId)
     }
     const { data } = await query
-    setRecords(data || [])
+    const marketingRecords = data || []
+    const ownerIds = Array.from(new Set(marketingRecords.map(record => record.owner_id).filter(Boolean)))
+
+    let ownerNames: Record<string, string> = {}
+    if (ownerIds.length > 0) {
+      const [{ data: profiles }, { data: employees }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email').in('id', ownerIds),
+        supabase.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
+      ])
+
+      ownerNames = Object.fromEntries((profiles || []).map(profile => [
+        profile.id,
+        profile.full_name || profile.email || 'Unknown employee',
+      ]))
+
+      for (const employee of employees || []) {
+        if (employee.user_id) {
+          ownerNames[employee.user_id] = employee.full_name || employee.email || ownerNames[employee.user_id] || 'Unknown employee'
+        }
+      }
+    }
+
+    let lastReminderByRecord: Record<string, string> = {}
+    if (isAdmin && marketingRecords.length > 0) {
+      const { data: reminderLogs } = await supabase
+        .from('marketing_reminder_logs')
+        .select('marketing_record_id, sent_at')
+        .is('error', null)
+        .in('marketing_record_id', marketingRecords.map(record => record.id))
+        .order('sent_at', { ascending: false })
+
+      for (const log of reminderLogs || []) {
+        if (!lastReminderByRecord[log.marketing_record_id]) {
+          lastReminderByRecord[log.marketing_record_id] = log.sent_at
+        }
+      }
+    }
+
+    setRecords(marketingRecords.map(record => ({
+      ...record,
+      employee_name: ownerNames[record.owner_id] || 'Unknown employee',
+      last_reminder_sent_at: lastReminderByRecord[record.id] || null,
+    })))
     setLoading(false)
   }, [supabase, isAdmin, readOnly])
 
@@ -136,9 +222,98 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
     fetchRecords()
   }
 
+  const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+  const formatExcelDate = (value: unknown, XLSX: any) => {
+    if (!value) return null
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value.toISOString().slice(0, 10)
+    }
+    if (typeof value === 'number') {
+      const parsed = XLSX.SSF.parse_date_code(value)
+      if (parsed) {
+        return `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`
+      }
+    }
+    const text = String(value).trim()
+    if (!text) return null
+    const parsed = new Date(text)
+    return Number.isNaN(parsed.getTime()) ? text : parsed.toISOString().slice(0, 10)
+  }
+
+  const handleImportExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setImporting(true)
+    setError('')
+
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        throw new Error('Please sign in before importing marketing records.')
+      }
+
+      const XLSX = await import('xlsx')
+      const buffer = await file.arrayBuffer()
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+      const firstSheetName = workbook.SheetNames[0]
+      const sheet = workbook.Sheets[firstSheetName]
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
+
+      if (rows.length === 0) {
+        throw new Error('The selected Excel file does not contain any rows.')
+      }
+
+      const aliasToField = new Map<string, MarketingImportField>()
+      for (const column of IMPORT_COLUMNS) {
+        aliasToField.set(normalizeHeader(column.key), column.key)
+        for (const label of column.labels) {
+          aliasToField.set(normalizeHeader(label), column.key)
+        }
+      }
+
+      const dateFields = new Set(IMPORT_COLUMNS.filter(column => column.isDate).map(column => column.key))
+      const importRows = rows.map(row => {
+        const normalizedRow = new Map<MarketingImportField, unknown>()
+        for (const [header, value] of Object.entries(row)) {
+          const field = aliasToField.get(normalizeHeader(header))
+          if (field) normalizedRow.set(field, value)
+        }
+
+        const record = Object.fromEntries(IMPORT_COLUMNS.map(column => {
+          const rawValue = normalizedRow.get(column.key)
+          const value = dateFields.has(column.key)
+            ? formatExcelDate(rawValue, XLSX)
+            : String(rawValue ?? '').trim() || null
+          return [column.key, value]
+        })) as Record<MarketingImportField, string | null>
+
+        return {
+          ...record,
+          name: record.name || '',
+          owner_id: user.id,
+        }
+      })
+
+      const { error: importError } = await supabase.from('marketing_records').insert(importRows)
+      if (importError) throw importError
+
+      toast.success(`Imported ${importRows.length} marketing record${importRows.length === 1 ? '' : 's'}`)
+      fetchRecords()
+    } catch (err: any) {
+      const message = err.message || 'Failed to import Excel file.'
+      setError(message)
+      toast.error(message)
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const exportCSV = () => {
-    const headers = ['Name', 'Date', 'Status', 'Recruiter', 'Recruiter Email', 'Organization', 'Implementation Partner', 'End Client', 'Interview Date', 'Interviewer Email']
-    const rows = filtered.map(r => [r.name, r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.end_client, r.interview_date, r.interviewer_email])
+    const headers = ['Name', 'Date', 'Status', 'Recruiter', 'Recruiter Email', 'Organization', 'Implementation Partner', 'End Client', 'Interview Date', 'Interviewer Email', 'Notes', ...(showEmployeeColumn ? ['Employee'] : []), ...(isAdmin ? ['Last Reminder'] : [])]
+    const rows = filtered.map(r => [r.name, r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.end_client, r.interview_date, r.interviewer_email, r.notes, ...(showEmployeeColumn ? [r.employee_name] : []), ...(isAdmin ? [r.last_reminder_sent_at] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -157,11 +332,30 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
     <div>
       <PageHeader title={isAdmin ? "All Marketing" : (readOnly ? "All Marketing" : "My Marketing")} subtitle={readOnly ? 'Read-only view of all marketing records' : 'Manage marketing records'}>
         {!readOnly && (
-          <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">
-            + Add Record
-          </button>
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleImportExcel}
+              suppressHydrationWarning
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              suppressHydrationWarning
+              className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all disabled:opacity-50"
+              title="Import Excel columns such as Name, Date, Status, Recruiter, Organization, End Client, Interview Date, Interviewer Email, and Notes"
+            >
+              {importing ? 'Importing...' : 'Import Excel'}
+            </button>
+            <button onClick={() => openModal()} suppressHydrationWarning className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">
+              + Add Record
+            </button>
+          </>
         )}
-        <button onClick={exportCSV} className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all">
+        <button onClick={exportCSV} suppressHydrationWarning className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all">
           Export CSV
         </button>
       </PageHeader>
@@ -169,8 +363,10 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
         <input type="text" placeholder="Search records..." value={search} onChange={e => setSearch(e.target.value)}
+          suppressHydrationWarning
           className="flex-1 min-w-[200px] bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60" />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          suppressHydrationWarning
           className="bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
           <option value="all">All Status</option>
           <option value="active">Active</option>
@@ -186,7 +382,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a2a]">
-                {['Name', 'Date', 'Status', 'Recruiter', 'Recruiter Email', 'Organization', 'Implementation Partner', 'End Client', 'Interview Date', 'Interviewer Email', !readOnly ? 'Actions' : ''].filter(Boolean).map(h => (
+                {['Name', 'Date', 'Status', 'Recruiter', 'Recruiter Email', 'Organization', 'Implementation Partner', 'End Client', 'Interview Date', 'Interviewer Email', 'Notes', showEmployeeColumn ? 'Employee' : '', isAdmin ? 'Last Reminder' : '', !readOnly ? 'Actions' : ''].filter(Boolean).map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -195,13 +391,13 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 11 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0) }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
+                <tr><td colSpan={11 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
                 filtered.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
@@ -219,6 +415,15 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.end_client || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interview_date || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interviewer_email || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa] max-w-[200px] truncate" title={rec.notes || ''}>{rec.notes || '—'}</td>
+                    {showEmployeeColumn && (
+                      <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
+                    )}
+                    {isAdmin && (
+                      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">
+                        {rec.last_reminder_sent_at ? new Date(rec.last_reminder_sent_at).toLocaleString() : '—'}
+                      </td>
+                    )}
                     {!readOnly && (
                       <td className="px-4 py-3">
                         {canEdit(rec) && (

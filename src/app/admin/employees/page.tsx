@@ -6,11 +6,13 @@ import PageHeader from '@/components/PageHeader'
 
 interface Employee {
   id: string
-  employee_id: string
+  employee_id: string | null
   full_name: string
   email: string
   contact: string | null
   designation: string | null
+  role: string
+  email_confirmed_at: string | null
   created_at: string
 }
 
@@ -36,11 +38,17 @@ export default function AdminEmployeesPage() {
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('employees')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setEmployees(data || [])
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      const res = await fetch('/api/admin/employees', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const json = await res.json()
+      setEmployees(json.users || [])
+    } catch {
+      setEmployees([])
+    }
     setLoading(false)
   }, [supabase])
 
@@ -51,7 +59,7 @@ export default function AdminEmployeesPage() {
   const openModal = (emp?: Employee) => {
     if (emp) {
       setEditing(emp)
-      setForm({ employee_id: emp.employee_id, full_name: emp.full_name, email: emp.email, contact: emp.contact || '', designation: emp.designation || '' })
+      setForm({ employee_id: emp.employee_id || '', full_name: emp.full_name, email: emp.email, contact: emp.contact || '', designation: emp.designation || '' })
     } else {
       setEditing(null)
       setForm({ employee_id: '', full_name: '', email: '', contact: '', designation: '' })
@@ -88,7 +96,7 @@ export default function AdminEmployeesPage() {
   const filtered = employees.filter(e =>
     e.full_name.toLowerCase().includes(search.toLowerCase()) ||
     e.email.toLowerCase().includes(search.toLowerCase()) ||
-    e.employee_id.toLowerCase().includes(search.toLowerCase())
+    (e.employee_id || '').toLowerCase().includes(search.toLowerCase())
   )
 
   return (
@@ -116,7 +124,7 @@ export default function AdminEmployeesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a2a]">
-                {['Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Actions'].map(h => (
+                {['Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Status', 'Actions'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -125,21 +133,28 @@ export default function AdminEmployeesPage() {
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 6 }).map((_, j) => (
+                    {Array.from({ length: 7 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-12 text-center text-[#71717a] text-sm">No employees found.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-[#71717a] text-sm">No employees found.</td></tr>
               ) : (
                 filtered.map(emp => (
                   <tr key={emp.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                    <td className="px-4 py-3 text-sm text-[#22c55e] font-mono">{emp.employee_id}</td>
+                    <td className="px-4 py-3 text-sm text-[#22c55e] font-mono">{emp.employee_id || '—'}</td>
                     <td className="px-4 py-3 text-sm text-white font-medium">{emp.full_name}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.email}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.contact || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.designation || '—'}</td>
+                    <td className="px-4 py-3">
+                      {emp.email_confirmed_at ? (
+                        <span className="text-[10px] px-2 py-1 rounded-full bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 font-bold uppercase tracking-wider">Verified</span>
+                      ) : (
+                        <span className="text-[10px] px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-bold uppercase tracking-wider">Unverified</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button onClick={() => openModal(emp)} className="text-xs bg-[#1a1a1a] hover:bg-[#22c55e]/10 hover:text-[#22c55e] border border-[#2a2a2a] px-3 py-1 rounded-lg transition-all">Edit</button>

@@ -1,28 +1,32 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import PageHeader from '@/components/PageHeader'
 import Link from 'next/link'
+import { formatDateTime } from '@/lib/format'
 
 export const metadata = { title: 'Admin Dashboard | GoldenPegasus' }
 
 export default async function AdminPage() {
   const supabase = await createClient()
 
-  const [
-    { count: empCount },
-    { count: mktCount },
-    { count: clientCount },
-    { count: tableCount },
-    { data: recentLogs },
-  ] = await Promise.all([
-    supabase.from('employees').select('*', { count: 'exact', head: true }),
-    supabase.from('marketing_records').select('*', { count: 'exact', head: true }),
-    supabase.from('client_records').select('*', { count: 'exact', head: true }),
-    supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }),
-    supabase.from('audit_logs').select('action, entity_type, created_at').order('created_at', { ascending: false }).limit(5),
-  ])
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  const supabaseAdmin = serviceRoleKey ? createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceRoleKey,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  ) : null
+
+  const [{ data: authUsers }, { count: mktCount }, { count: clientCount }, { count: tableCount }, { data: recentLogs }] =
+    await Promise.all([
+      supabaseAdmin ? supabaseAdmin.auth.admin.listUsers() : Promise.resolve({ data: { users: [] } }),
+      supabase.from('marketing_records').select('*', { count: 'exact', head: true }),
+      supabase.from('Candidate_records').select('*', { count: 'exact', head: true }),
+      supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }),
+      supabase.from('audit_logs').select('action, entity_type, created_at').order('created_at', { ascending: false }).limit(5),
+    ])
 
   const stats = [
-    { label: 'Employees', value: empCount ?? 0, icon: '👥', href: '/admin/employees', color: 'blue' },
+    { label: 'Employees', value: authUsers?.users?.length ?? 0, icon: '👥', href: '/admin/employees' },
     { label: 'Marketing Records', value: mktCount ?? 0, icon: '📈', href: '/admin/marketing', color: 'green' },
     { label: 'Client Records', value: clientCount ?? 0, icon: '🤝', href: '/admin/clients', color: 'purple' },
     { label: 'Dynamic Tables', value: tableCount ?? 0, icon: '🏗️', href: '/admin/tables', color: 'yellow' },
@@ -83,7 +87,7 @@ export default async function AdminPage() {
                     <span className="text-white font-medium">{log.action}</span>
                     {log.entity_type && <span className="text-[#71717a]"> on {log.entity_type}</span>}
                     <div className="text-xs text-[#3a3a3a] mt-0.5">
-                      {new Date(log.created_at).toLocaleString()}
+                      {formatDateTime(log.created_at)}
                     </div>
                   </div>
                 </div>
