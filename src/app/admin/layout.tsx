@@ -9,13 +9,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   if (!user) redirect('/admin-login')
   
-  // Strictly enforce email confirmation
   if (!user.email_confirmed_at) {
     redirect('/admin-login?error=Please confirm your admin email address first.')
   }
 
-  const { data: profile, error: profileError } = await supabase.from('profiles').select('full_name, email, role, must_change_password').eq('id', user.id).single()
-  const { data: adminProfile } = await supabase.from('admin_profiles').select('status').eq('user_id', user.id).maybeSingle()
+  const [{ data: profile, error: profileError }, { data: adminProfile }] = await Promise.all([
+    supabase.from('profiles').select('full_name, email, role, must_change_password').eq('id', user.id).single(),
+    supabase.from('admin_profiles').select('status').eq('user_id', user.id).maybeSingle(),
+  ])
   
   if (profileError || !profile || profile.role !== 'admin' || adminProfile?.status === 'disabled') {
     redirect('/login')

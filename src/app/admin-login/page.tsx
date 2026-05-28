@@ -6,8 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import BackHomeNav from "@/components/BackHomeNav";
 import BrandLogo from "@/components/BrandLogo";
 
-export const dynamic = "force-dynamic";
-
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
