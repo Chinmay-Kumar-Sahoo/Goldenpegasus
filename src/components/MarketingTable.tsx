@@ -312,8 +312,8 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
   }
 
   const exportCSV = () => {
-    const headers = ['Name', 'Date', 'Status', 'Recruiter', 'Recruiter Email', 'Organization', 'Implementation Partner', 'End Client', 'Interview Date', 'Interviewer Email', 'Notes', ...(showEmployeeColumn ? ['Employee'] : []), ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.end_client, r.interview_date, r.interviewer_email, r.notes, ...(showEmployeeColumn ? [r.employee_name] : []), ...(isAdmin ? [r.last_reminder_sent_at] : [])])
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Of Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date, r.interviewer_email, r.notes, ...(isAdmin ? [r.last_reminder_sent_at] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -382,7 +382,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a2a]">
-                {['Name', 'Date', 'Status', 'Recruiter', 'Recruiter Email', 'Organization', 'Implementation Partner', 'End Client', 'Interview Date', 'Interviewer Email', 'Notes', showEmployeeColumn ? 'Employee' : '', isAdmin ? 'Last Reminder' : '', !readOnly ? 'Actions' : ''].filter(Boolean).map(h => (
+                {['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Of Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Comments', isAdmin ? 'Last Reminder' : '', !readOnly ? 'Actions' : ''].filter(Boolean).map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -391,17 +391,20 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 11 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0) }).map((_, j) => (
+                    {Array.from({ length: 12 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0) }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={11 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
+                <tr><td colSpan={12 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
                 filtered.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
                     <td className="px-4 py-3 text-sm text-white font-medium">{rec.name}</td>
+                    {showEmployeeColumn && (
+                      <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
+                    )}
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.date || '—'}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'active'] || STATUS_COLORS.active}`}>
@@ -412,13 +415,11 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_email || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.organization_name || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_partner || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_poc_email || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.end_client || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interview_date || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interviewer_email || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] max-w-[200px] truncate" title={rec.notes || ''}>{rec.notes || '—'}</td>
-                    {showEmployeeColumn && (
-                      <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
-                    )}
                     {isAdmin && (
                       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">
                         {rec.last_reminder_sent_at ? new Date(rec.last_reminder_sent_at).toLocaleString() : '—'}
@@ -452,12 +453,12 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
             <h2 className="text-lg font-bold text-white mb-6">{editing ? 'Edit Record' : 'Add Marketing Record'}</h2>
             <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
               {[
-                { label: 'Name *', name: 'name', type: 'text', required: true, span: 2 },
-                { label: 'Date', name: 'date', type: 'date', span: 1 },
+                { label: 'Candidate Name *', name: 'name', type: 'text', required: true, span: 2 },
+                { label: 'Created Date', name: 'date', type: 'date', span: 1 },
                 { label: 'Status', name: 'status', type: 'select', options: ['active', 'pending', 'completed', 'closed'], span: 1 },
                 { label: 'Recruiter Name', name: 'recruiter_name', type: 'text', span: 1 },
                 { label: 'Recruiter Email', name: 'recruiter_email', type: 'email', span: 1 },
-                { label: 'Organization Name', name: 'organization_name', type: 'text', span: 1 },
+                { label: '2nd Of Recruiter', name: 'organization_name', type: 'text', span: 1 },
                 { label: 'Implementation Partner', name: 'implementation_partner', type: 'text', span: 1 },
                 { label: 'End Client', name: 'end_client', type: 'text', span: 1 },
                 { label: 'Interview Date', name: 'interview_date', type: 'date', span: 1 },
@@ -467,7 +468,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
                 { label: 'Client Email', name: 'client_email', type: 'email', span: 1 },
                 { label: 'Implementation POC Email', name: 'implementation_poc_email', type: 'email', span: 1 },
                 { label: 'Interviewer Email', name: 'interviewer_email', type: 'email', span: 1 },
-                { label: 'Notes', name: 'notes', type: 'textarea', span: 2 },
+                { label: 'Comments', name: 'notes', type: 'textarea', span: 2 },
               ].map(field => (
                 <div key={field.name} className={field.span === 2 ? 'col-span-2' : ''}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
