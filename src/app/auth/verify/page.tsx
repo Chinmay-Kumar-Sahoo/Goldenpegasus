@@ -42,9 +42,9 @@ function VerifyContent() {
         activeUser = data?.user;
 
         // If token_hash verification fails, try code exchange as fallback
-        if (authError && !code) {
+        if (authError && code) {
           const { error: codeError, data: codeData } =
-            await supabase.auth.exchangeCodeForSession(code as string);
+            await supabase.auth.exchangeCodeForSession(code);
           if (!codeError) {
             authError = null;
             activeUser = codeData?.user;
