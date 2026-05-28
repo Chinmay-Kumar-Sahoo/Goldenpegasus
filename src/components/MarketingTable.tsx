@@ -94,8 +94,8 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
   const [form, setForm] = useState({
     name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '',
     implementation_partner: '', end_client: '', status: 'active',
-    project_start_date: '', project_end_date: '', interview_date: '', interview_type: '',
-    client_name: '', client_email: '', implementation_poc_email: '', interviewer_email: '', notes: '',
+    project_start_date: '', project_end_date: '', interview_date: '',
+    implementation_poc_email: '', interviewer_email: '', notes: '',
   })
 
   const fetchRecords = useCallback(async () => {
@@ -183,13 +183,12 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
         implementation_partner: rec.implementation_partner || '', end_client: rec.end_client || '',
         status: rec.status || 'active', project_start_date: rec.project_start_date || '',
         project_end_date: rec.project_end_date || '', interview_date: rec.interview_date || '',
-        interview_type: rec.interview_type || '', client_name: rec.client_name || '',
-        client_email: rec.client_email || '', implementation_poc_email: rec.implementation_poc_email || '',
+        implementation_poc_email: rec.implementation_poc_email || '',
         interviewer_email: rec.interviewer_email || '', notes: rec.notes || '',
       })
     } else {
       setEditing(null)
-      setForm({ name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'active', project_start_date: '', project_end_date: '', interview_date: '', interview_type: '', client_name: '', client_email: '', implementation_poc_email: '', interviewer_email: '', notes: '' })
+      setForm({ name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'active', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '' })
     }
     setError('')
     setShowModal(true)
@@ -312,8 +311,8 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Of Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date, r.interviewer_email, r.notes, ...(isAdmin ? [r.last_reminder_sent_at] : [])])
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Of Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date, r.interviewer_email, r.project_start_date, r.notes, ...(isAdmin ? [r.last_reminder_sent_at] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -382,7 +381,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a2a]">
-                {['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Of Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Comments', isAdmin ? 'Last Reminder' : '', !readOnly ? 'Actions' : ''].filter(Boolean).map(h => (
+                {['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Of Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Comments', isAdmin ? 'Last Reminder' : '', !readOnly ? 'Actions' : ''].filter(Boolean).map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -391,13 +390,13 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 12 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0) }).map((_, j) => (
+                    {Array.from({ length: 13 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0) }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={12 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
+                <tr><td colSpan={13 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
                 filtered.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
@@ -419,6 +418,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.end_client || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interview_date || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interviewer_email || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.project_start_date || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] max-w-[200px] truncate" title={rec.notes || ''}>{rec.notes || '—'}</td>
                     {isAdmin && (
                       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">
@@ -427,12 +427,14 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
                     )}
                     {!readOnly && (
                       <td className="px-4 py-3">
-                        {canEdit(rec) && (
-                          <div className="flex gap-2">
+                        <div className="flex gap-2">
+                          {canEdit(rec) && (
                             <button onClick={() => openModal(rec)} className="text-xs bg-[#1a1a1a] hover:bg-[#22c55e]/10 hover:text-[#22c55e] border border-[#2a2a2a] px-3 py-1 rounded-lg transition-all">Edit</button>
+                          )}
+                          {isAdmin && (
                             <button onClick={() => handleDelete(rec.id)} className="text-xs bg-[#1a1a1a] hover:bg-red-500/10 hover:text-red-400 border border-[#2a2a2a] px-3 py-1 rounded-lg transition-all">Delete</button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -462,10 +464,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
                 { label: 'Implementation Partner', name: 'implementation_partner', type: 'text', span: 1 },
                 { label: 'End Client', name: 'end_client', type: 'text', span: 1 },
                 { label: 'Interview Date', name: 'interview_date', type: 'date', span: 1 },
-                { label: 'Interview Type', name: 'interview_type', type: 'text', span: 1 },
                 { label: 'Project Start Date', name: 'project_start_date', type: 'date', span: 1 },
-                { label: 'Client Name', name: 'client_name', type: 'text', span: 1 },
-                { label: 'Client Email', name: 'client_email', type: 'email', span: 1 },
                 { label: 'Implementation POC Email', name: 'implementation_poc_email', type: 'email', span: 1 },
                 { label: 'Interviewer Email', name: 'interviewer_email', type: 'email', span: 1 },
                 { label: 'Comments', name: 'notes', type: 'textarea', span: 2 },
