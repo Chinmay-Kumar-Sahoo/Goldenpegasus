@@ -81,6 +81,8 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
   const supabaseRef = useRef(createClient())
   const supabase = supabaseRef.current
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const exportMenuRef = useRef<HTMLDivElement | null>(null)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [records, setRecords] = useState<MarketingRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -171,6 +173,17 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
       supabase.removeChannel(channel)
     }
   }, [fetchRecords, supabase])
+
+  useEffect(() => {
+    if (!showExportMenu) return
+    const handleClick = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showExportMenu])
 
   const canEdit = (record: MarketingRecord) => !readOnly && (isAdmin || record.owner_id === currentUserId)
 
@@ -317,6 +330,26 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = 'marketing_records.csv'; a.click()
+    setShowExportMenu(false)
+  }
+
+  const exportPDF = async () => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const doc = new jsPDF({ orientation: 'landscape' })
+
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Of Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.date || '', r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', r.interview_date || '', r.interviewer_email || '', r.project_start_date || '', r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? new Date(r.last_reminder_sent_at).toLocaleString() : ''] : [])])
+
+    autoTable(doc, {
+      head: [headers],
+      body: data,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [34, 197, 94] },
+    })
+
+    doc.save('marketing_records.pdf')
+    setShowExportMenu(false)
   }
 
   const filtered = records.filter(r => {
@@ -354,9 +387,17 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
             </button>
           </>
         )}
-        <button onClick={exportCSV} suppressHydrationWarning className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all">
-          Export CSV
-        </button>
+        <div ref={exportMenuRef} className="relative">
+          <button onClick={() => setShowExportMenu(v => !v)} suppressHydrationWarning className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all">
+            Export ▾
+          </button>
+          {showExportMenu && (
+            <div className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden z-50 min-w-[120px] shadow-xl">
+              <button onClick={exportCSV} suppressHydrationWarning className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">CSV</button>
+              <button onClick={exportPDF} suppressHydrationWarning className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">PDF</button>
+            </div>
+          )}
+        </div>
       </PageHeader>
 
       {/* Filters */}
