@@ -1,8 +1,13 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
+
+const getCookieStore = cache(async () => {
+  return await cookies()
+})
 
 export async function createClient() {
-  const cookieStore = await cookies()
+  const cookieStore = await getCookieStore()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,7 +28,6 @@ export async function createClient() {
               })
             )
           } catch {
-            // The `setAll` method is called from a Server Component.
           }
         },
       },
