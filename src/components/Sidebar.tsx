@@ -19,6 +19,7 @@ interface SidebarProps {
 
 const adminNav: NavItem[] = [
   { label: 'Overview', href: '/admin', icon: '📊' },
+  { label: 'Admin', href: '/admin/admins', icon: '🔑' },
   { label: 'Employees', href: '/admin/employees', icon: '👥' },
   { label: 'All Marketing', href: '/admin/marketing', icon: '📈' },
   { label: 'Candidate Records', href: '/admin/clients', icon: '🤝' },
