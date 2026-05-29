@@ -3,7 +3,11 @@
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 
-export default function BackHomeNav() {
+type BackHomeNavProps = {
+  hideBack?: boolean
+}
+
+export default function BackHomeNav({ hideBack = false }: BackHomeNavProps) {
   const router = useRouter()
   const pathname = usePathname()
 
@@ -28,27 +32,31 @@ export default function BackHomeNav() {
   return (
     <div className="flex items-center gap-2 mb-6">
       {/* Back Button */}
-      <button
-        type="button"
-        onClick={handleBack}
-        suppressHydrationWarning
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] text-[#a1a1aa] hover:text-white hover:border-[#3a3a3a] hover:bg-[#222222] transition-all duration-200 text-xs font-medium group"
-        aria-label="Go back"
-      >
-        <svg
-          className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2.5}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      {!hideBack && (
+        <>
+          <button
+            type="button"
+            onClick={handleBack}
+            suppressHydrationWarning
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] text-[#a1a1aa] hover:text-white hover:border-[#3a3a3a] hover:bg-[#222222] transition-all duration-200 text-xs font-medium group"
+            aria-label="Go back"
+          >
+            <svg
+              className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
 
-      {/* Divider */}
-      <span className="text-[#2a2a2a] text-sm select-none">/</span>
+          {/* Divider */}
+          <span className="text-[#2a2a2a] text-sm select-none">/</span>
+        </>
+      )}
 
       {/* Home Button */}
       <Link

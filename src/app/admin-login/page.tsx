@@ -85,6 +85,10 @@ export default function AdminLoginPage() {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative">
+        <div className="flex justify-center">
+          <BackHomeNav hideBack={true} />
+        </div>
+
         <div className="text-center mb-8 flex flex-col items-center">
           <BrandLogo href="/" size="lg" className="mb-2" subtitle="IT Consulting & Services LLC" />
           <h1 className="text-2xl font-bold text-white">
