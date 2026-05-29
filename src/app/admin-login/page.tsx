@@ -85,16 +85,8 @@ export default function AdminLoginPage() {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative">
-        <div className="flex justify-center">
-          <BackHomeNav />
-        </div>
-
-        <div className="text-center mb-8">
-          <BrandLogo href="/" size="md" className="mb-6" />
-          <div className="inline-flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-full px-4 py-1.5 text-xs text-red-400 font-medium mb-4">
-            <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
-            Admin Portal
-          </div>
+        <div className="text-center mb-8 flex flex-col items-center">
+          <BrandLogo href="/" size="lg" className="mb-2" subtitle="IT Consulting & Services LLC" />
           <h1 className="text-2xl font-bold text-white">
             Administrator Sign In
           </h1>

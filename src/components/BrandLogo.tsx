@@ -28,14 +28,14 @@ export default function BrandLogo({
   className = '',
 }: BrandLogoProps) {
   const image = (
-    <span className={`inline-flex items-center gap-3 ${className}`}>
+    <span className={`inline-flex flex-col items-center gap-1 ${className}`}>
       <img
         src={variant === 'mark' ? '/golden-pegasus-mark.svg' : '/golden-pegasus-logo.svg'}
         alt="Golden Pegasus"
-        className={`${variant === 'mark' ? markSizes[size] : lockupSizes[size]} object-contain`}
+        className={`${variant === 'mark' ? markSizes[size] : lockupSizes[size]} object-contain ${size === 'lg' ? 'scale-125 origin-bottom' : ''}`}
       />
       {subtitle && variant === 'lockup' && (
-        <span className="hidden sm:block text-[10px] font-medium leading-tight text-[#a1a1aa]">
+        <span className={`text-[12px] font-medium leading-tight text-[#a1a1aa] ${size === 'lg' ? 'mt-2 text-[14px]' : ''}`}>
           {subtitle}
         </span>
       )}
