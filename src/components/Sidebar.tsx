@@ -49,9 +49,8 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
     setLoggingOut(true)
     try {
       const supabase = createClient()
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: 'local' })
     } catch {
-      // signOut already handled clearing cookies
     }
     if (role === 'admin') {
       window.location.href = '/admin-login'

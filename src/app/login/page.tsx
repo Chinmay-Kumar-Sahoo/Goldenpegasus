@@ -53,7 +53,7 @@ export default function LoginPage() {
 
       // Check if email is confirmed
       if (!authData.user.email_confirmed_at) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         setError(
           "Please confirm your email before logging in."
         );
@@ -70,17 +70,14 @@ export default function LoginPage() {
         .single();
 
       if (profileError || !profile) {
-        // If profile doesn't exist but email is confirmed, something is wrong
-        // but we should still block them if we expect a profile.
-        // Actually, for a new confirmed user, the trigger should have created it.
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         setError("Account setup incomplete. Please contact support or try again.");
         setLoading(false);
         return;
       }
 
       if (profile.role === "admin") {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         setError("Administrators must use the Admin Login portal.");
         setLoading(false);
       } else {

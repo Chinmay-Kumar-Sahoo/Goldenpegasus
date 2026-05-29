@@ -100,40 +100,46 @@ export default function MarketingPage({ isAdmin = false, readOnly = false, curre
     implementation_poc_email: '', interviewer_email: '', notes: '',
   })
 
+  const timeout = (ms: number) => new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms)
+  )
+
   const fetchRecords = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
-      let userId = propUserId
-      if (!userId) {
-        const { data: { user } } = await supabase.auth.getUser()
-        userId = user?.id ?? null
-      }
+      const userId = propUserId
       setCurrentUserId(userId)
 
-      // "My Marketing" (isAdmin=false, readOnly=false) — only show own records
-      let query = supabase.from('marketing_records').select('*').order('created_at', { ascending: false })
+      const query = supabase.from('marketing_records').select('*').order('created_at', { ascending: false })
       if (!isAdmin && !readOnly && userId) {
-        query = query.eq('owner_id', userId)
+        query.eq('owner_id', userId)
       }
-      const { data } = await query
-      const marketingRecords = data || []
-      const ownerIds = Array.from(new Set(marketingRecords.map(record => record.owner_id).filter(Boolean)))
+      const { data, error: queryError } = await Promise.race([
+        query,
+        timeout(15000),
+      ]) as any
+      if (queryError) throw queryError
+      const marketingRecords: MarketingRecord[] = data || []
+      const ownerIds = Array.from(new Set(marketingRecords.map(r => r.owner_id).filter(Boolean)))
 
       let ownerNames: Record<string, string> = {}
       if (ownerIds.length > 0) {
-        const [{ data: profiles }, { data: employees }] = await Promise.all([
-          supabase.from('profiles').select('id, full_name, email').in('id', ownerIds),
-          supabase.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
-        ])
+        const [{ data: profiles }, { data: employees }] = await Promise.race([
+          Promise.all([
+            supabase.from('profiles').select('id, full_name, email').in('id', ownerIds),
+            supabase.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
+          ]),
+          timeout(15000),
+        ]) as any
 
-        ownerNames = Object.fromEntries((profiles || []).map(profile => [
-          profile.id,
-          profile.full_name || profile.email || 'Unknown employee',
+        ownerNames = Object.fromEntries((profiles || []).map((p: any) => [
+          p.id, p.full_name || p.email || 'Unknown employee',
         ]))
 
-        for (const employee of employees || []) {
-          if (employee.user_id) {
-            ownerNames[employee.user_id] = employee.full_name || employee.email || ownerNames[employee.user_id] || 'Unknown employee'
+        for (const e of (employees || []) as any[]) {
+          if (e.user_id && !ownerNames[e.user_id]) {
+            ownerNames[e.user_id] = e.full_name || e.email || 'Unknown employee'
           }
         }
       }
@@ -144,7 +150,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false, curre
           .from('marketing_reminder_logs')
           .select('marketing_record_id, sent_at')
           .is('error', null)
-          .in('marketing_record_id', marketingRecords.map(record => record.id))
+          .in('marketing_record_id', marketingRecords.map(r => r.id))
           .order('sent_at', { ascending: false })
 
         for (const log of reminderLogs || []) {
@@ -154,14 +160,19 @@ export default function MarketingPage({ isAdmin = false, readOnly = false, curre
         }
       }
 
-      setRecords(marketingRecords.map(record => ({
-        ...record,
-        employee_name: ownerNames[record.owner_id] || 'Unknown employee',
-        last_reminder_sent_at: lastReminderByRecord[record.id] || null,
+      setRecords(marketingRecords.map((rec: MarketingRecord) => ({
+        ...rec,
+        employee_name: ownerNames[rec.owner_id] || 'Unknown employee',
+        last_reminder_sent_at: lastReminderByRecord[rec.id] || null,
       })))
-    } catch (err) {
-      console.error('MarketingTable fetch error:', err)
-      toast.error('Failed to load records. Please check your connection.')
+    } catch (err: any) {
+      const message = err?.message || 'Failed to load records. Please check your connection.'
+      if (message.includes('timed out')) {
+        toast.error('Request timed out. Please try again or check your network connection.')
+      } else {
+        toast.error('Failed to load records. Please check your connection.')
+      }
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -444,6 +455,11 @@ export default function MarketingPage({ isAdmin = false, readOnly = false, curre
                     ))}
                   </tr>
                 ))
+              ) : error ? (
+                <tr><td colSpan={13 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0)} className="px-4 py-12 text-center">
+                  <div className="text-red-400 text-sm mb-1">Failed to load records</div>
+                  <div className="text-[#71717a] text-xs">{error.includes('timed') ? 'The request timed out. Try refreshing the page.' : 'Please check your connection and try again.'}</div>
+                </td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={13 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (

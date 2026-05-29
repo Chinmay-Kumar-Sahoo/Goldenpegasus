@@ -43,7 +43,7 @@ export default function AdminLoginPage() {
 
     // Step 2: Verify email confirmation
     if (!authData.user.email_confirmed_at) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
       setError("Please confirm your email before logging in as an administrator.");
       setLoading(false);
       return;
@@ -57,14 +57,14 @@ export default function AdminLoginPage() {
       .single();
 
     if (profileError || !profile) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
       setError("Could not verify account. Please contact support.");
       setLoading(false);
       return;
     }
 
     if (profile.role !== "admin") {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
       setError(
         "This portal is for administrators only. Please use the Employee Login.",
       );
