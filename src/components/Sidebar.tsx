@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
 import BrandLogo from '@/components/BrandLogo'
@@ -40,7 +40,6 @@ const employeeNav: NavItem[] = [
 
 export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
 
@@ -48,12 +47,16 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
 
   const handleLogout = async () => {
     setLoggingOut(true)
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch {
+      // signOut already handled clearing cookies
+    }
     if (role === 'admin') {
-      router.push('/admin-login')
+      window.location.href = '/admin-login'
     } else {
-      router.push('/login')
+      window.location.href = '/login'
     }
   }
 
