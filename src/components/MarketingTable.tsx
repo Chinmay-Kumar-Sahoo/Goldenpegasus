@@ -102,63 +102,69 @@ export default function MarketingPage({ isAdmin = false, readOnly = false, curre
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)
-    let userId = propUserId
-    if (!userId) {
-      const { data: { user } } = await supabase.auth.getUser()
-      userId = user?.id ?? null
-    }
-    setCurrentUserId(userId)
+    try {
+      let userId = propUserId
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        userId = user?.id ?? null
+      }
+      setCurrentUserId(userId)
 
-    // "My Marketing" (isAdmin=false, readOnly=false) — only show own records
-    let query = supabase.from('marketing_records').select('*').order('created_at', { ascending: false })
-    if (!isAdmin && !readOnly && userId) {
-      query = query.eq('owner_id', userId)
-    }
-    const { data } = await query
-    const marketingRecords = data || []
-    const ownerIds = Array.from(new Set(marketingRecords.map(record => record.owner_id).filter(Boolean)))
+      // "My Marketing" (isAdmin=false, readOnly=false) — only show own records
+      let query = supabase.from('marketing_records').select('*').order('created_at', { ascending: false })
+      if (!isAdmin && !readOnly && userId) {
+        query = query.eq('owner_id', userId)
+      }
+      const { data } = await query
+      const marketingRecords = data || []
+      const ownerIds = Array.from(new Set(marketingRecords.map(record => record.owner_id).filter(Boolean)))
 
-    let ownerNames: Record<string, string> = {}
-    if (ownerIds.length > 0) {
-      const [{ data: profiles }, { data: employees }] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, email').in('id', ownerIds),
-        supabase.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
-      ])
+      let ownerNames: Record<string, string> = {}
+      if (ownerIds.length > 0) {
+        const [{ data: profiles }, { data: employees }] = await Promise.all([
+          supabase.from('profiles').select('id, full_name, email').in('id', ownerIds),
+          supabase.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
+        ])
 
-      ownerNames = Object.fromEntries((profiles || []).map(profile => [
-        profile.id,
-        profile.full_name || profile.email || 'Unknown employee',
-      ]))
+        ownerNames = Object.fromEntries((profiles || []).map(profile => [
+          profile.id,
+          profile.full_name || profile.email || 'Unknown employee',
+        ]))
 
-      for (const employee of employees || []) {
-        if (employee.user_id) {
-          ownerNames[employee.user_id] = employee.full_name || employee.email || ownerNames[employee.user_id] || 'Unknown employee'
+        for (const employee of employees || []) {
+          if (employee.user_id) {
+            ownerNames[employee.user_id] = employee.full_name || employee.email || ownerNames[employee.user_id] || 'Unknown employee'
+          }
         }
       }
-    }
 
-    let lastReminderByRecord: Record<string, string> = {}
-    if (isAdmin && marketingRecords.length > 0) {
-      const { data: reminderLogs } = await supabase
-        .from('marketing_reminder_logs')
-        .select('marketing_record_id, sent_at')
-        .is('error', null)
-        .in('marketing_record_id', marketingRecords.map(record => record.id))
-        .order('sent_at', { ascending: false })
+      let lastReminderByRecord: Record<string, string> = {}
+      if (isAdmin && marketingRecords.length > 0) {
+        const { data: reminderLogs } = await supabase
+          .from('marketing_reminder_logs')
+          .select('marketing_record_id, sent_at')
+          .is('error', null)
+          .in('marketing_record_id', marketingRecords.map(record => record.id))
+          .order('sent_at', { ascending: false })
 
-      for (const log of reminderLogs || []) {
-        if (!lastReminderByRecord[log.marketing_record_id]) {
-          lastReminderByRecord[log.marketing_record_id] = log.sent_at
+        for (const log of reminderLogs || []) {
+          if (!lastReminderByRecord[log.marketing_record_id]) {
+            lastReminderByRecord[log.marketing_record_id] = log.sent_at
+          }
         }
       }
-    }
 
-    setRecords(marketingRecords.map(record => ({
-      ...record,
-      employee_name: ownerNames[record.owner_id] || 'Unknown employee',
-      last_reminder_sent_at: lastReminderByRecord[record.id] || null,
-    })))
-    setLoading(false)
+      setRecords(marketingRecords.map(record => ({
+        ...record,
+        employee_name: ownerNames[record.owner_id] || 'Unknown employee',
+        last_reminder_sent_at: lastReminderByRecord[record.id] || null,
+      })))
+    } catch (err) {
+      console.error('MarketingTable fetch error:', err)
+      toast.error('Failed to load records. Please check your connection.')
+    } finally {
+      setLoading(false)
+    }
   }, [supabase, isAdmin, readOnly, propUserId])
 
   useEffect(() => {
