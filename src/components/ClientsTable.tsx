@@ -27,11 +27,11 @@ const STATUS_COLORS: Record<string, string> = {
   prospect: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
 }
 
-export default function CandidatesPage({ isAdmin = false }: { isAdmin?: boolean }) {
+export default function CandidatesPage({ isAdmin = false, initialRecords = [] }: { isAdmin?: boolean; initialRecords?: CandidateRecord[] }) {
   const supabaseRef = useRef(createClient())
   const supabase = supabaseRef.current
-  const [records, setRecords] = useState<CandidateRecord[]>([])
-  const [loading, setLoading] = useState(true)
+  const [records, setRecords] = useState<CandidateRecord[]>(initialRecords)
+  const [loading, setLoading] = useState(initialRecords.length === 0)
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<CandidateRecord | null>(null)
@@ -44,22 +44,16 @@ export default function CandidatesPage({ isAdmin = false }: { isAdmin?: boolean 
     const { data } = await supabase.from('Candidate_records').select('*').order('created_at', { ascending: false })
     setRecords(data || [])
     setLoading(false)
-  }, [supabase, isAdmin])
+  }, [supabase])
+
+  const fetchedRef = useRef(initialRecords.length > 0)
 
   useEffect(() => {
-    fetchRecords()
-
-    // Realtime subscription — re-fetch on any change
-    const channel = supabase.channel('candidate_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'Candidate_records' }, () => {
-        fetchRecords()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
+    if (!fetchedRef.current) {
+      fetchedRef.current = true
+      fetchRecords()
     }
-  }, [fetchRecords, supabase])
+  }, [fetchRecords])
 
   const openModal = (rec?: CandidateRecord) => {
     if (rec) {

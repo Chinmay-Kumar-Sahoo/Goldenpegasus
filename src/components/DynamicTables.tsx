@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
@@ -21,11 +21,11 @@ interface Permission { id: string; table_id: string; user_id: string; permission
 
 const FIELD_TYPES = ['text', 'number', 'email', 'date', 'textarea', 'select']
 
-export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boolean }) {
+export default function DynamicTablesPage({ isAdmin = false, initialTables = [], initialUserId = null }: { isAdmin?: boolean; initialTables?: DynamicTable[]; initialUserId?: string | null }) {
   const supabase = createClient()
-  const [tables, setTables] = useState<DynamicTable[]>([])
-  const [loading, setLoading] = useState(true)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [tables, setTables] = useState<DynamicTable[]>(initialTables)
+  const [loading, setLoading] = useState(initialTables.length === 0)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(initialUserId)
   const [activeTable, setActiveTable] = useState<DynamicTable | null>(null)
   const [records, setRecords] = useState<TableRecord[]>([])
   const [recordsLoading, setRecordsLoading] = useState(false)
@@ -51,52 +51,20 @@ export default function DynamicTablesPage({ isAdmin = false }: { isAdmin?: boole
     setLoading(false)
   }, [supabase])
 
+  const fetchedRef = useRef(initialTables.length > 0)
+
   useEffect(() => {
-    setTimeout(() => {
+    if (!fetchedRef.current) {
+      fetchedRef.current = true
       fetchTables()
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        setCurrentUserId(user?.id || null)
-        if (user) {
-          supabase.from('profiles').select('id, full_name, email').then(({ data }) => setAllUsers(data || []))
-        }
-      })
-    }, 0)
-
-    // Subscribe to realtime changes
-    const channel = supabase.channel('dynamic_tables_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dynamic_tables' }, () => {
-        fetchTables()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dynamic_table_records' }, () => {
-        // If we have an active table and the record belongs to it, refresh
-        setRecords(prev => {
-          // A bit hacky since we don't have activeTable in the dependency array
-          // but we can just trigger a fetch if the user re-clicks or we can just fetch if activeTable is set.
-          return prev;
-        });
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
     }
-  }, [fetchTables, isAdmin, supabase])
-
-  // Fix the activeTable effect to subscribe to its records
-  useEffect(() => {
-    if (!activeTable) return;
-    const recordsChannel = supabase.channel(`records_${activeTable.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dynamic_table_records', filter: `table_id=eq.${activeTable.id}` }, () => {
-        // Fetch records for active table
-        supabase.from('dynamic_table_records').select('*').eq('table_id', activeTable.id).order('created_at', { ascending: false })
-          .then(({ data }) => setRecords(data || []))
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(recordsChannel)
-    }
-  }, [activeTable, supabase])
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id || null)
+      if (user) {
+        supabase.from('profiles').select('id, full_name, email').then(({ data }) => setAllUsers(data || []))
+      }
+    })
+  }, [fetchTables, supabase])
 
   const openTable = async (table: DynamicTable) => {
     setActiveTable(table)

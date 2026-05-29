@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
 import BrandLogo from '@/components/BrandLogo'
 
@@ -45,13 +44,18 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
 
   const nav = role === 'admin' ? adminNav : employeeNav
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     setLoggingOut(true)
-    try {
-      const supabase = createClient()
-      await supabase.auth.signOut({ scope: 'local' })
-    } catch {
-    }
+    // Clear all auth cookies directly — bypass Supabase client to avoid hanging
+    document.cookie.split(';').forEach(c => {
+      const name = c.trim().split('=')[0]
+      if (name.startsWith('sb-') || name.startsWith('supabase-')) {
+        document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`
+        document.cookie = `${name}=; path=/; max-age=0; SameSite=Strict`
+      }
+    })
+    localStorage.clear()
+    sessionStorage.clear()
     if (role === 'admin') {
       window.location.href = '/admin-login'
     } else {
