@@ -76,7 +76,7 @@ const STATUS_COLORS: Record<string, string> = {
   completed: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
 }
 
-export default function MarketingPage({ isAdmin = false, readOnly = false }: { isAdmin?: boolean; readOnly?: boolean }) {
+export default function MarketingPage({ isAdmin = false, readOnly = false, currentUserId: propUserId = null }: { isAdmin?: boolean; readOnly?: boolean; currentUserId?: string | null }) {
   const showEmployeeColumn = isAdmin || readOnly
   const supabaseRef = useRef(createClient())
   const supabase = supabaseRef.current
@@ -92,7 +92,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(propUserId)
   const [form, setForm] = useState({
     name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '',
     implementation_partner: '', end_client: '', status: 'active',
@@ -102,9 +102,11 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)
-    // Always fetch user so canEdit() works correctly
-    const { data: { user } } = await supabase.auth.getUser()
-    const userId = user?.id ?? null
+    let userId = propUserId
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser()
+      userId = user?.id ?? null
+    }
     setCurrentUserId(userId)
 
     // "My Marketing" (isAdmin=false, readOnly=false) — only show own records
@@ -157,7 +159,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
       last_reminder_sent_at: lastReminderByRecord[record.id] || null,
     })))
     setLoading(false)
-  }, [supabase, isAdmin, readOnly])
+  }, [supabase, isAdmin, readOnly, propUserId])
 
   useEffect(() => {
     fetchRecords()
@@ -217,8 +219,8 @@ export default function MarketingPage({ isAdmin = false, readOnly = false }: { i
       if (err) { setError(err.message); setSaving(false); toast.error('Failed to update record'); return }
       toast.success('Record updated successfully')
     } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { error: err } = await supabase.from('marketing_records').insert({ ...cleanForm, name: form.name, owner_id: user?.id })
+      const ownerId = currentUserId || (await supabase.auth.getUser()).data.user?.id
+      const { error: err } = await supabase.from('marketing_records').insert({ ...cleanForm, name: form.name, owner_id: ownerId })
       if (err) { setError(err.message); setSaving(false); toast.error('Failed to add record'); return }
       toast.success('Record added successfully')
     }
