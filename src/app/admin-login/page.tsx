@@ -90,7 +90,7 @@ export default function AdminLoginPage() {
         </div>
 
         <div className="text-center mb-8 flex flex-col items-center">
-          <BrandLogo href="/" size="lg" className="mb-2" subtitle="IT Consulting & Services LLC" />
+          <BrandLogo size="lg" className="mb-6" subtitle="IT Consulting & Services LLC" />
           <h1 className="text-2xl font-bold text-white">
             Administrator Sign In
           </h1>

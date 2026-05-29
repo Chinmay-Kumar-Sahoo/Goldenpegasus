@@ -28,7 +28,7 @@ export default function BrandLogo({
   className = '',
 }: BrandLogoProps) {
   const image = (
-    <span className={`inline-flex flex-col items-center gap-1 ${className}`}>
+    <span className={`inline-flex flex-col items-center gap-0 ${className}`}>
       <img
         src={variant === 'mark' ? '/golden-pegasus-mark.svg' : '/golden-pegasus-logo.svg'}
         alt="Golden Pegasus"

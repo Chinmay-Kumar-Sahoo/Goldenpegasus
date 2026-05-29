@@ -60,7 +60,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Redirect logged-in users away from auth pages
-  if ((pathname === '/login' || pathname === '/signup') && user) {
+  if ((pathname === '/login' || pathname === '/signup' || pathname === '/admin-login') && user) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -82,5 +82,6 @@ export const config = {
     '/dashboard/:path*',
     '/login',
     '/signup',
+    '/admin-login',
   ],
 }
