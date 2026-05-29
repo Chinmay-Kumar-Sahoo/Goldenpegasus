@@ -108,8 +108,6 @@ export default function AdminEmployeesPage() {
     )
   )
 
-  const admins = employees.filter(e => e.role === 'admin')
-
   return (
     <div>
       <PageHeader title="Employee Management" subtitle="Manage all employee records">
@@ -171,51 +169,6 @@ export default function AdminEmployeesPage() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Admin Management Table */}
-      <div className="mt-8 mb-8">
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-white">Admin Management</h2>
-          <p className="text-sm text-[#71717a] mt-0.5">Manage all admin accounts</p>
-        </div>
-        {admins.length === 0 ? (
-          <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-8 text-center">
-            <p className="text-[#71717a] text-sm">No admin accounts.</p>
-          </div>
-        ) : (
-          <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[#2a2a2a]">
-                    {['Full Name', 'Email', 'Status', 'Actions'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {admins.map(adm => (
-                    <tr key={adm.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                      <td className="px-4 py-3 text-sm text-white font-medium">{adm.full_name}</td>
-                      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{adm.email}</td>
-                      <td className="px-4 py-3">
-                        {adm.email_confirmed_at ? (
-                          <span className="text-[10px] px-2 py-1 rounded-full bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 font-bold uppercase tracking-wider">Verified</span>
-                        ) : (
-                          <span className="text-[10px] px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-bold uppercase tracking-wider">Unverified</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-[#3a3a3a]">—</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </div>
 
       {showModal && (

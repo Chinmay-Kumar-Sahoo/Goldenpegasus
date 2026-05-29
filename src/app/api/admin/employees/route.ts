@@ -16,40 +16,25 @@ export async function GET() {
     const auth = await checkAdmin(supabase)
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-    if (!serviceRoleKey) {
-      return NextResponse.json({ error: 'Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is missing' }, { status: 500 })
-    }
-
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-
-    const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers()
-    const { data: profiles } = await supabase.from('profiles').select('*')
+    const { data: profiles } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
     const { data: employees } = await supabase.from('employees').select('*')
 
     const employeeMap = new Map((employees || []).map(e => [e.email?.toLowerCase(), e]))
 
-    const merged = (authUsers?.users || []).map(u => {
-      const p = (profiles || []).find(pr => pr.id === u.id)
-      const emp = employeeMap.get(u.email?.toLowerCase())
+    const merged = (profiles || []).map(p => {
+      const emp = employeeMap.get(p.email?.toLowerCase())
       return {
-        id: u.id,
-        email: u.email,
-        full_name: p?.full_name || u.user_metadata?.full_name || emp?.full_name || '',
-        role: p?.role || u.user_metadata?.role || 'employee',
-        email_confirmed_at: u.email_confirmed_at,
+        id: p.id,
+        email: p.email,
+        full_name: p.full_name || '',
+        role: p.role || 'employee',
+        email_confirmed_at: p.email_confirmed_at,
         employee_id: emp?.employee_id || null,
         contact: emp?.contact || null,
         designation: emp?.designation || null,
-        created_at: u.created_at,
+        created_at: p.created_at,
       }
     })
-
-    merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
     return NextResponse.json({ users: merged })
   } catch (error: any) {
