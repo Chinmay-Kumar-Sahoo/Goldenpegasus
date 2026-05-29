@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
@@ -354,13 +354,13 @@ export default function MarketingPage({ isAdmin = false, readOnly = false, curre
     setShowExportMenu(false)
   }
 
-  const filtered = records.filter(r => {
+  const filtered = useMemo(() => records.filter(r => {
     const matchSearch = r.name.toLowerCase().includes(search.toLowerCase()) ||
       (r.organization_name || '').toLowerCase().includes(search.toLowerCase()) ||
       (r.end_client || '').toLowerCase().includes(search.toLowerCase())
     const matchStatus = statusFilter === 'all' || r.status === statusFilter
     return matchSearch && matchStatus
-  })
+  }), [records, search, statusFilter])
 
   return (
     <div>
