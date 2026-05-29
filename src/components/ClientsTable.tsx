@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
 
@@ -28,8 +27,6 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function CandidatesPage({ isAdmin = false, initialRecords = [] }: { isAdmin?: boolean; initialRecords?: CandidateRecord[] }) {
-  const supabaseRef = useRef(createClient())
-  const supabase = supabaseRef.current
   const [records, setRecords] = useState<CandidateRecord[]>(initialRecords)
   const [loading, setLoading] = useState(initialRecords.length === 0)
   const [search, setSearch] = useState('')
@@ -41,10 +38,17 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('Candidate_records').select('*').order('created_at', { ascending: false })
-    setRecords(data || [])
-    setLoading(false)
-  }, [supabase])
+    try {
+      const res = await fetch('/api/candidates')
+      if (!res.ok) throw new Error('Failed to load')
+      const json = await res.json()
+      setRecords(json.records || [])
+    } catch (err: any) {
+      toast.error('Failed to load candidates')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   const fetchedRef = useRef(initialRecords.length > 0)
 
@@ -72,26 +76,39 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
     setSaving(true)
     setError('')
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
-    if (editing) {
-      const { error: err } = await supabase.from('Candidate_records').update({ ...cleanForm, updated_at: new Date().toISOString() }).eq('id', editing.id)
-      if (err) { setError(err.message); setSaving(false); toast.error('Failed to update candidate'); return }
-      toast.success('Candidate updated successfully')
-    } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { error: err } = await supabase.from('Candidate_records').insert({ ...cleanForm, Candidate_name: form.Candidate_name, owner_id: user?.id })
-      if (err) { setError(err.message); setSaving(false); toast.error('Failed to add candidate'); return }
-      toast.success('Candidate added successfully')
+    const payload = editing ? { ...cleanForm, id: editing.id } : { ...cleanForm, Candidate_name: form.Candidate_name }
+    try {
+      const res = await fetch('/api/candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok) { throw new Error(json.error || 'Failed to save') }
+      toast.success(editing ? 'Candidate updated successfully' : 'Candidate added successfully')
+      setSaving(false)
+      setShowModal(false)
+      fetchRecords()
+    } catch (err: any) {
+      setError(err.message)
+      setSaving(false)
+      toast.error('Failed to save candidate')
     }
-    setSaving(false)
-    setShowModal(false)
-    fetchRecords()
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this candidate record?')) return
-    await supabase.from('Candidate_records').delete().eq('id', id)
-    toast.success('Candidate deleted')
-    fetchRecords()
+    try {
+      await fetch('/api/candidates', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      toast.success('Candidate deleted')
+      fetchRecords()
+    } catch {
+      toast.error('Failed to delete candidate')
+    }
   }
 
   const exportCSV = () => {

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
 
@@ -90,8 +89,6 @@ export default function MarketingPage({
   initialOwnerNames?: Record<string, string>
 }) {
   const showEmployeeColumn = isAdmin || readOnly
-  const supabaseRef = useRef(createClient())
-  const supabase = supabaseRef.current
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -115,85 +112,32 @@ export default function MarketingPage({
     implementation_poc_email: '', interviewer_email: '', notes: '',
   })
 
-  const timeout = (ms: number) => new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms)
-  )
-
   const fetchRecords = useCallback(async () => {
+    setLoading(true)
     setError('')
     try {
-      const userId = propUserId
-      setCurrentUserId(userId)
-
-      const query = supabase.from('marketing_records').select('*').order('created_at', { ascending: false })
-      if (!isAdmin && !readOnly && userId) {
-        query.eq('owner_id', userId)
-      }
-      const { data, error: queryError } = await Promise.race([
-        query,
-        timeout(15000),
-      ]) as any
-      if (queryError) throw queryError
-      const marketingRecords: MarketingRecord[] = data || []
-      const ownerIds = Array.from(new Set(marketingRecords.map(r => r.owner_id).filter(Boolean)))
-
-      let ownerNames: Record<string, string> = {}
-      if (ownerIds.length > 0) {
-        const [{ data: profiles }, { data: employees }] = await Promise.race([
-          Promise.all([
-            supabase.from('profiles').select('id, full_name, email').in('id', ownerIds),
-            supabase.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
-          ]),
-          timeout(15000),
-        ]) as any
-
-        ownerNames = Object.fromEntries((profiles || []).map((p: any) => [
-          p.id, p.full_name || p.email || 'Unknown employee',
-        ]))
-
-        for (const e of (employees || []) as any[]) {
-          if (e.user_id && !ownerNames[e.user_id]) {
-            ownerNames[e.user_id] = e.full_name || e.email || 'Unknown employee'
-          }
-        }
-      }
-
-      let lastReminderByRecord: Record<string, string> = {}
-      if (isAdmin && marketingRecords.length > 0) {
-        const { data: reminderLogs } = await supabase
-          .from('marketing_reminder_logs')
-          .select('marketing_record_id, sent_at')
-          .is('error', null)
-          .in('marketing_record_id', marketingRecords.map(r => r.id))
-          .order('sent_at', { ascending: false })
-
-        for (const log of reminderLogs || []) {
-          if (!lastReminderByRecord[log.marketing_record_id]) {
-            lastReminderByRecord[log.marketing_record_id] = log.sent_at
-          }
-        }
-      }
-
-      setRecords(marketingRecords.map((rec: MarketingRecord) => ({
-        ...rec,
-        employee_name: ownerNames[rec.owner_id] || 'Unknown employee',
-        last_reminder_sent_at: lastReminderByRecord[rec.id] || null,
-      })))
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 20000)
+      const res = await fetch('/api/marketing', { signal: controller.signal })
+      clearTimeout(timeoutId)
+      if (!res.ok) throw new Error('Failed to load records')
+      const json = await res.json()
+      setRecords(json.records || [])
     } catch (err: any) {
-      const message = err?.message || 'Failed to load records. Please check your connection.'
-      if (message.includes('timed out')) {
+      if (err.name === 'AbortError') {
         toast.error('Request timed out. Please try again or check your network connection.')
+        setError('Request timed out')
       } else {
-        toast.error('Failed to load records. Please check your connection.')
+        toast.error('Failed to load records. Check your connection.')
+        setError(err.message || 'Failed to load records')
       }
-      setError(message)
     } finally {
       setLoading(false)
     }
-  }, [supabase, isAdmin, readOnly, propUserId])
+  }, [])
 
   useEffect(() => {
-    fetchRecords()
+    if (records.length === 0) fetchRecords()
   }, [fetchRecords])
 
   useEffect(() => {
@@ -234,26 +178,39 @@ export default function MarketingPage({
     setSaving(true)
     setError('')
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
-    if (editing) {
-      const { error: err } = await supabase.from('marketing_records').update({ ...cleanForm, updated_at: new Date().toISOString() }).eq('id', editing.id)
-      if (err) { setError(err.message); setSaving(false); toast.error('Failed to update record'); return }
-      toast.success('Record updated successfully')
-    } else {
-      const ownerId = currentUserId || (await supabase.auth.getUser()).data.user?.id
-      const { error: err } = await supabase.from('marketing_records').insert({ ...cleanForm, name: form.name, owner_id: ownerId })
-      if (err) { setError(err.message); setSaving(false); toast.error('Failed to add record'); return }
-      toast.success('Record added successfully')
+    const payload = editing ? { ...cleanForm, id: editing.id } : { ...cleanForm, name: form.name }
+    try {
+      const res = await fetch('/api/marketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok) { throw new Error(json.error || 'Failed to save record') }
+      toast.success(editing ? 'Record updated successfully' : 'Record added successfully')
+      setSaving(false)
+      setShowModal(false)
+      fetchRecords()
+    } catch (err: any) {
+      setError(err.message)
+      setSaving(false)
+      toast.error('Failed to save record')
     }
-    setSaving(false)
-    setShowModal(false)
-    fetchRecords()
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this record?')) return
-    await supabase.from('marketing_records').delete().eq('id', id)
-    toast.success('Record deleted')
-    fetchRecords()
+    try {
+      await fetch('/api/marketing', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      toast.success('Record deleted')
+      fetchRecords()
+    } catch {
+      toast.error('Failed to delete record')
+    }
   }
 
   const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -284,11 +241,6 @@ export default function MarketingPage({
     setError('')
 
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      if (userError || !user) {
-        throw new Error('Please sign in before importing marketing records.')
-      }
-
       const XLSX = await import('xlsx')
       const buffer = await file.arrayBuffer()
       const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
@@ -327,12 +279,16 @@ export default function MarketingPage({
         return {
           ...record,
           name: record.name || '',
-          owner_id: user.id,
         }
       })
 
-      const { error: importError } = await supabase.from('marketing_records').insert(importRows)
-      if (importError) throw importError
+      for (const row of importRows) {
+        await fetch('/api/marketing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(row),
+        })
+      }
 
       toast.success(`Imported ${importRows.length} marketing record${importRows.length === 1 ? '' : 's'}`)
       fetchRecords()
