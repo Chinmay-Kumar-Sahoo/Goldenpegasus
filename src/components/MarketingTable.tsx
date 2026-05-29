@@ -76,15 +76,30 @@ const STATUS_COLORS: Record<string, string> = {
   completed: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
 }
 
-export default function MarketingPage({ isAdmin = false, readOnly = false, currentUserId: propUserId = null }: { isAdmin?: boolean; readOnly?: boolean; currentUserId?: string | null }) {
+export default function MarketingPage({
+  isAdmin = false,
+  readOnly = false,
+  currentUserId: propUserId = null,
+  initialRecords: serverRecords = [],
+  initialOwnerNames: serverOwnerNames = {},
+}: {
+  isAdmin?: boolean
+  readOnly?: boolean
+  currentUserId?: string | null
+  initialRecords?: MarketingRecord[]
+  initialOwnerNames?: Record<string, string>
+}) {
   const showEmployeeColumn = isAdmin || readOnly
   const supabaseRef = useRef(createClient())
   const supabase = supabaseRef.current
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
-  const [records, setRecords] = useState<MarketingRecord[]>([])
-  const [loading, setLoading] = useState(true)
+  const [records, setRecords] = useState<MarketingRecord[]>(serverRecords.map(r => ({
+    ...r,
+    employee_name: serverOwnerNames[r.owner_id] || 'Unknown employee',
+  })))
+  const [loading, setLoading] = useState(serverRecords.length === 0)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
@@ -105,7 +120,6 @@ export default function MarketingPage({ isAdmin = false, readOnly = false, curre
   )
 
   const fetchRecords = useCallback(async () => {
-    setLoading(true)
     setError('')
     try {
       const userId = propUserId
@@ -180,18 +194,7 @@ export default function MarketingPage({ isAdmin = false, readOnly = false, curre
 
   useEffect(() => {
     fetchRecords()
-
-    // Realtime subscription — re-fetch on any change
-    const channel = supabase.channel('marketing_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'marketing_records' }, () => {
-        fetchRecords()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [fetchRecords, supabase])
+  }, [fetchRecords])
 
   useEffect(() => {
     if (!showExportMenu) return
