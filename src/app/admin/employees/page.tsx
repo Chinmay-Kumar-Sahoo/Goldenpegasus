@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect, useCallback } from 'react'
 import PageHeader from '@/components/PageHeader'
 
 interface Employee {
@@ -25,8 +24,6 @@ interface FormData {
 }
 
 export default function AdminEmployeesPage() {
-  const supabaseRef = useRef(createClient())
-  const supabase = supabaseRef.current
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -34,23 +31,19 @@ export default function AdminEmployeesPage() {
   const [search, setSearch] = useState('')
   const [form, setForm] = useState<FormData>({ employee_id: '', full_name: '', email: '', contact: '', designation: '' })
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<string | null>('')
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true)
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData?.session?.access_token
-      const res = await fetch('/api/admin/employees', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch('/api/admin/employees')
       const json = await res.json()
       setEmployees(json.users || [])
     } catch {
       setEmployees([])
     }
     setLoading(false)
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     fetchEmployees()
@@ -73,12 +66,20 @@ export default function AdminEmployeesPage() {
     setSaving(true)
     setError('')
     let saveError: string | null = null
-    if (editing) {
-      const { error: err } = await supabase.from('employees').update({ ...form, updated_at: new Date().toISOString() }).eq('id', editing.id)
-      if (err) { saveError = err.message; setError(err.message) }
-    } else {
-      const { error: err } = await supabase.from('employees').insert(form)
-      if (err) { saveError = err.message; setError(err.message) }
+    try {
+      const res = await fetch('/api/admin/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editing ? { ...form, id: editing.id } : form),
+      })
+      if (!res.ok) {
+        const json = await res.json()
+        saveError = json.error || 'Failed to save'
+        setError(saveError)
+      }
+    } catch {
+      saveError = 'Failed to save'
+      setError('Failed to save employee')
     }
     setSaving(false)
     if (!saveError) {
@@ -89,8 +90,14 @@ export default function AdminEmployeesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this employee?')) return
-    await supabase.from('employees').delete().eq('id', id)
-    fetchEmployees()
+    try {
+      await fetch('/api/admin/employees', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      fetchEmployees()
+    } catch {}
   }
 
   const filtered = employees.filter(e =>
@@ -107,18 +114,11 @@ export default function AdminEmployeesPage() {
         </button>
       </PageHeader>
 
-      {/* Search */}
       <div className="mb-6">
-        <input
-          type="text"
-          placeholder="Search by name, email, or ID..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full md:w-96 bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60"
-        />
+        <input type="text" placeholder="Search by name, email, or ID..." value={search} onChange={e => setSearch(e.target.value)}
+          className="w-full md:w-96 bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60" />
       </div>
 
-      {/* Table */}
       <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -169,7 +169,6 @@ export default function AdminEmployeesPage() {
         </div>
       </div>
 
-      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-md p-6">
@@ -184,14 +183,9 @@ export default function AdminEmployeesPage() {
               ].map(field => (
                 <div key={field.name}>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
-                  <input
-                    type={field.type}
-                    value={form[field.name as keyof FormData]}
-                    onChange={e => setForm({ ...form, [field.name]: e.target.value })}
-                    placeholder={field.placeholder}
+                  <input type={field.type} value={form[field.name as keyof FormData]} onChange={e => setForm({ ...form, [field.name]: e.target.value })} placeholder={field.placeholder}
                     required={['employee_id', 'full_name', 'email'].includes(field.name)}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60 transition-all"
-                  />
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60 transition-all" />
                 </div>
               ))}
               {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}

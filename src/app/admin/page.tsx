@@ -10,7 +10,7 @@ export default async function AdminPage() {
 
   const [{ count: employeeCount }, { count: mktCount }, { count: clientCount }, { count: tableCount }, { data: recentLogs }] =
     await Promise.all([
-      supabase.from('employees').select('*', { count: 'exact', head: true }),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'employee'),
       supabase.from('marketing_records').select('*', { count: 'exact', head: true }),
       supabase.from('Candidate_records').select('*', { count: 'exact', head: true }),
       supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }),
