@@ -57,6 +57,16 @@ export async function proxy(request: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
+    // Check role — admins should not be on the employee dashboard
+    const { data: dashProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (dashProfile?.role === 'admin') {
+      return NextResponse.redirect(new URL('/admin', request.url))
+    }
   }
 
   // Redirect logged-in users away from auth pages

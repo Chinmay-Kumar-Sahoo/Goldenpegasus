@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
+import SessionGuard from '@/components/SessionGuard'
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -19,12 +20,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (profileError || !profile) {
     redirect('/login?error=Account setup incomplete. Please contact support.')
   }
+
+  // Redirect admins away from employee dashboard
+  if (profile.role === 'admin') {
+    redirect('/admin')
+  }
   
   // Robust name fetching
   const displayName = profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Employee'
 
   return (
     <div className="flex min-h-screen bg-[#0a0a0a]">
+      <SessionGuard expectedRole="employee" />
       <Sidebar role="employee" userName={displayName} userEmail={profile?.email || user.email} />
       <main className="flex-1 overflow-auto">
         {/* Global Header */}

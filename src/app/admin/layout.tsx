@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
+import SessionGuard from '@/components/SessionGuard'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -32,6 +33,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-screen bg-[#0a0a0a]">
+      <SessionGuard expectedRole="admin" />
       <Sidebar role="admin" userName={displayName} userEmail={profile?.email || user.email} />
       <main className="flex-1 overflow-auto">
         {/* Global Header */}
