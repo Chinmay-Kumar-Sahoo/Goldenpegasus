@@ -33,6 +33,17 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // Fetch role once — shared across all checks below
+  let userRole: string | null = null
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    userRole = profile?.role ?? null
+  }
+
   // Protected admin routes (but exclude standalone public pages)
   if (pathname.startsWith('/admin') &&
       pathname !== '/admin-login' &&
@@ -40,14 +51,7 @@ export async function proxy(request: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-    // Check role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role !== 'admin') {
+    if (userRole !== 'admin') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }
@@ -57,27 +61,14 @@ export async function proxy(request: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-    // Check role — admins should not be on the employee dashboard
-    const { data: dashProfile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (dashProfile?.role === 'admin') {
+    if (userRole === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url))
     }
   }
 
   // Redirect logged-in users away from auth pages
   if ((pathname === '/login' || pathname === '/signup' || pathname === '/admin-login') && user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role === 'admin') {
+    if (userRole === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url))
     }
     return NextResponse.redirect(new URL('/dashboard', request.url))

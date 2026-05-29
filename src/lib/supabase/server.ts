@@ -6,7 +6,7 @@ const getCookieStore = cache(async () => {
   return await cookies()
 })
 
-export async function createClient() {
+const getClient = cache(async () => {
   const cookieStore = await getCookieStore()
 
   return createServerClient(
@@ -33,4 +33,8 @@ export async function createClient() {
       },
     }
   )
+})
+
+export async function createClient() {
+  return getClient()
 }
