@@ -8,9 +8,10 @@ export const metadata = { title: 'Admin Dashboard | GoldenPegasus' }
 export default async function AdminPage() {
   const supabase = await createClient()
 
-  const [{ count: employeeCount }, { count: mktCount }, { count: clientCount }, { count: tableCount }, { data: recentLogs }] =
+  const [{ count: employeeCount }, { count: adminCount }, { count: mktCount }, { count: clientCount }, { count: tableCount }, { data: recentLogs }] =
     await Promise.all([
       supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'employee'),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'admin'),
       supabase.from('marketing_records').select('*', { count: 'exact', head: true }),
       supabase.from('Candidate_records').select('*', { count: 'exact', head: true }),
       supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }),
@@ -19,6 +20,7 @@ export default async function AdminPage() {
 
   const stats = [
     { label: 'Employees', value: employeeCount ?? 0, icon: '👥', href: '/admin/employees' },
+    { label: 'Admins', value: adminCount ?? 0, icon: '🔑', href: '/admin/register', color: 'blue' },
     { label: 'Marketing Records', value: mktCount ?? 0, icon: '📈', href: '/admin/marketing', color: 'green' },
     { label: 'Client Records', value: clientCount ?? 0, icon: '🤝', href: '/admin/clients', color: 'purple' },
     { label: 'Dynamic Tables', value: tableCount ?? 0, icon: '🏗️', href: '/admin/tables', color: 'yellow' },
@@ -32,7 +34,7 @@ export default async function AdminPage() {
       />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         {stats.map((stat) => (
           <Link
             key={stat.label}
