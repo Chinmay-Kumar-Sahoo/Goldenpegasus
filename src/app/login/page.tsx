@@ -100,12 +100,12 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md relative">
         <div className="flex justify-center">
-          <BackHomeNav />
+          <BackHomeNav hideBack={true} />
         </div>
 
         {/* Logo */}
-        <div className="text-center mb-8">
-          <BrandLogo href="/" size="md" className="mb-6" />
+        <div className="text-center mb-8 flex flex-col items-center">
+          <BrandLogo size="lg" className="mb-6" subtitle="IT Consulting & Services LLC" />
           <h1 className="text-2xl font-bold text-white">Welcome back</h1>
           <p className="text-sm text-[#71717a] mt-1">Sign in to your account</p>
         </div>
