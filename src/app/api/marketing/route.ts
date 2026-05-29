@@ -64,13 +64,17 @@ export async function POST(req: NextRequest) {
       .update({ ...body, updated_at: new Date().toISOString() })
       .eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await supabase.from('audit_logs').insert({ action: 'updated', entity_type: 'marketing_record', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })
     return NextResponse.json({ success: true })
   }
 
-  const { error } = await supabase
+  const { data: inserted, error } = await supabase
     .from('marketing_records')
     .insert({ ...body, owner_id: user.id })
+    .select('id')
+    .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await supabase.from('audit_logs').insert({ action: 'created', entity_type: 'marketing_record', entity_id: inserted?.id || '', user_id: user.id, created_at: new Date().toISOString() })
   return NextResponse.json({ success: true })
 }
 
@@ -82,5 +86,6 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json()
   const { error } = await supabase.from('marketing_records').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await supabase.from('audit_logs').insert({ action: 'deleted', entity_type: 'marketing_record', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })
   return NextResponse.json({ success: true })
 }

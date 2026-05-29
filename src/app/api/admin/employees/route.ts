@@ -10,6 +10,16 @@ async function checkAdmin(supabase: any) {
   return { user }
 }
 
+async function logAudit(supabase: any, userId: string, action: string, entityType: string, entityId: string) {
+  await supabase.from('audit_logs').insert({
+    action,
+    entity_type: entityType,
+    entity_id: entityId,
+    user_id: userId,
+    created_at: new Date().toISOString(),
+  })
+}
+
 export async function GET() {
   try {
     const supabase = await createServerClient()
@@ -53,11 +63,13 @@ export async function POST(req: NextRequest) {
     if (body.id) {
       const { error } = await supabase.from('employees').update(body).eq('user_id', body.id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      await logAudit(supabase, auth.user.id, 'updated', 'employee', body.id)
       return NextResponse.json({ success: true })
     }
 
-    const { error } = await supabase.from('employees').insert(body)
+    const { data: inserted, error } = await supabase.from('employees').insert(body).select('id').single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await logAudit(supabase, auth.user.id, 'created', 'employee', inserted?.id || '')
     return NextResponse.json({ success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
@@ -73,6 +85,7 @@ export async function DELETE(req: NextRequest) {
     const { id } = await req.json()
     const { error } = await supabase.from('employees').delete().eq('user_id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await logAudit(supabase, auth.user.id, 'deleted', 'employee', id)
     return NextResponse.json({ success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
