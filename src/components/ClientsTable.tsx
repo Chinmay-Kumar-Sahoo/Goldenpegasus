@@ -143,7 +143,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a2a]">
-                {['Candidate Name', 'Email', 'Phone', 'Company', 'Status', 'Project Type', 'Actions'].map(h => (
+                {['Candidate Name', 'Email', 'Phone', 'Company', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Actions'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -152,13 +152,13 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 9 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 filtered.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
@@ -172,10 +172,12 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.project_type || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.contract_start ? new Date(rec.contract_start).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.contract_end ? new Date(rec.contract_end).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button onClick={() => openModal(rec)} className="text-xs bg-[#1a1a1a] hover:bg-[#22c55e]/10 hover:text-[#22c55e] border border-[#2a2a2a] px-3 py-1 rounded-lg transition-all">Edit</button>
-                        <button onClick={() => handleDelete(rec.id)} className="text-xs bg-[#1a1a1a] hover:bg-red-500/10 hover:text-red-400 border border-[#2a2a2a] px-3 py-1 rounded-lg transition-all">Delete</button>
+                        {isAdmin && <button onClick={() => handleDelete(rec.id)} className="text-xs bg-[#1a1a1a] hover:bg-red-500/10 hover:text-red-400 border border-[#2a2a2a] px-3 py-1 rounded-lg transition-all">Delete</button>}
                       </div>
                     </td>
                   </tr>
