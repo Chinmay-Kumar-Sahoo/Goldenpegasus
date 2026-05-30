@@ -49,7 +49,6 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
       user_id: userId,
       employee_id: employee.employee_id || `EMP-${Date.now()}`,
       full_name: profile.full_name,
-      email: profile.email,
       contact: employee.contact || null,
       address: employee.address || null,
       date_of_birth: employee.date_of_birth || null,
@@ -91,8 +90,9 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Email</label>
-                  <input type="email" value={profile.email} disabled
+                  <input type="email" value={profile.email} disabled tabIndex={-1}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-[#71717a] cursor-not-allowed" />
+                  <p className="text-[10px] text-[#71717a] mt-1">Email cannot be changed. Contact admin to update.</p>
                 </div>
               </div>
             </div>
