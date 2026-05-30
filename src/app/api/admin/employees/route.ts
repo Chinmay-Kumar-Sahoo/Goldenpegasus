@@ -88,23 +88,12 @@ export async function POST(req: NextRequest) {
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: body.email.trim().toLowerCase(),
       password: body.password,
-      email_confirm: true,
       user_metadata: { full_name: body.full_name, role: 'employee' },
     })
 
     if (createError) return NextResponse.json({ error: createError.message }, { status: 400 })
 
     const userId = userData.user.id
-
-    await supabaseAdmin.from('profiles').upsert({
-      id: userId,
-      email: body.email.trim().toLowerCase(),
-      full_name: body.full_name,
-      role: 'employee',
-      email_confirmed_at: userData.user.email_confirmed_at || new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'id' })
 
     const { error: empError } = await supabaseAdmin.from('employees').upsert({
       user_id: userId,

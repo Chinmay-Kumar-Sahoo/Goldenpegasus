@@ -27,6 +27,7 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+  const fieldsLocked = !!(initialEmployee?.employee_id)
 
   const ensureUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -61,6 +62,7 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
     if (empError) { setError(empError.message); setSaving(false); return }
     setSuccess('Profile updated successfully!')
     setSaving(false)
+    window.location.reload()
   }
 
   if (loading) {
@@ -85,8 +87,8 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Full Name</label>
-                  <input type="text" value={profile.full_name} onChange={e => setProfile({ ...profile, full_name: e.target.value })} required
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                  <input type="text" value={profile.full_name} onChange={e => setProfile({ ...profile, full_name: e.target.value })} required disabled={fieldsLocked}
+                    className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm ${fieldsLocked ? 'text-[#71717a] cursor-not-allowed' : 'text-white focus:outline-none focus:border-[#22c55e]/60'}`} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Email</label>
@@ -109,14 +111,14 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
                 ].map(field => (
                   <div key={field.name}>
                     <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
-                    <input type={field.type} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: e.target.value })} placeholder={field.placeholder}
-                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                    <input type={field.type} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: e.target.value })} placeholder={field.placeholder} disabled={fieldsLocked}
+                      className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm ${fieldsLocked ? 'text-[#71717a] cursor-not-allowed' : 'text-white focus:outline-none focus:border-[#22c55e]/60'}`} />
                   </div>
                 ))}
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Address</label>
-                  <textarea value={employee.address} onChange={e => setEmployee({ ...employee, address: e.target.value })} rows={2} placeholder="123 Main St, City, State"
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-none" />
+                  <textarea value={employee.address} onChange={e => setEmployee({ ...employee, address: e.target.value })} rows={2} placeholder="123 Main St, City, State" disabled={fieldsLocked}
+                    className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm resize-none ${fieldsLocked ? 'text-[#71717a] cursor-not-allowed' : 'text-white focus:outline-none focus:border-[#22c55e]/60'}`} />
                 </div>
               </div>
             </div>
@@ -124,10 +126,12 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
             {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
             {success && <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-green-400">{success}</div>}
 
-            <button type="submit" disabled={saving}
-              className="w-full bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold py-3 rounded-xl text-sm transition-all">
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
+            {!fieldsLocked && (
+              <button type="submit" disabled={saving}
+                className="w-full bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold py-3 rounded-xl text-sm transition-all">
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            )}
           </form>
         </div>
       </div>
