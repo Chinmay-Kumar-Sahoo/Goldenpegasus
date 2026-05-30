@@ -14,6 +14,7 @@ interface Employee {
   contact: string
   address: string
   date_of_birth: string
+  joining_date: string
   company_id: string
   designation: string
 }
@@ -21,7 +22,7 @@ interface Employee {
 export default function AdminProfileContent({ initialProfile, initialEmployee }: { initialProfile?: Profile; initialEmployee?: Employee }) {
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile>(initialProfile || { full_name: '', email: '' })
-  const [employee, setEmployee] = useState<Employee>(initialEmployee || { employee_id: '', contact: '', address: '', date_of_birth: '', company_id: '', designation: '' })
+  const [employee, setEmployee] = useState<Employee>(initialEmployee || { employee_id: '', contact: '', address: '', date_of_birth: '', joining_date: '', company_id: '', designation: '' })
   const [loading, setLoading] = useState(!initialProfile)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
@@ -54,6 +55,7 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
       contact: employee.contact || null,
       address: employee.address || null,
       date_of_birth: employee.date_of_birth || null,
+      joining_date: employee.joining_date || null,
       company_id: employee.company_id || null,
       designation: employee.designation || 'Administrator',
       updated_at: new Date().toISOString(),
@@ -130,6 +132,7 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
                   { label: 'Contact', name: 'contact', type: 'text', placeholder: '+1 234 567 8900' },
                   { label: 'Company ID', name: 'company_id', type: 'text', placeholder: 'GPEG-123' },
                   { label: 'Date of Birth', name: 'date_of_birth', type: 'date', placeholder: '' },
+                  { label: 'Joining Date', name: 'joining_date', type: 'date', placeholder: '' },
                 ].map(field => (
                   <div key={field.name}>
                     <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>

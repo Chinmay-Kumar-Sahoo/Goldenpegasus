@@ -24,6 +24,7 @@ export default async function ProfilePage() {
     contact: employee.contact || '',
     address: employee.address || '',
     date_of_birth: employee.date_of_birth || '',
+    joining_date: employee.joining_date || '',
     company_id: employee.company_id || '',
     designation: employee.designation || '',
   } : undefined
