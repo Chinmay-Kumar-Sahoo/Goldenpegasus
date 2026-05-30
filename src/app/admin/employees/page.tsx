@@ -21,6 +21,7 @@ interface FormData {
   email: string
   contact: string
   designation: string
+  password: string
 }
 
 export default function AdminEmployeesPage() {
@@ -29,7 +30,7 @@ export default function AdminEmployeesPage() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Employee | null>(null)
   const [search, setSearch] = useState('')
-  const [form, setForm] = useState<FormData>({ employee_id: '', full_name: '', email: '', contact: '', designation: '' })
+  const [form, setForm] = useState<FormData>({ employee_id: '', full_name: '', email: '', contact: '', designation: '', password: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>('')
 
@@ -52,10 +53,10 @@ export default function AdminEmployeesPage() {
   const openModal = (emp?: Employee) => {
     if (emp) {
       setEditing(emp)
-      setForm({ employee_id: emp.employee_id || '', full_name: emp.full_name, email: emp.email, contact: emp.contact || '', designation: emp.designation || '' })
+      setForm({ employee_id: emp.employee_id || '', full_name: emp.full_name, email: emp.email, contact: emp.contact || '', designation: emp.designation || '', password: '' })
     } else {
       setEditing(null)
-      setForm({ employee_id: '', full_name: '', email: '', contact: '', designation: '' })
+      setForm({ employee_id: '', full_name: '', email: '', contact: '', designation: '', password: '' })
     }
     setError('')
     setShowModal(true)
@@ -182,11 +183,12 @@ export default function AdminEmployeesPage() {
                 { label: 'Email', name: 'email', type: 'email', placeholder: 'john@example.com' },
                 { label: 'Contact', name: 'contact', type: 'text', placeholder: '+1 234 567 8900' },
                 { label: 'Designation', name: 'designation', type: 'text', placeholder: 'Software Engineer' },
+                ...(editing ? [] : [{ label: 'Password', name: 'password' as const, type: 'password' as const, placeholder: 'Min. 8 characters' }]),
               ].map(field => (
                 <div key={field.name}>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
                   <input type={field.type} value={form[field.name as keyof FormData]} onChange={e => setForm({ ...form, [field.name]: e.target.value })} placeholder={field.placeholder}
-                    required={['employee_id', 'full_name', 'email'].includes(field.name)}
+                    required={['employee_id', 'full_name', 'email'].includes(field.name) || (!editing && field.name === 'password')}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60 transition-all" />
                 </div>
               ))}
