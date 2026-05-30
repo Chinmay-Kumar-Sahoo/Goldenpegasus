@@ -24,6 +24,9 @@ export default function LoginPage() {
     if (msg) {
       setTimeout(() => setMessage(msg), 0);
     }
+    if (params.get("email_confirmed") === "true") {
+      setTimeout(() => setMessage("Email confirmed! You can now sign in."), 0);
+    }
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {

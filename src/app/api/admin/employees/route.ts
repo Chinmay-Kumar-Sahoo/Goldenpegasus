@@ -130,10 +130,13 @@ export async function POST(req: NextRequest) {
     const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
       type: 'signup',
       email,
-      options: { redirectTo: `${appUrl.replace(/\/$/, '')}/auth/verify?next=/dashboard` },
+      options: { redirectTo: `${appUrl.replace(/\/$/, '')}/auth/verify?next=/login` },
     } as any)
 
-    const confirmationLink = linkData?.properties?.action_link || ''
+    const actionLink = linkData?.properties?.action_link || ''
+    const nextParam = encodeURIComponent('/login?email_confirmed=true')
+    const customRedirect = encodeURIComponent(`${appUrl.replace(/\/$/, '')}/auth/verify?next=${nextParam}`)
+    const confirmationLink = actionLink.replace(/redirect_to=[^&]+/, `redirect_to=${customRedirect}`)
 
     await logAudit(supabase, auth.user.id, emailSent ? 'employee_created_email_sent' : 'employee_created_pending', 'employee', userId)
 
