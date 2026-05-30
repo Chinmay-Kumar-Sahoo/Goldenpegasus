@@ -330,13 +330,23 @@ export default function MarketingPage({
     setShowExportMenu(false)
   }
 
-  const filtered = useMemo(() => records.filter(r => {
-    const matchSearch = r.name.toLowerCase().includes(search.toLowerCase()) ||
-      (r.organization_name || '').toLowerCase().includes(search.toLowerCase()) ||
-      (r.end_client || '').toLowerCase().includes(search.toLowerCase())
-    const matchStatus = statusFilter === 'all' || r.status === statusFilter
-    return matchSearch && matchStatus
-  }), [records, search, statusFilter])
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    if (!q && statusFilter === 'all') return records
+    return records.filter(r => {
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      if (!q) return true
+      const fields = [
+        r.name, r.date, r.status, r.recruiter_name, r.recruiter_email,
+        r.organization_name, r.implementation_partner, r.end_client,
+        r.project_start_date, r.project_end_date, r.interview_date,
+        r.interview_type, r.client_name, r.client_email,
+        r.implementation_poc_email, r.interviewer_email, r.notes,
+        r.employee_name,
+      ]
+      return fields.some(f => f && f.toLowerCase().includes(q))
+    })
+  }, [records, search, statusFilter])
 
   return (
     <div>
