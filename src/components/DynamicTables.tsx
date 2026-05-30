@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
 
@@ -22,7 +21,6 @@ interface Permission { id: string; table_id: string; user_id: string; permission
 const FIELD_TYPES = ['text', 'number', 'email', 'date', 'textarea', 'select']
 
 export default function DynamicTablesPage({ isAdmin = false, initialTables = [], initialUserId = null }: { isAdmin?: boolean; initialTables?: DynamicTable[]; initialUserId?: string | null }) {
-  const supabase = createClient()
   const [tables, setTables] = useState<DynamicTable[]>(initialTables)
   const [loading, setLoading] = useState(initialTables.length === 0)
   const [currentUserId, setCurrentUserId] = useState<string | null>(initialUserId)
@@ -41,90 +39,81 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  const api = async (url: string, options?: RequestInit) => {
+    const res = await fetch(url, options)
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error || 'Request failed')
+    return json
+  }
+
   const fetchTables = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('dynamic_tables')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setTables(data || [])
+    try {
+      const json = await api('/api/tables?action=tables')
+      setTables(json.tables || [])
+    } catch { setTables([]) }
     setLoading(false)
-  }, [supabase])
+  }, [])
 
   const fetchedRef = useRef(initialTables.length > 0)
 
   useEffect(() => {
-    if (!fetchedRef.current) {
-      fetchedRef.current = true
-      fetchTables()
-    }
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setCurrentUserId(user?.id || null)
-      if (user) {
-        supabase.from('profiles').select('id, full_name, email').then(({ data }) => setAllUsers(data || []))
+    ;(async () => {
+      if (!fetchedRef.current) {
+        fetchedRef.current = true
+        fetchTables()
       }
-    })
-  }, [fetchTables, supabase])
+      try {
+        const json = await api('/api/tables?action=profiles')
+        setAllUsers(json.profiles || [])
+      } catch {}
+    })()
+  }, [fetchTables])
 
   const openTable = async (table: DynamicTable) => {
     setActiveTable(table)
     setRecordsLoading(true)
-    const { data, error: err } = await supabase.from('dynamic_table_records').select('*').eq('table_id', table.id).order('created_at', { ascending: false })
-    if (err) toast.error('Failed to load records: ' + err.message)
-    setRecords(data || [])
+    try {
+      const json = await api(`/api/tables?action=records&table_id=${table.id}`)
+      setRecords(json.records || [])
+    } catch { setRecords([]) }
     setRecordsLoading(false)
 
-    // Owners & admins load all permissions for the table (to manage them)
-    if (isAdmin || table.owner_id === currentUserId) {
-      console.log('Fetching permissions for table:', table.id, 'User:', currentUserId)
-      const { data: perms, error: pErr } = await supabase
-        .from('table_permissions')
-        .select('*')
-        .eq('table_id', table.id)
-      if (pErr) {
-        console.error('Error fetching perms:', pErr)
-        toast.error('Failed to load permissions: ' + pErr.message)
-      } else if (perms) {
-        console.log('Permissions loaded:', perms.length)
-        setPermissions(perms as Permission[])
-      }
-    } else {
-      // Non-owners: load only their own permission so canEditData() works
-      const { data: myPerm } = await supabase
-        .from('table_permissions')
-        .select('*')
-        .eq('table_id', table.id)
-        .eq('user_id', currentUserId)
-        .maybeSingle()
-      setPermissions(myPerm ? [myPerm as Permission] : [])
-    }
+    try {
+      const json = await api(`/api/tables?action=permissions&table_id=${table.id}`)
+      setPermissions(json.permissions || [])
+    } catch { setPermissions([]) }
   }
 
   const handleCreateTable = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true); setError('')
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error: err } = await supabase.from('dynamic_tables').insert({
-      owner_id: user?.id,
-      table_name: newTableForm.table_name,
-      description: newTableForm.description || null,
-      schema_definition: fields,
-      is_global: isAdmin ? newTableForm.is_global : false,
-    })
-    if (err) { setError(err.message); setSaving(false); toast.error('Failed to create table'); return }
-    setSaving(false); setShowTableModal(false)
-    setNewTableForm({ table_name: '', description: '', is_global: false })
-    setFields([{ name: 'field1', label: 'Field 1', type: 'text', required: false }])
-    toast.success('Table created successfully')
-    fetchTables()
+    try {
+      await api('/api/tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'table', table_name: newTableForm.table_name, description: newTableForm.description, schema_definition: fields, is_global: isAdmin ? newTableForm.is_global : false }),
+      })
+      setShowTableModal(false)
+      setNewTableForm({ table_name: '', description: '', is_global: false })
+      setFields([{ name: 'field1', label: 'Field 1', type: 'text', required: false }])
+      toast.success('Table created successfully')
+      fetchTables()
+    } catch (err: any) {
+      setError(err.message)
+      toast.error('Failed to create table')
+    }
+    setSaving(false)
   }
 
   const handleDeleteTable = async (id: string) => {
     if (!confirm('Delete this table and all its records?')) return
-    await supabase.from('dynamic_tables').delete().eq('id', id)
-    if (activeTable?.id === id) setActiveTable(null)
-    toast.success('Table deleted')
-    fetchTables()
+    try {
+      await api('/api/tables', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'table', id }) })
+      if (activeTable?.id === id) setActiveTable(null)
+      toast.success('Table deleted')
+      fetchTables()
+    } catch { toast.error('Failed to delete table') }
   }
 
   const openRecordModal = (rec?: TableRecord) => {
@@ -141,105 +130,63 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
 
   const handleSaveRecord = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setError('')
-    const { data: { user } } = await supabase.auth.getUser()
-    if (editingRecord) {
-      const { error: err } = await supabase.from('dynamic_table_records').update({ data: recordForm, updated_at: new Date().toISOString() }).eq('id', editingRecord.id)
-      if (err) { setError(err.message); setSaving(false); toast.error('Failed to update record'); return }
-      toast.success('Record updated')
-    } else {
-      const { error: err } = await supabase.from('dynamic_table_records').insert({ table_id: activeTable!.id, owner_id: user?.id, data: recordForm })
-      if (err) { setError(err.message); setSaving(false); toast.error('Failed to add record'); return }
-      toast.success('Record added')
+    try {
+      await api('/api/tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'record', id: editingRecord?.id, table_id: activeTable!.id, data: recordForm }),
+      })
+      toast.success(editingRecord ? 'Record updated' : 'Record added')
+      setShowRecordModal(false)
+      if (activeTable) openTable(activeTable)
+    } catch (err: any) {
+      setError(err.message)
+      toast.error('Failed to save record')
     }
-    setSaving(false); setShowRecordModal(false)
-    if (activeTable) openTable(activeTable)
+    setSaving(false)
   }
 
   const handleDeleteRecord = async (id: string) => {
     if (!confirm('Delete this record?')) return
-    await supabase.from('dynamic_table_records').delete().eq('id', id)
-    toast.success('Record deleted')
-    if (activeTable) openTable(activeTable)
+    try {
+      await api('/api/tables', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'record', id }) })
+      toast.success('Record deleted')
+      if (activeTable) openTable(activeTable)
+    } catch { toast.error('Failed to delete record') }
   }
 
   const handleGrantPermission = async (userId: string, permission: string) => {
     if (!activeTable) return
-
-    // STEP 1: Immediately update UI (optimistic update - never gets overwritten)
     setPermissions(prev => {
       const filtered = prev.filter(p => p.user_id !== userId)
-      if (permission) {
-        return [...filtered, {
-          id: 'optimistic-' + Date.now(),
-          table_id: activeTable.id,
-          user_id: userId,
-          permission
-        }]
-      }
+      if (permission) return [...filtered, { id: 'opt-' + Date.now(), table_id: activeTable.id, user_id: userId, permission }]
       return filtered
     })
-
-    // STEP 2: Persist to database in background
     setSaving(true)
     try {
-      const { data: existing } = await supabase
-        .from('table_permissions')
-        .select('id')
-        .eq('table_id', activeTable.id)
-        .eq('user_id', userId)
-        .maybeSingle()
-
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (existing) {
-        if (!permission) {
-          await supabase.from('table_permissions').delete().eq('id', existing.id)
-        } else {
-          const { error: updateErr } = await supabase
-            .from('table_permissions')
-            .update({ permission, granted_by: user?.id })
-            .eq('id', existing.id)
-          if (updateErr) throw updateErr
-        }
-      } else if (permission) {
-        const { error: insertErr } = await supabase
-          .from('table_permissions')
-          .insert({
-            table_id: activeTable.id,
-            user_id: userId,
-            permission,
-            granted_by: user?.id
-          })
-        if (insertErr) throw insertErr
-      }
-
-      // NOTE: Do NOT re-fetch from DB here — RLS may block SELECT and return []
-      // which would wipe out our optimistic state. UI is already correct.
+      await api('/api/tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'permission', table_id: activeTable.id, user_id: userId, permission }),
+      })
       toast.success(permission ? `Permission set to ${permission}` : 'Access revoked')
-
     } catch (err: any) {
-      console.error('Permission error:', err)
-      toast.error('Failed: ' + (err.message || 'Unknown error'))
-      // On failure only: revert the optimistic update
+      toast.error('Failed: ' + err.message)
       setPermissions(prev => prev.filter(p => p.user_id !== userId))
-    } finally {
-      setSaving(false)
     }
+    setSaving(false)
   }
 
   const handleRevokePermission = async (userId: string) => {
     if (!activeTable) return
-    // Optimistically remove from UI
+    const existingPerm = permissions.find(p => p.user_id === userId)
+    if (!existingPerm) return
     setPermissions(prev => prev.filter(p => p.user_id !== userId))
-    const { data: existing } = await supabase
-      .from('table_permissions')
-      .select('id')
-      .eq('table_id', activeTable.id)
-      .eq('user_id', userId)
-      .maybeSingle()
-    if (existing) {
-      await supabase.from('table_permissions').delete().eq('id', existing.id)
-    }
+    setSaving(true)
+    try {
+      await api('/api/tables', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'permission', id: existingPerm.id }) })
+    } catch { }
+    setSaving(false)
   }
 
   const addField = () => setFields([...fields, { name: `field${fields.length + 1}`, label: `Field ${fields.length + 1}`, type: 'text', required: false }])

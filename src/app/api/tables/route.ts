@@ -1,0 +1,150 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+export async function GET(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { searchParams } = new URL(req.url)
+  const action = searchParams.get('action') || 'tables'
+  const tableId = searchParams.get('table_id')
+
+  if (action === 'tables') {
+    const { data, error } = await supabase
+      .from('dynamic_tables')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ tables: data || [] })
+  }
+
+  if (action === 'records' && tableId) {
+    const { data, error } = await supabase
+      .from('dynamic_table_records')
+      .select('*')
+      .eq('table_id', tableId)
+      .order('created_at', { ascending: false })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ records: data || [] })
+  }
+
+  if (action === 'permissions' && tableId) {
+    const { data, error } = await supabase
+      .from('table_permissions')
+      .select('*')
+      .eq('table_id', tableId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ permissions: data || [] })
+  }
+
+  if (action === 'profiles') {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ profiles: data || [] })
+  }
+
+  return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+}
+
+export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json()
+  const action = body.action || 'table'
+
+  if (action === 'table') {
+    const { error } = await supabase.from('dynamic_tables').insert({
+      owner_id: user.id,
+      table_name: body.table_name,
+      description: body.description || null,
+      schema_definition: body.schema_definition,
+      is_global: body.is_global || false,
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'record') {
+    if (body.id) {
+      const { error } = await supabase
+        .from('dynamic_table_records')
+        .update({ data: body.data, updated_at: new Date().toISOString() })
+        .eq('id', body.id)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ success: true })
+    }
+    const { error } = await supabase.from('dynamic_table_records').insert({
+      table_id: body.table_id,
+      owner_id: user.id,
+      data: body.data,
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'permission') {
+    const { data: existing } = await supabase
+      .from('table_permissions')
+      .select('id')
+      .eq('table_id', body.table_id)
+      .eq('user_id', body.user_id)
+      .maybeSingle()
+
+    if (existing) {
+      if (!body.permission) {
+        await supabase.from('table_permissions').delete().eq('id', existing.id)
+      } else {
+        const { error } = await supabase
+          .from('table_permissions')
+          .update({ permission: body.permission, granted_by: user.id })
+          .eq('id', existing.id)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+    } else if (body.permission) {
+      const { error } = await supabase.from('table_permissions').insert({
+        table_id: body.table_id,
+        user_id: body.user_id,
+        permission: body.permission,
+        granted_by: user.id,
+      })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    return NextResponse.json({ success: true })
+  }
+
+  return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+}
+
+export async function DELETE(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json()
+  const action = body.action || 'table'
+
+  if (action === 'table') {
+    const { error } = await supabase.from('dynamic_tables').delete().eq('id', body.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'record') {
+    const { error } = await supabase.from('dynamic_table_records').delete().eq('id', body.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'permission') {
+    const { error } = await supabase.from('table_permissions').delete().eq('id', body.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+}
