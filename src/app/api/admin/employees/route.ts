@@ -70,13 +70,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
+    if (!body.password) {
+      return NextResponse.json({ error: 'Password is required to create a new employee' }, { status: 400 })
+    }
+
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
     if (!serviceRoleKey) {
       return NextResponse.json({ error: 'Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is missing' }, { status: 500 })
-    }
-
-    if (!body.password) {
-      return NextResponse.json({ error: 'Password is required to create a new employee' }, { status: 400 })
     }
 
     const supabaseAdmin = createClient(
@@ -85,30 +85,66 @@ export async function POST(req: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
+    const supabaseAnon = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
+    const email = body.email.trim().toLowerCase()
+
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email: body.email.trim().toLowerCase(),
+      email,
       password: body.password,
-      user_metadata: { full_name: body.full_name, role: 'employee' },
+      email_confirm: false,
+      user_metadata: {
+        full_name: body.full_name,
+        role: 'employee',
+        employee_id: body.employee_id || '',
+        contact: body.contact || '',
+        designation: body.designation || '',
+      },
     })
 
     if (createError) return NextResponse.json({ error: createError.message }, { status: 400 })
-
     const userId = userData.user.id
 
-    const { error: empError } = await supabaseAdmin.from('employees').upsert({
-      user_id: userId,
-      employee_id: body.employee_id || `EMP-${Date.now()}`,
-      full_name: body.full_name,
-      email: body.email.trim().toLowerCase(),
-      contact: body.contact || null,
-      designation: body.designation || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
+    let emailSent = false
+    const { error: signUpError } = await supabaseAnon.auth.signUp({
+      email,
+      password: body.password,
+      options: {
+        emailRedirectTo: `${appUrl.replace(/\/$/, '')}/auth/verify?next=/dashboard`,
+        data: {
+          full_name: body.full_name,
+          role: 'employee',
+          employee_id: body.employee_id || '',
+          contact: body.contact || '',
+          designation: body.designation || '',
+        },
+      },
+    })
+    emailSent = !signUpError
 
-    if (empError) return NextResponse.json({ error: empError.message }, { status: 500 })
-    await logAudit(supabase, auth.user.id, 'created', 'employee', userId)
-    return NextResponse.json({ success: true })
+    const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'signup',
+      email,
+      options: { redirectTo: `${appUrl.replace(/\/$/, '')}/auth/verify?next=/dashboard` },
+    } as any)
+
+    const confirmationLink = linkData?.properties?.action_link || ''
+
+    await logAudit(supabase, auth.user.id, emailSent ? 'employee_created_email_sent' : 'employee_created_pending', 'employee', userId)
+
+    return NextResponse.json({
+      success: true,
+      confirmationLink,
+      emailSent,
+      message: emailSent
+        ? `Verification email sent to ${email}. They can also use the link below.`
+        : 'Verification email could not be sent. Use the link below to activate the account.',
+    })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }

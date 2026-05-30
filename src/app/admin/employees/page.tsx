@@ -33,6 +33,8 @@ export default function AdminEmployeesPage() {
   const [form, setForm] = useState<FormData>({ employee_id: '', full_name: '', email: '', contact: '', designation: '', password: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>('')
+  const [successMessage, setSuccessMessage] = useState('')
+  const [confirmationLink, setConfirmationLink] = useState('')
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true)
@@ -59,6 +61,8 @@ export default function AdminEmployeesPage() {
       setForm({ employee_id: '', full_name: '', email: '', contact: '', designation: '', password: '' })
     }
     setError('')
+    setSuccessMessage('')
+    setConfirmationLink('')
     setShowModal(true)
   }
 
@@ -66,6 +70,7 @@ export default function AdminEmployeesPage() {
     e.preventDefault()
     setSaving(true)
     setError('')
+    setSuccessMessage('')
     let saveError: string | null = null
     try {
       const res = await fetch('/api/admin/employees', {
@@ -73,10 +78,13 @@ export default function AdminEmployeesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editing ? { ...form, id: editing.id } : form),
       })
+      const json = await res.json()
       if (!res.ok) {
-        const json = await res.json()
         saveError = json.error || 'Failed to save'
         setError(saveError)
+      } else if (!editing) {
+        setSuccessMessage(json.message || 'Employee created successfully.')
+        setConfirmationLink(json.confirmationLink || '')
       }
     } catch {
       saveError = 'Failed to save'
@@ -116,6 +124,20 @@ export default function AdminEmployeesPage() {
           + Add Employee
         </button>
       </PageHeader>
+
+      {successMessage && (
+        <div className="mb-4 bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-green-400 space-y-2">
+          <div>{successMessage}</div>
+          {confirmationLink && (
+            <div className="flex items-center gap-2">
+              <input readOnly value={confirmationLink} onClick={e => (e.target as HTMLInputElement).select()}
+                className="flex-1 bg-black/30 border border-green-500/20 rounded-lg px-3 py-1.5 text-xs text-green-300 font-mono truncate focus:outline-none cursor-text" />
+              <button onClick={() => { navigator.clipboard.writeText(confirmationLink); setSuccessMessage('Link copied!') }}
+                className="shrink-0 text-[10px] bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 px-2 py-1.5 rounded-lg text-green-300 transition-all">Copy</button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mb-6">
         <input type="text" placeholder="Search by name, email, or ID..." value={search} onChange={e => setSearch(e.target.value)}
