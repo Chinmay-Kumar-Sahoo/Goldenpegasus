@@ -336,15 +336,15 @@ export default function MarketingPage({
     return records.filter(r => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false
       if (!q) return true
-      const fields = [
-        r.name, r.date, r.status, r.recruiter_name, r.recruiter_email,
+      const dateMatch = r.date && r.date.toLowerCase().includes(q)
+      const textFields = [
+        r.name, r.status, r.recruiter_name, r.recruiter_email,
         r.organization_name, r.implementation_partner, r.end_client,
-        r.project_start_date, r.project_end_date, r.interview_date,
         r.interview_type, r.client_name, r.client_email,
         r.implementation_poc_email, r.interviewer_email, r.notes,
         r.employee_name,
       ]
-      return fields.some(f => f && f.toLowerCase().includes(q))
+      return dateMatch || textFields.some(f => f && f.toLowerCase().includes(q))
     })
   }, [records, search, statusFilter])
 
