@@ -108,22 +108,33 @@ export default function AdminEmployeesPage() {
 
   const query = search.trim().toLowerCase()
 
-  const matches = (val: string | null, q: string) => {
+  const wordScore = (val: string | null, q: string): number => {
     const v = (val ?? '').toLowerCase()
-    return v === q || v.split(/[\s\-_./@]+/).some(w => w.startsWith(q))
+    if (!v || !q) return 0
+    const words = v.split(/[\s\-_./@]+/)
+    if (words.some(w => w === q)) return 3
+    if (words.some(w => w.startsWith(q))) return 2
+    if (words.some(w => w.includes(q))) return 1
+    return 0
   }
 
   const filtered = useMemo(() => {
     if (!query) return employees.filter(e => e.role === 'employee')
-    return employees.filter(e =>
-      e.role === 'employee' && (
-        matches(e.full_name, query) ||
-        matches(e.email, query) ||
-        matches(e.employee_id, query) ||
-        matches(e.contact, query) ||
-        matches(e.designation, query)
-      )
-    )
+    const scored = employees
+      .filter(e => e.role === 'employee')
+      .map(e => {
+        const score = Math.max(
+          wordScore(e.full_name, query),
+          wordScore(e.email, query),
+          wordScore(e.employee_id, query),
+          wordScore(e.contact, query),
+          wordScore(e.designation, query),
+        )
+        return { emp: e, score }
+      })
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+    return scored.map(x => x.emp)
   }, [employees, query])
 
   return (
