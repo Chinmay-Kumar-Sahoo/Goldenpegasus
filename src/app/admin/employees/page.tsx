@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import PageHeader from '@/components/PageHeader'
 
 interface Employee {
@@ -106,13 +106,19 @@ export default function AdminEmployeesPage() {
     } catch {}
   }
 
-  const filtered = employees.filter(e =>
-    e.role === 'employee' && (
-      e.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      e.email.toLowerCase().includes(search.toLowerCase()) ||
-      (e.employee_id || '').toLowerCase().includes(search.toLowerCase())
+  const query = search.trim().toLowerCase()
+  const filtered = useMemo(() => {
+    if (!query) return employees.filter(e => e.role === 'employee')
+    return employees.filter(e =>
+      e.role === 'employee' && (
+        (e.full_name ?? '').toLowerCase().includes(query) ||
+        (e.email ?? '').toLowerCase().includes(query) ||
+        (e.employee_id ?? '').toLowerCase().includes(query) ||
+        (e.contact ?? '').toLowerCase().includes(query) ||
+        (e.designation ?? '').toLowerCase().includes(query)
+      )
     )
-  )
+  }, [employees, query])
 
   return (
     <div>
@@ -128,9 +134,17 @@ export default function AdminEmployeesPage() {
         </div>
       )}
 
-      <div className="mb-6">
-        <input type="text" placeholder="Search by name, email, or ID..." value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full md:w-96 bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60" />
+      <div className="mb-6 flex items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <input type="text" placeholder="Search by name, email, ID, contact, or designation..." value={search} onChange={e => setSearch(e.target.value)}
+            className="w-full bg-[#111111] border border-[#2a2a2a] rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60 transition-all" />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717a] hover:text-white transition-colors text-lg leading-none">&times;</button>
+          )}
+        </div>
+        {search && (
+          <span className="text-xs text-[#71717a] whitespace-nowrap">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+        )}
       </div>
 
       <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl overflow-hidden">
