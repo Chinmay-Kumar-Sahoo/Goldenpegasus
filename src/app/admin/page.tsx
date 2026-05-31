@@ -15,7 +15,7 @@ export default async function AdminPage() {
       supabase.from('marketing_records').select('*', { count: 'exact', head: true }),
       supabase.from('Candidate_records').select('*', { count: 'exact', head: true }),
       supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }),
-      supabase.from('audit_logs').select('action, entity_type, created_at').order('created_at', { ascending: false }).limit(5),
+      supabase.from('audit_logs').select('action, entity_type, created_at').gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()).order('created_at', { ascending: false }),
     ])
 
   const stats = [

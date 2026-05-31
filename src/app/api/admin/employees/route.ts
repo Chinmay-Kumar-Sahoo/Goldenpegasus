@@ -85,13 +85,12 @@ export async function POST(req: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
     const email = body.email.trim().toLowerCase()
 
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: body.password,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: {
         full_name: body.full_name,
         role: 'employee',
@@ -104,22 +103,11 @@ export async function POST(req: NextRequest) {
     if (createError) return NextResponse.json({ error: createError.message }, { status: 400 })
     const userId = userData.user.id
 
-    const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'signup',
-      email,
-      options: { redirectTo: `${appUrl.replace(/\/$/, '')}/auth/verify?next=/login` },
-    } as any)
-
-    const actionLink = linkData?.properties?.action_link || ''
-    const customRedirect = `${appUrl.replace(/\/$/, '')}/auth/verify?next=${encodeURIComponent('/login?email_confirmed=true')}`
-    const confirmationLink = actionLink.replace(/redirect_to=[^&]+/, `redirect_to=${encodeURIComponent(customRedirect)}`)
-
-    await logAudit(supabase, auth.user.id, 'employee_created_pending', 'employee', userId)
+    await logAudit(supabase, auth.user.id, 'employee_created', 'employee', userId)
 
     return NextResponse.json({
       success: true,
-      confirmationLink,
-      message: 'Employee created. Share this verification link with them to activate their account:',
+      message: 'Employee created successfully. They can now log in using the email and password set by Admin.',
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
