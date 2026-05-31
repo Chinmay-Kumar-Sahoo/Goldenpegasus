@@ -10,6 +10,7 @@ interface Employee {
   email: string
   contact: string | null
   designation: string | null
+  joining_date: string | null
   role: string
   email_confirmed_at: string | null
   created_at: string
@@ -21,6 +22,7 @@ interface FormData {
   email: string
   contact: string
   designation: string
+  joining_date: string
   password: string
 }
 
@@ -30,7 +32,7 @@ export default function AdminEmployeesPage() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Employee | null>(null)
   const [search, setSearch] = useState('')
-  const [form, setForm] = useState<FormData>({ employee_id: '', full_name: '', email: '', contact: '', designation: '', password: '' })
+  const [form, setForm] = useState<FormData>({ employee_id: '', full_name: '', email: '', contact: '', designation: '', joining_date: '', password: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -54,10 +56,10 @@ export default function AdminEmployeesPage() {
   const openModal = (emp?: Employee) => {
     if (emp) {
       setEditing(emp)
-      setForm({ employee_id: emp.employee_id || '', full_name: emp.full_name, email: emp.email, contact: emp.contact || '', designation: emp.designation || '', password: '' })
+      setForm({ employee_id: emp.employee_id || '', full_name: emp.full_name, email: emp.email, contact: emp.contact || '', designation: emp.designation || '', joining_date: emp.joining_date || '', password: '' })
     } else {
       setEditing(null)
-      setForm({ employee_id: '', full_name: '', email: '', contact: '', designation: '', password: '' })
+      setForm({ employee_id: '', full_name: '', email: '', contact: '', designation: '', joining_date: '', password: '' })
     }
     setError('')
     setSuccessMessage('')
@@ -129,6 +131,7 @@ export default function AdminEmployeesPage() {
           wordScore(e.employee_id, query),
           wordScore(e.contact, query),
           wordScore(e.designation, query),
+          wordScore(e.joining_date, query),
         )
         return { emp: e, score }
       })
@@ -169,7 +172,7 @@ export default function AdminEmployeesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a2a]">
-                {['Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Status', 'Actions'].map(h => (
+                {['Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Joining Date', 'Status', 'Actions'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -178,13 +181,13 @@ export default function AdminEmployeesPage() {
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 8 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-[#71717a] text-sm">No employees found.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-[#71717a] text-sm">No employees found.</td></tr>
               ) : (
                 filtered.map(emp => (
                   <tr key={emp.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
@@ -193,6 +196,7 @@ export default function AdminEmployeesPage() {
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.email}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.contact || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.designation || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.joining_date || '—'}</td>
                     <td className="px-4 py-3">
                       {emp.email_confirmed_at ? (
                         <span className="text-[10px] px-2 py-1 rounded-full bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 font-bold uppercase tracking-wider">Verified</span>
@@ -225,6 +229,7 @@ export default function AdminEmployeesPage() {
                 { label: 'Email', name: 'email', type: 'email', placeholder: 'john@example.com' },
                 { label: 'Contact', name: 'contact', type: 'text', placeholder: '+1 234 567 8900' },
                 { label: 'Designation', name: 'designation', type: 'text', placeholder: 'Software Engineer' },
+                { label: 'Joining Date', name: 'joining_date' as const, type: 'date', placeholder: '' },
                 ...(editing ? [] : [{ label: 'Password', name: 'password' as const, type: 'password' as const, placeholder: 'Min. 8 characters' }]),
               ].map(field => (
                 <div key={field.name}>

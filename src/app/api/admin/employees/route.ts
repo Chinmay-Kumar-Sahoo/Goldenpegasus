@@ -42,6 +42,7 @@ export async function GET() {
         employee_id: emp?.employee_id || null,
         contact: emp?.contact || null,
         designation: emp?.designation || null,
+        joining_date: emp?.joining_date ?? null,
         created_at: p.created_at,
       }
     })
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
         employee_id: body.employee_id || '',
         contact: body.contact || '',
         designation: body.designation || '',
+        joining_date: body.joining_date || '',
       },
     })
 

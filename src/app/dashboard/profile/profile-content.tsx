@@ -28,6 +28,7 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const fieldsLocked = !!(initialEmployee?.employee_id)
+  const joiningDateLocked = !!(initialEmployee?.joining_date)
 
   const ensureUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -108,13 +109,16 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
                   { label: 'Company ID', name: 'company_id', type: 'text', placeholder: 'GPEG-123' },
                   { label: 'Date of Birth', name: 'date_of_birth', type: 'date', placeholder: '' },
                   { label: 'Joining Date', name: 'joining_date', type: 'date', placeholder: '' },
-                ].map(field => (
+                ].map(field => {
+                  const isLocked = field.name === 'joining_date' ? joiningDateLocked : fieldsLocked
+                  return (
                   <div key={field.name}>
                     <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
-                    <input type={field.type} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: e.target.value })} placeholder={field.placeholder} disabled={fieldsLocked}
-                      className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm ${fieldsLocked ? 'text-[#71717a] cursor-not-allowed' : 'text-white focus:outline-none focus:border-[#22c55e]/60'}`} />
+                    <input type={field.type} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: e.target.value })} placeholder={field.placeholder} disabled={isLocked}
+                      className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm ${isLocked ? 'text-[#71717a] cursor-not-allowed' : 'text-white focus:outline-none focus:border-[#22c55e]/60'}`} />
                   </div>
-                ))}
+                  )
+                })}
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Address</label>
                   <textarea value={employee.address} onChange={e => setEmployee({ ...employee, address: e.target.value })} rows={2} placeholder="123 Main St, City, State" disabled={fieldsLocked}
@@ -126,7 +130,7 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
             {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
             {success && <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-green-400">{success}</div>}
 
-            {!fieldsLocked && (
+            {(!fieldsLocked || !joiningDateLocked) && (
               <button type="submit" disabled={saving}
                 className="w-full bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-black font-bold py-3 rounded-xl text-sm transition-all">
                 {saving ? 'Saving...' : 'Save Changes'}
