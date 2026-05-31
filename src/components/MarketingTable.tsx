@@ -116,9 +116,13 @@ export default function MarketingPage({
     setLoading(true)
     setError('')
     try {
+      const params = new URLSearchParams()
+      if (!isAdmin && currentUserId) params.set('owner_id', currentUserId)
+      const qs = params.toString()
+      const url = `/api/marketing${qs ? '?' + qs : ''}`
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 20000)
-      const res = await fetch('/api/marketing', { signal: controller.signal })
+      const res = await fetch(url, { signal: controller.signal })
       clearTimeout(timeoutId)
       if (!res.ok) throw new Error('Failed to load records')
       const json = await res.json()
@@ -134,7 +138,7 @@ export default function MarketingPage({
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isAdmin, currentUserId])
 
   useEffect(() => {
     if (records.length === 0) fetchRecords()
