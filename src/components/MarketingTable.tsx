@@ -99,6 +99,13 @@ export default function MarketingPage({
   const [loading, setLoading] = useState(serverRecords.length === 0)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [showDateFilters, setShowDateFilters] = useState(false)
+  const [dateFilters, setDateFilters] = useState({
+    date: { start: '', end: '' },
+    interview_date: { start: '', end: '' },
+    project_start_date: { start: '', end: '' },
+    project_end_date: { start: '', end: '' },
+  })
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<MarketingRecord | null>(null)
   const [saving, setSaving] = useState(false)
@@ -334,11 +341,25 @@ export default function MarketingPage({
     setShowExportMenu(false)
   }
 
+  const inRange = (val: string | null, range: { start: string; end: string }) => {
+    if (!range.start && !range.end) return true
+    if (!val) return false
+    const d = val.slice(0, 10)
+    if (range.start && d < range.start) return false
+    if (range.end && d > range.end) return false
+    return true
+  }
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
-    if (!q && statusFilter === 'all') return records
+    const hasDateFilter = Object.values(dateFilters).some(r => r.start || r.end)
+    if (!q && statusFilter === 'all' && !hasDateFilter) return records
     return records.filter(r => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      if (!inRange(r.date, dateFilters.date)) return false
+      if (!inRange(r.interview_date, dateFilters.interview_date)) return false
+      if (!inRange(r.project_start_date, dateFilters.project_start_date)) return false
+      if (!inRange(r.project_end_date, dateFilters.project_end_date)) return false
       if (!q) return true
       const fields = [
         r.name, r.date, r.status, r.recruiter_name, r.recruiter_email,
@@ -349,7 +370,7 @@ export default function MarketingPage({
       ]
       return fields.some(f => f && f.toLowerCase().includes(q))
     })
-  }, [records, search, statusFilter])
+  }, [records, search, statusFilter, dateFilters])
 
   return (
     <div>
@@ -392,7 +413,7 @@ export default function MarketingPage({
       </PageHeader>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="flex flex-wrap gap-3 mb-4">
         <input type="text" placeholder="Search records..." value={search} onChange={e => setSearch(e.target.value)}
           suppressHydrationWarning
           className="flex-1 min-w-[200px] bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60" />
@@ -405,7 +426,37 @@ export default function MarketingPage({
           <option value="completed">Completed</option>
           <option value="closed">Closed</option>
         </select>
+        <button onClick={() => setShowDateFilters(v => !v)} suppressHydrationWarning
+          className={`border ${showDateFilters ? 'border-[#22c55e] bg-[#22c55e]/10 text-[#22c55e]' : 'border-[#2a2a2a] text-white hover:bg-[#1a1a1a]'} rounded-xl px-4 py-2.5 text-sm transition-all`}>
+          Date Filter {showDateFilters ? '▲' : '▼'}
+        </button>
+        {Object.values(dateFilters).some(r => r.start || r.end) && (
+          <button onClick={() => setDateFilters({ date: { start: '', end: '' }, interview_date: { start: '', end: '' }, project_start_date: { start: '', end: '' }, project_end_date: { start: '', end: '' } })} suppressHydrationWarning
+            className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2">
+            Clear dates
+          </button>
+        )}
       </div>
+
+      {showDateFilters && (
+        <div className="bg-[#111111] border border-[#2a2a2a] rounded-xl px-5 py-4 mb-6 space-y-3">
+          {[
+            { label: 'Created Date', key: 'date' as const },
+            { label: 'Interview Date', key: 'interview_date' as const },
+            { label: 'Project Start Date', key: 'project_start_date' as const },
+            { label: 'Project End Date', key: 'project_end_date' as const },
+          ].map(field => (
+            <div key={field.key} className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[#a1a1aa] w-36 shrink-0">{field.label}</span>
+              <input type="date" value={dateFilters[field.key].start} onChange={e => setDateFilters(f => ({ ...f, [field.key]: { ...f[field.key], start: e.target.value } }))}
+                className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#22c55e]/60" />
+              <span className="text-xs text-[#71717a]">to</span>
+              <input type="date" value={dateFilters[field.key].end} onChange={e => setDateFilters(f => ({ ...f, [field.key]: { ...f[field.key], end: e.target.value } }))}
+                className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#22c55e]/60" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl overflow-hidden">
