@@ -75,6 +75,13 @@ const STATUS_COLORS: Record<string, string> = {
   completed: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
 }
 
+const DATE_COLUMNS: Record<string, string> = {
+  'Created Date': 'date',
+  'Interview Date': 'interview_date',
+  'Project Start Date': 'project_start_date',
+  'Project End Date': 'project_end_date',
+}
+
 export default function MarketingPage({
   isAdmin = false,
   readOnly = false,
@@ -99,7 +106,7 @@ export default function MarketingPage({
   const [loading, setLoading] = useState(serverRecords.length === 0)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [showDateFilters, setShowDateFilters] = useState(false)
+  const [activeDateFilter, setActiveDateFilter] = useState<string | null>(null)
   const [dateFilters, setDateFilters] = useState({
     date: { start: '', end: '' },
     interview_date: { start: '', end: '' },
@@ -151,6 +158,9 @@ export default function MarketingPage({
     if (records.length === 0) fetchRecords()
   }, [fetchRecords])
 
+  const dateFilterRef = useRef<HTMLTableSectionElement>(null)
+  const dateFilterBtnRef = useRef<HTMLButtonElement | null>(null)
+
   useEffect(() => {
     if (!showExportMenu) return
     const handleClick = (e: MouseEvent) => {
@@ -161,6 +171,17 @@ export default function MarketingPage({
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showExportMenu])
+
+  useEffect(() => {
+    if (!activeDateFilter) return
+    const handleClick = (e: MouseEvent) => {
+      if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
+        setActiveDateFilter(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [activeDateFilter])
 
   const canEdit = (record: MarketingRecord) => !readOnly && (isAdmin || record.owner_id === currentUserId)
 
@@ -426,47 +447,71 @@ export default function MarketingPage({
           <option value="completed">Completed</option>
           <option value="closed">Closed</option>
         </select>
-        <button onClick={() => setShowDateFilters(v => !v)} suppressHydrationWarning
-          className={`border ${showDateFilters ? 'border-[#22c55e] bg-[#22c55e]/10 text-[#22c55e]' : 'border-[#2a2a2a] text-white hover:bg-[#1a1a1a]'} rounded-xl px-4 py-2.5 text-sm transition-all`}>
-          Date Filter {showDateFilters ? '▲' : '▼'}
-        </button>
         {Object.values(dateFilters).some(r => r.start || r.end) && (
-          <button onClick={() => setDateFilters({ date: { start: '', end: '' }, interview_date: { start: '', end: '' }, project_start_date: { start: '', end: '' }, project_end_date: { start: '', end: '' } })} suppressHydrationWarning
+          <button onClick={() => { setDateFilters({ date: { start: '', end: '' }, interview_date: { start: '', end: '' }, project_start_date: { start: '', end: '' }, project_end_date: { start: '', end: '' } }); setActiveDateFilter(null) }} suppressHydrationWarning
             className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2">
-            Clear dates
+            Clear all date filters
           </button>
         )}
       </div>
 
-      {showDateFilters && (
-        <div className="bg-[#111111] border border-[#2a2a2a] rounded-xl px-5 py-4 mb-6 space-y-3">
-          {[
-            { label: 'Created Date', key: 'date' as const },
-            { label: 'Interview Date', key: 'interview_date' as const },
-            { label: 'Project Start Date', key: 'project_start_date' as const },
-            { label: 'Project End Date', key: 'project_end_date' as const },
-          ].map(field => (
-            <div key={field.key} className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-[#a1a1aa] w-36 shrink-0">{field.label}</span>
-              <input type="date" value={dateFilters[field.key].start} onChange={e => setDateFilters(f => ({ ...f, [field.key]: { ...f[field.key], start: e.target.value } }))}
-                className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#22c55e]/60" />
-              <span className="text-xs text-[#71717a]">to</span>
-              <input type="date" value={dateFilters[field.key].end} onChange={e => setDateFilters(f => ({ ...f, [field.key]: { ...f[field.key], end: e.target.value } }))}
-                className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#22c55e]/60" />
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Table */}
-      <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className={`bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeDateFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
+        <div className={activeDateFilter ? 'overflow-visible' : 'overflow-x-auto'}>
           <table className="w-full">
-            <thead>
+            <thead ref={dateFilterRef}>
               <tr className="border-b border-[#2a2a2a]">
-                {['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Of Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : '', !readOnly ? 'Actions' : ''].filter(Boolean).map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap">{h}</th>
-                ))}
+                {['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Of Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : '', !readOnly ? 'Actions' : ''].filter(Boolean).map(h => {
+                  const dateKey = DATE_COLUMNS[h]
+                  const isActive = activeDateFilter === dateKey
+                  const hasFilter = dateFilters[dateKey as keyof typeof dateFilters]?.start || dateFilters[dateKey as keyof typeof dateFilters]?.end
+                  return (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap relative">
+                      {dateKey ? (
+                        <div className="flex items-center gap-1.5">
+                          <span>{h}</span>
+                          <button ref={dateKey === activeDateFilter ? (el) => { dateFilterBtnRef.current = el } : undefined}
+                            onClick={(e) => { e.stopPropagation(); setActiveDateFilter(isActive ? null : dateKey) }}
+                            className={`p-0.5 rounded transition-colors ${hasFilter ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : h}
+                      {dateKey && isActive && (
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3.5 z-[9999] shadow-2xl min-w-[260px]" onClick={e => e.stopPropagation()}>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-[10px] text-[#71717a] mb-1.5 font-medium">FROM</label>
+                              <input type="date" value={dateFilters[dateKey as keyof typeof dateFilters].start}
+                                onChange={e => setDateFilters(f => ({ ...f, [dateKey]: { ...f[dateKey as keyof typeof f], start: e.target.value } }))}
+                                className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 [color-scheme:dark]" />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-[#71717a] mb-1.5 font-medium">TO</label>
+                              <input type="date" value={dateFilters[dateKey as keyof typeof dateFilters].end}
+                                onChange={e => setDateFilters(f => ({ ...f, [dateKey]: { ...f[dateKey as keyof typeof f], end: e.target.value } }))}
+                                className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 [color-scheme:dark]" />
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              {hasFilter && (
+                                <button onClick={() => { setDateFilters(f => ({ ...f, [dateKey]: { start: '', end: '' } })); setActiveDateFilter(null) }}
+                                  className="flex-1 text-center text-xs text-[#71717a] hover:text-red-400 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-red-400/30 transition-colors">
+                                  Clear
+                                </button>
+                              )}
+                              <button onClick={() => setActiveDateFilter(null)}
+                                className="flex-1 text-center text-xs text-white bg-[#22c55e]/20 hover:bg-[#22c55e]/30 py-1.5 rounded-lg border border-[#22c55e]/40 transition-colors">
+                                Apply
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
