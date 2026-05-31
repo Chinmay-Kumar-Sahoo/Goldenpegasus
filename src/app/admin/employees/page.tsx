@@ -107,15 +107,21 @@ export default function AdminEmployeesPage() {
   }
 
   const query = search.trim().toLowerCase()
+
+  const matches = (val: string | null, q: string) => {
+    const v = (val ?? '').toLowerCase()
+    return v === q || v.split(/[\s\-_./@]+/).some(w => w.startsWith(q))
+  }
+
   const filtered = useMemo(() => {
     if (!query) return employees.filter(e => e.role === 'employee')
     return employees.filter(e =>
       e.role === 'employee' && (
-        (e.full_name ?? '').toLowerCase().includes(query) ||
-        (e.email ?? '').toLowerCase().includes(query) ||
-        (e.employee_id ?? '').toLowerCase().includes(query) ||
-        (e.contact ?? '').toLowerCase().includes(query) ||
-        (e.designation ?? '').toLowerCase().includes(query)
+        matches(e.full_name, query) ||
+        matches(e.email, query) ||
+        matches(e.employee_id, query) ||
+        matches(e.contact, query) ||
+        matches(e.designation, query)
       )
     )
   }, [employees, query])
