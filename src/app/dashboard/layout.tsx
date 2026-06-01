@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import SessionGuard from '@/components/SessionGuard'
+import SignOutButton from '@/components/SignOutButton'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -43,6 +44,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <div className="text-[10px] px-2 py-1 rounded-full bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 font-bold uppercase tracking-wider">
                 Active Session
               </div>
+              <SignOutButton role="employee" />
             </div>
           </div>
         </header>

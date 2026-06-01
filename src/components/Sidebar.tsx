@@ -40,29 +40,9 @@ const employeeNav: NavItem[] = [
 
 export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
   const pathname = usePathname()
-  const [loggingOut, setLoggingOut] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
 
   const nav = role === 'admin' ? adminNav : employeeNav
-
-  const handleLogout = () => {
-    setLoggingOut(true)
-    // Clear all auth cookies directly — bypass Supabase client to avoid hanging
-    document.cookie.split(';').forEach(c => {
-      const name = c.trim().split('=')[0]
-      if (name.startsWith('sb-') || name.startsWith('supabase-')) {
-        document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`
-        document.cookie = `${name}=; path=/; max-age=0; SameSite=Strict`
-      }
-    })
-    localStorage.clear()
-    sessionStorage.clear()
-    if (role === 'admin') {
-      window.location.href = '/admin-login'
-    } else {
-      window.location.href = '/login'
-    }
-  }
 
   const isActive = (href: string) => {
     if (href === '/admin' || href === '/dashboard') return pathname === href
@@ -128,15 +108,6 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
             <div className="text-[10px] text-[#71717a] truncate font-medium">{userEmail}</div>
           </div>
         )}
-        <button
-          onClick={handleLogout}
-          disabled={loggingOut}
-          title={collapsed ? 'Sign Out' : undefined}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#a1a1aa] hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
-        >
-          <span className="text-base flex-shrink-0">🚪</span>
-          {!collapsed && <span>{loggingOut ? 'Signing out...' : 'Sign Out'}</span>}
-        </button>
       </div>
     </aside>
   )
