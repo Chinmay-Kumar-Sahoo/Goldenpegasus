@@ -67,6 +67,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
     contract_end: { start: '', end: '' },
   })
 
+  const exportMenuRef = useRef<HTMLDivElement | null>(null)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const dateFilterRef = useRef<HTMLTableSectionElement>(null)
 
   const fetchRecords = useCallback(async () => {
@@ -91,6 +93,17 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
       fetchRecords()
     }
   }, [fetchRecords])
+
+  useEffect(() => {
+    if (!showExportMenu) return
+    const handleClick = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showExportMenu])
 
   useEffect(() => {
     if (!activeDateFilter) return
@@ -162,6 +175,26 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = 'candidate_records.csv'; a.click()
+    setShowExportMenu(false)
+  }
+
+  const exportPDF = async () => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const doc = new jsPDF({ orientation: 'landscape' })
+
+    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
+    const data = filtered.map(r => [r.Candidate_name, r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.status || '', r.project_type || '', r.contract_start || '', r.contract_end || '', r.notes || ''])
+
+    autoTable(doc, {
+      head: [headers],
+      body: data,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [34, 197, 94] },
+    })
+
+    doc.save('candidate_records.pdf')
+    setShowExportMenu(false)
   }
 
   const query = search.trim().toLowerCase()
@@ -213,7 +246,17 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
     <div>
       <PageHeader title={isAdmin ? 'All Candidate Records' : 'My Candidates'} subtitle="Manage candidate information">
         <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">+ Add Candidate</button>
-        <button onClick={exportCSV} className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all">Export CSV</button>
+        <div ref={exportMenuRef} className="relative">
+          <button onClick={() => setShowExportMenu(v => !v)} className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all">
+            Export ▾
+          </button>
+          {showExportMenu && (
+            <div className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden z-50 min-w-[120px] shadow-xl">
+              <button onClick={exportCSV} className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">CSV</button>
+              <button onClick={exportPDF} className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">PDF</button>
+            </div>
+          )}
+        </div>
       </PageHeader>
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
