@@ -322,8 +322,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.project_type || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.contract_start ? new Date(rec.contract_start).toLocaleDateString() : '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.contract_end ? new Date(rec.contract_end).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{(rec.contract_start || '').split('T')[0] || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{(rec.contract_end || '').split('T')[0] || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button onClick={() => openModal(rec)} className="text-xs bg-[#1a1a1a] hover:bg-[#22c55e]/10 hover:text-[#22c55e] border border-[#2a2a2a] px-3 py-1 rounded-lg transition-all">Edit</button>
