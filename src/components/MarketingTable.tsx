@@ -124,6 +124,7 @@ export default function MarketingPage({
     implementation_partner: '', end_client: '', status: 'active',
     project_start_date: '', project_end_date: '', interview_date: '',
     implementation_poc_email: '', interviewer_email: '', notes: '',
+    employee_name: '',
   })
 
   const fetchRecords = useCallback(async () => {
@@ -196,10 +197,11 @@ export default function MarketingPage({
         project_end_date: rec.project_end_date || '', interview_date: rec.interview_date || '',
         implementation_poc_email: rec.implementation_poc_email || '',
         interviewer_email: rec.interviewer_email || '', notes: rec.notes || '',
+        employee_name: rec.employee_name || '',
       })
     } else {
       setEditing(null)
-      setForm({ name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'active', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '' })
+      setForm({ name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'active', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '' })
     }
     setError('')
     setShowModal(true)
@@ -589,6 +591,7 @@ export default function MarketingPage({
             <h2 className="text-lg font-bold text-white mb-6">{editing ? 'Edit Record' : 'Add Marketing Record'}</h2>
             <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
               {[
+                ...(isAdmin ? [{ label: 'Employee Name', name: 'employee_name' as const, type: 'text' as const, span: 1 as const }] : []),
                 { label: 'Candidate Name *', name: 'name', type: 'text', required: true, span: 2 },
                 { label: 'Created Date', name: 'date', type: 'date', span: 1 },
                 { label: 'Status', name: 'status', type: 'select', options: ['active', 'pending', 'completed', 'closed'], span: 1 },

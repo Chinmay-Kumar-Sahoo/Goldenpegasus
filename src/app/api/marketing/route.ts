@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
   const enriched = records.map(r => ({
     ...r,
-    employee_name: ownerNames[r.owner_id] || 'Unknown employee',
+    employee_name: (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
     last_reminder_sent_at: lastReminderByRecord[r.id] || null,
   }))
 
@@ -59,6 +59,13 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
+
+  if (!body.employee_name) {
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+    if (profile?.full_name) body.employee_name = profile.full_name
+    const { data: employee } = await supabase.from('employees').select('full_name').eq('user_id', user.id).single()
+    if (employee?.full_name) body.employee_name = employee.full_name
+  }
 
   if (body.id) {
     const { error } = await supabase
