@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import PageHeader from '@/components/PageHeader'
 
 interface Employee {
@@ -26,6 +26,19 @@ interface FormData {
   password: string
 }
 
+const DATE_COLUMNS: Record<string, string> = {
+  'Joining Date': 'joining_date',
+}
+
+function inRange(val: string | null, range: { start: string; end: string }): boolean {
+  if (!range.start && !range.end) return true
+  const d = (val || '').split('T')[0]
+  if (!d) return false
+  if (range.start && d < range.start) return false
+  if (range.end && d > range.end) return false
+  return true
+}
+
 export default function AdminEmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,6 +49,12 @@ export default function AdminEmployeesPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [activeDateFilter, setActiveDateFilter] = useState<string | null>(null)
+  const [dateFilters, setDateFilters] = useState({
+    joining_date: { start: '', end: '' },
+  })
+
+  const dateFilterRef = useRef<HTMLTableSectionElement>(null)
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true)
@@ -52,6 +71,17 @@ export default function AdminEmployeesPage() {
   useEffect(() => {
     fetchEmployees()
   }, [fetchEmployees])
+
+  useEffect(() => {
+    if (!activeDateFilter) return
+    const handleClick = (e: MouseEvent) => {
+      if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
+        setActiveDateFilter(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [activeDateFilter])
 
   const openModal = (emp?: Employee) => {
     if (emp) {
@@ -120,25 +150,43 @@ export default function AdminEmployeesPage() {
     return 0
   }
 
+  const hasDateFilter = Object.values(dateFilters).some(r => r.start || r.end)
+
   const filtered = useMemo(() => {
-    if (!query) return employees.filter(e => e.role === 'employee')
-    const scored = employees
-      .filter(e => e.role === 'employee')
-      .map(e => {
-        const score = Math.max(
-          wordScore(e.full_name, query),
-          wordScore(e.email, query),
-          wordScore(e.employee_id, query),
-          wordScore(e.contact, query),
-          wordScore(e.designation, query),
-          wordScore(e.joining_date, query),
-        )
-        return { emp: e, score }
-      })
-      .filter(x => x.score > 0)
-      .sort((a, b) => b.score - a.score)
+    const base = employees.filter(e => e.role === 'employee')
+    const hasSearch = !!query
+    if (!hasSearch && !hasDateFilter) return base
+    return base.filter(e => {
+      if (!inRange(e.joining_date, dateFilters.joining_date)) return false
+      if (!hasSearch) return true
+      const score = Math.max(
+        wordScore(e.full_name, query),
+        wordScore(e.email, query),
+        wordScore(e.employee_id, query),
+        wordScore(e.contact, query),
+        wordScore(e.designation, query),
+        wordScore(e.joining_date, query),
+      )
+      return score > 0
+    })
+  }, [employees, query, dateFilters, hasDateFilter])
+
+  const sorted = useMemo(() => {
+    if (!query) return filtered
+    const scored = filtered.map(e => {
+      const score = Math.max(
+        wordScore(e.full_name, query),
+        wordScore(e.email, query),
+        wordScore(e.employee_id, query),
+        wordScore(e.contact, query),
+        wordScore(e.designation, query),
+        wordScore(e.joining_date, query),
+      )
+      return { emp: e, score }
+    })
+    scored.sort((a, b) => b.score - a.score)
     return scored.map(x => x.emp)
-  }, [employees, query])
+  }, [filtered, query])
 
   return (
     <div>
@@ -163,18 +211,71 @@ export default function AdminEmployeesPage() {
           )}
         </div>
         {search && (
-          <span className="text-xs text-[#71717a] whitespace-nowrap">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+          <span className="text-xs text-[#71717a] whitespace-nowrap">{sorted.length} result{sorted.length !== 1 ? 's' : ''}</span>
+        )}
+        {hasDateFilter && (
+          <button onClick={() => { setDateFilters({ joining_date: { start: '', end: '' } }); setActiveDateFilter(null) }}
+            className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2">
+            Clear all date filters
+          </button>
         )}
       </div>
 
-      <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className={`bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeDateFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
+        <div className={activeDateFilter ? 'overflow-visible' : 'overflow-x-auto'}>
           <table className="w-full">
-            <thead>
+            <thead ref={dateFilterRef}>
               <tr className="border-b border-[#2a2a2a]">
-                {['Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Joining Date', 'Status', 'Actions'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">{h}</th>
-                ))}
+                {['Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Joining Date', 'Status', 'Actions'].map(h => {
+                  const dateKey = DATE_COLUMNS[h]
+                  const isActive = activeDateFilter === dateKey
+                  const hasFilter = dateKey && !!(dateFilters[dateKey as keyof typeof dateFilters]?.start || dateFilters[dateKey as keyof typeof dateFilters]?.end)
+                  return (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap relative">
+                      {dateKey ? (
+                        <div className="flex items-center gap-1.5">
+                          <span>{h}</span>
+                          <button onClick={(e) => { e.stopPropagation(); setActiveDateFilter(isActive ? null : dateKey) }}
+                            className={`p-0.5 rounded transition-colors ${hasFilter ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : h}
+                      {dateKey && isActive && (
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3.5 z-[9999] shadow-2xl min-w-[260px]" onClick={e => e.stopPropagation()}>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-[10px] text-[#71717a] mb-1.5 font-medium">FROM</label>
+                              <input type="date" value={dateFilters[dateKey as keyof typeof dateFilters].start}
+                                onChange={e => setDateFilters(f => ({ ...f, [dateKey]: { ...f[dateKey as keyof typeof f], start: e.target.value } }))}
+                                className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 [color-scheme:dark]" />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-[#71717a] mb-1.5 font-medium">TO</label>
+                              <input type="date" value={dateFilters[dateKey as keyof typeof dateFilters].end}
+                                onChange={e => setDateFilters(f => ({ ...f, [dateKey]: { ...f[dateKey as keyof typeof f], end: e.target.value } }))}
+                                className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 [color-scheme:dark]" />
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              {hasFilter && (
+                                <button onClick={() => { setDateFilters(f => ({ ...f, [dateKey]: { start: '', end: '' } })); setActiveDateFilter(null) }}
+                                  className="flex-1 text-center text-xs text-[#71717a] hover:text-red-400 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-red-400/30 transition-colors">
+                                  Clear
+                                </button>
+                              )}
+                              <button onClick={() => setActiveDateFilter(null)}
+                                className="flex-1 text-center text-xs text-white bg-[#22c55e]/20 hover:bg-[#22c55e]/30 py-1.5 rounded-lg border border-[#22c55e]/40 transition-colors">
+                                Apply
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
@@ -186,10 +287,10 @@ export default function AdminEmployeesPage() {
                     ))}
                   </tr>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : sorted.length === 0 ? (
                 <tr><td colSpan={8} className="px-4 py-12 text-center text-[#71717a] text-sm">No employees found.</td></tr>
               ) : (
-                filtered.map(emp => (
+                sorted.map(emp => (
                   <tr key={emp.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
                     <td className="px-4 py-3 text-sm text-[#22c55e] font-mono">{emp.employee_id || '—'}</td>
                     <td className="px-4 py-3 text-sm text-white font-medium">{emp.full_name}</td>
