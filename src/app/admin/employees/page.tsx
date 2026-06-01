@@ -147,6 +147,7 @@ export default function AdminEmployeesPage() {
     if (words.some(w => w === q)) return 3
     if (words.some(w => w.startsWith(q))) return 2
     if (words.some(w => w.includes(q))) return 1
+    if (v.includes(q)) return 1
     return 0
   }
 
