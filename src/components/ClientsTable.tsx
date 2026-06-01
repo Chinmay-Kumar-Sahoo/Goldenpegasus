@@ -182,7 +182,9 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
         wordScore(r.client_phone, query) > 0 ||
         wordScore(r.project_type, query) > 0 ||
         wordScore(r.address, query) > 0 ||
-        wordScore(r.notes, query) > 0
+        wordScore(r.notes, query) > 0 ||
+        wordScore(r.contract_start, query) > 0 ||
+        wordScore(r.contract_end, query) > 0
     })
   }, [records, query, statusFilter, dateFilters, hasDateFilter])
 
@@ -197,6 +199,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
         wordScore(r.project_type, query),
         wordScore(r.address, query),
         wordScore(r.notes, query),
+        wordScore(r.contract_start, query),
+        wordScore(r.contract_end, query),
       )
       return { rec: r, score }
     })
