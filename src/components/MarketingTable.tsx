@@ -82,6 +82,8 @@ const DATE_COLUMNS: Record<string, string> = {
   'Project End Date': 'project_end_date',
 }
 
+const LOCKABLE_FIELDS = new Set(['name', 'date', 'employee_name'])
+
 export default function MarketingPage({
   isAdmin = false,
   readOnly = false,
@@ -99,9 +101,10 @@ export default function MarketingPage({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const todayIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
   const [records, setRecords] = useState<MarketingRecord[]>(serverRecords.map(r => ({
     ...r,
-    employee_name: serverOwnerNames[r.owner_id] || 'Unknown employee',
+    employee_name: r.employee_name || serverOwnerNames[r.owner_id] || 'Unknown employee',
   })))
   const [loading, setLoading] = useState(serverRecords.length === 0)
   const [search, setSearch] = useState('')
@@ -201,7 +204,7 @@ export default function MarketingPage({
       })
     } else {
       setEditing(null)
-      setForm({ name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'active', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '' })
+      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'active', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: isAdmin ? 'Admin' : '' })
     }
     setError('')
     setShowModal(true)
@@ -606,23 +609,27 @@ export default function MarketingPage({
                 { label: 'Implementation POC Email', name: 'implementation_poc_email', type: 'email', span: 1 },
                 { label: 'Interviewer Email', name: 'interviewer_email', type: 'email', span: 1 },
                 { label: 'Comments', name: 'notes', type: 'textarea', span: 2 },
-              ].map(field => (
+              ].map(field => {
+                const locked = !!editing && LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]
+                return (
                 <div key={field.name} className={field.span === 2 ? 'col-span-2' : ''}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
                   {field.type === 'select' ? (
-                    <select value={form[field.name as keyof typeof form]} onChange={e => setForm({ ...form, [field.name]: e.target.value })}
-                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                    <select value={form[field.name as keyof typeof form]} onChange={e => setForm({ ...form, [field.name]: e.target.value })} disabled={locked}
+                      className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>
                       {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   ) : field.type === 'textarea' ? (
-                    <textarea value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} rows={2}
-                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-none" />
+                    <textarea value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} rows={2} disabled={locked}
+                      className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-none ${locked ? 'opacity-50 cursor-not-allowed' : ''}`} />
                   ) : (
-                    <input type={field.type} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} required={field.required}
-                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                    <input type={field.type} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} required={field.required} disabled={locked}
+                      className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${locked ? 'opacity-50 cursor-not-allowed' : ''}`} />
                   )}
+                  {locked && <p className="text-[10px] text-[#71717a] mt-1">Locked after save</p>}
                 </div>
-              ))}
+                )
+              })}
               {error && <div className="col-span-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
               <div className="col-span-2 flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white py-2.5 rounded-xl text-sm transition-all">Cancel</button>
