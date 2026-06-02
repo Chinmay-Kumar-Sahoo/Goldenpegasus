@@ -591,22 +591,22 @@ export default function MarketingPage({
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 15 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0) }).map((_, j) => (
+                    {Array.from({ length: 14 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0) }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : error ? (
-                <tr><td colSpan={15 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0)} className="px-4 py-12 text-center">
+                <tr><td colSpan={14 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center">
                   <div className="text-red-400 text-sm mb-1">Failed to load records</div>
                   <div className="text-[#71717a] text-xs">{error.includes('timed') ? 'The request timed out. Try refreshing the page.' : 'Please check your connection and try again.'}</div>
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={14 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
+                <tr><td colSpan={14 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
                 filtered.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                    <td className="px-2 py-3">{!readOnly && <input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" />}</td>
+                    {!readOnly && <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>}
                     <td className="px-4 py-3 text-sm text-white font-medium">{rec.name}</td>
                     {showEmployeeColumn && (
                       <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
