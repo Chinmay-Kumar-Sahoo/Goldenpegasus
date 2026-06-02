@@ -511,7 +511,7 @@ export default function MarketingPage({
       </div>
 
       {/* Bulk Actions */}
-      {selectedIds.size > 0 && (
+      {!readOnly && selectedIds.size > 0 && (
         <div className="mb-4 flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5">
           <span className="text-sm text-[#a1a1aa]">{selectedIds.size} selected</span>
           <button onClick={() => { setBulkForm({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', interviewer_email: '' }); setShowBulkModal(true) }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
@@ -526,7 +526,7 @@ export default function MarketingPage({
           <table className="w-full">
             <thead ref={dateFilterRef}>
               <tr className="border-b border-[#2a2a2a]">
-                {['SELECT', 'Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : '', !readOnly ? 'Actions' : ''].filter(Boolean).map(h => {
+                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : '', !readOnly ? 'Actions' : ''].filter(Boolean).map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -606,7 +606,7 @@ export default function MarketingPage({
               ) : (
                 filtered.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                    <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>
+                    <td className="px-2 py-3">{!readOnly && <input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" />}</td>
                     <td className="px-4 py-3 text-sm text-white font-medium">{rec.name}</td>
                     {showEmployeeColumn && (
                       <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
