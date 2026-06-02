@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import PageHeader from '@/components/PageHeader'
+import toast from 'react-hot-toast'
 
 interface Employee {
   id: string
@@ -53,6 +54,10 @@ export default function AdminEmployeesPage() {
   const [dateFilters, setDateFilters] = useState({
     joining_date: { start: '', end: '' },
   })
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBulkModal, setShowBulkModal] = useState(false)
+  const [bulkForm, setBulkForm] = useState({ designation: '', contact: '' })
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   const dateFilterRef = useRef<HTMLTableSectionElement>(null)
 
@@ -136,6 +141,52 @@ export default function AdminEmployeesPage() {
       })
       fetchEmployees()
     } catch {}
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => prev.size === sorted.length ? new Set() : new Set(sorted.map(r => r.id)))
+  }
+
+  const handleBulkUpdate = async () => {
+    const updates = Object.fromEntries(Object.entries(bulkForm).filter(([_, v]) => v !== ''))
+    if (Object.keys(updates).length === 0) { toast.error('No fields to update'); return }
+    setBulkSaving(true)
+    try {
+      const res = await fetch('/api/admin/employees/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds), updates }),
+      })
+      if (!res.ok) throw new Error('Failed to bulk update')
+      toast.success(`Updated ${selectedIds.size} employees`)
+      setShowBulkModal(false)
+      setSelectedIds(new Set())
+      setBulkForm({ designation: '', contact: '' })
+      fetchEmployees()
+    } catch {
+      toast.error('Failed to bulk update')
+    }
+    setBulkSaving(false)
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Delete ${selectedIds.size} employees?`)) return
+    try {
+      const res = await fetch('/api/admin/employees/batch', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      })
+      if (!res.ok) throw new Error('Failed to bulk delete')
+      toast.success(`Deleted ${selectedIds.size} employees`)
+      setSelectedIds(new Set())
+      fetchEmployees()
+    } catch {
+      toast.error('Failed to bulk delete')
+    }
   }
 
   const query = search.trim().toLowerCase()
@@ -222,12 +273,29 @@ export default function AdminEmployeesPage() {
         )}
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="mb-4 flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5">
+          <span className="text-sm text-[#a1a1aa]">{selectedIds.size} selected</span>
+          <button onClick={() => { setBulkForm({ designation: '', contact: '' }); setShowBulkModal(true) }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
+          <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
+        </div>
+      )}
+
       <div className={`bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeDateFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
         <div className={activeDateFilter ? 'overflow-visible' : 'overflow-x-auto'}>
           <table className="w-full">
             <thead ref={dateFilterRef}>
               <tr className="border-b border-[#2a2a2a]">
-                {['Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Joining Date', 'Status', 'Actions'].map(h => {
+                {['SELECT', 'Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Joining Date', 'Status', 'Actions'].map(h => {
+                  if (h === 'SELECT') {
+                    return (
+                      <th key="select" className="text-left px-2 py-3 w-10">
+                        <input type="checkbox" checked={selectedIds.size === sorted.length && sorted.length > 0} onChange={toggleSelectAll}
+                          className="accent-[#22c55e] cursor-pointer" />
+                      </th>
+                    )
+                  }
                   const dateKey = DATE_COLUMNS[h]
                   const isActive = activeDateFilter === dateKey
                   const hasFilter = dateKey && !!(dateFilters[dateKey as keyof typeof dateFilters]?.start || dateFilters[dateKey as keyof typeof dateFilters]?.end)
@@ -283,16 +351,17 @@ export default function AdminEmployeesPage() {
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 8 }).map((_, j) => (
+                    {Array.from({ length: 9 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-[#71717a] text-sm">No employees found.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-12 text-center text-[#71717a] text-sm">No employees found.</td></tr>
               ) : (
                 sorted.map(emp => (
                   <tr key={emp.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
+                    <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(emp.id)} onChange={() => toggleSelect(emp.id)} className="accent-[#22c55e] cursor-pointer" /></td>
                     <td className="px-4 py-3 text-sm text-[#22c55e] font-mono">{emp.employee_id || '—'}</td>
                     <td className="px-4 py-3 text-sm text-white font-medium">{emp.full_name}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.email}</td>
@@ -349,6 +418,34 @@ export default function AdminEmployeesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Edit Modal */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-lg p-6">
+            <h2 className="text-lg font-bold text-white mb-1">Bulk Edit ({selectedIds.size} employees)</h2>
+            <p className="text-xs text-[#71717a] mb-5">Only filled fields will be updated.</p>
+            <div className="space-y-3">
+              {[
+                { label: 'Designation', name: 'designation', type: 'text' },
+                { label: 'Contact', name: 'contact', type: 'text' },
+              ].map(f => (
+                <div key={f.name}>
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{f.label}</label>
+                  <input type={f.type} value={bulkForm[f.name as keyof typeof bulkForm]} onChange={e => setBulkForm({ ...bulkForm, [f.name]: e.target.value })}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                </div>
+              ))}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowBulkModal(false)} className="flex-1 border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white py-2.5 rounded-xl text-sm transition-all">Cancel</button>
+                <button type="button" onClick={handleBulkUpdate} disabled={bulkSaving} className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold py-2.5 rounded-xl text-sm transition-all disabled:opacity-50">
+                  {bulkSaving ? 'Updating...' : 'Update All'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
