@@ -241,12 +241,14 @@ export default function AdminEmployeesPage() {
   }, [filtered, query])
 
   return (
-    <div>
+    <div className="flex flex-col flex-1 overflow-hidden">
       <PageHeader title="Employee Management" subtitle="Manage all employee records">
         <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">
           + Add Employee
         </button>
       </PageHeader>
+
+      <div className="shrink-0 space-y-4 mb-4">
 
       {successMessage && (
         <div className="mb-4 bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-green-400">
@@ -281,11 +283,12 @@ export default function AdminEmployeesPage() {
           <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
         </div>
       )}
+      </div>
 
-      <div className={`bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeDateFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
-        <div className={activeDateFilter ? 'overflow-visible' : 'overflow-x-auto'}>
+      <div className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeDateFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
+        <div className={`flex-1 ${activeDateFilter ? 'overflow-hidden' : 'overflow-auto'}`}>
           <table className="w-full">
-            <thead ref={dateFilterRef}>
+            <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
                 {['SELECT', 'Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Joining Date', 'Status', 'Actions'].map(h => {
                   if (h === 'SELECT') {

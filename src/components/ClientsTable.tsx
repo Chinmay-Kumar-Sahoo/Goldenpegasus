@@ -293,7 +293,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
   }, [filtered, query])
 
   return (
-    <div>
+    <div className="flex flex-col flex-1 overflow-hidden">
       <PageHeader title={isAdmin ? 'All Candidate Records' : 'My Candidates'} subtitle="Manage candidate information">
         <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">+ Add Candidate</button>
         <div ref={exportMenuRef} className="relative">
@@ -309,7 +309,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
         </div>
       </PageHeader>
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
+      <div className="shrink-0 space-y-4 mb-4">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <input type="text" placeholder="Search candidates..." value={search} onChange={e => setSearch(e.target.value)}
             className="w-full bg-[#111111] border border-[#2a2a2a] rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60" />
@@ -343,11 +344,12 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
           <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
         </div>
       )}
+      </div>
 
-      <div className={`bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeDateFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
-        <div className={activeDateFilter ? 'overflow-visible' : 'overflow-x-auto'}>
+      <div className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeDateFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
+        <div className={`flex-1 ${activeDateFilter ? 'overflow-hidden' : 'overflow-auto'}`}>
           <table className="w-full">
-            <thead ref={dateFilterRef}>
+            <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
                 {['SELECT', 'Candidate Name', 'Email', 'Phone', 'Company', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Actions'].map(h => {
                   if (h === 'SELECT') {

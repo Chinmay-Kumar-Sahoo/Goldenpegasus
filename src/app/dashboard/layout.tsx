@@ -30,12 +30,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const displayName = profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Employee'
 
   return (
-    <div className="flex min-h-screen bg-[#0a0a0a]">
+    <div className="flex h-screen bg-[#0a0a0a]">
       <SessionGuard expectedRole="employee" />
       <Sidebar role="employee" userName={displayName} userEmail={profile?.email || user.email} />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 flex flex-col min-h-0">
         {/* Global Header */}
-        <header className="h-16 border-b border-[#2a2a2a] bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-30 flex items-center px-6 md:px-8">
+        <header className="h-16 border-b border-[#2a2a2a] bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-30 flex items-center px-6 md:px-8 shrink-0">
           <div className="flex items-center justify-between w-full">
             <div>
               <h2 className="text-sm font-semibold text-white">Welcome back, <span className="text-[#22c55e]">{displayName}</span>! 👋</h2>
@@ -49,7 +49,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </header>
 
-        <div className="p-6 md:p-8 max-w-7xl mx-auto">
+        <div className="p-6 md:p-8 max-w-7xl mx-auto w-full flex-1 overflow-hidden flex flex-col min-h-0">
           {children}
         </div>
       </main>

@@ -208,14 +208,14 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
   }
 
   return (
-    <div>
+    <div className="flex flex-col h-full">
       <PageHeader title={isAdmin ? 'Dynamic Tables' : 'Custom Tables'} subtitle={isAdmin ? 'Create and manage global tables' : 'Your private and shared tables'}>
         <button onClick={() => setShowTableModal(true)} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">+ New Table</button>
       </PageHeader>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="flex-1 min-h-0 grid lg:grid-cols-3 gap-6">
         {/* Tables List */}
-        <div className="lg:col-span-1 space-y-3">
+        <div className="lg:col-span-1 space-y-3 overflow-y-auto">
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton h-20 rounded-2xl" />)
           ) : tables.length === 0 ? (
@@ -250,14 +250,14 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
         </div>
 
         {/* Table Records Viewer */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 flex flex-col min-h-0">
           {!activeTable ? (
             <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-12 text-center">
               <div className="text-4xl mb-4">👈</div>
               <p className="text-[#71717a]">Select a table to view its records</p>
             </div>
           ) : (
-            <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl">
+            <div className="flex flex-col flex-1 min-h-0 bg-[#111111] border border-[#2a2a2a] rounded-2xl overflow-hidden">
               <div className="p-4 border-b border-[#2a2a2a] flex items-center justify-between gap-3">
                 <div>
                   <div className="font-semibold text-white">{activeTable.table_name}</div>
@@ -277,10 +277,10 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="flex-1 overflow-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-[#2a2a2a]">
+                    <tr className="border-b border-[#2a2a2a] sticky top-0 z-10 bg-[#111111]">
                       {activeTable.schema_definition.map(f => (
                         <th key={f.name} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap">{f.label}</th>
                       ))}
