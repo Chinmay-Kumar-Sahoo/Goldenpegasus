@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ])
   
   if (profileError || !profile || profile.role !== 'admin' || adminProfile?.status === 'disabled') {
-    redirect('/login')
+    redirect('/admin-login')
   }
 
   // If new admin hasn't changed their password yet, force them to the change-password page
