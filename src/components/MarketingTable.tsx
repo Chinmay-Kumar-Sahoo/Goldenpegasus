@@ -117,7 +117,7 @@ export default function MarketingPage({
   const todayIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
   const [records, setRecords] = useState<MarketingRecord[]>(serverRecords.map(r => ({
     ...r,
-    employee_name: r.employee_name || serverOwnerNames[r.owner_id] || 'Unknown employee',
+    employee_name: (r.employee_name || serverOwnerNames[r.owner_id] || 'Unknown employee').trim(),
   })))
   const [loading, setLoading] = useState(serverRecords.length === 0)
   const [search, setSearch] = useState('')
@@ -171,7 +171,7 @@ export default function MarketingPage({
       clearTimeout(timeoutId)
       if (!res.ok) throw new Error('Failed to load records')
       const json = await res.json()
-      setRecords(json.records || [])
+      setRecords((json.records || []).map((r: any) => ({ ...r, employee_name: r.employee_name || serverOwnerNames[r.owner_id] || 'Unknown employee' })))
     } catch (err: any) {
       if (err.name === 'AbortError') {
         toast.error('Request timed out. Please try again or check your network connection.')
@@ -449,7 +449,7 @@ export default function MarketingPage({
       const values = new Set<string>()
       for (const rec of records) {
         const val = (rec as any)[fieldKey]
-        if (val != null && val !== '') values.add(String(val))
+        if (val != null && val !== '') values.add(String(val).trim())
       }
       result[header] = Array.from(values).sort((a, b) => a.localeCompare(b))
     }
@@ -470,7 +470,7 @@ export default function MarketingPage({
       for (const [header, selected] of Object.entries(textFilters)) {
         if (selected.length === 0) continue
         const fieldKey = TEXT_FILTER_COLUMNS[header] || header.toLowerCase()
-        const fieldVal = String((r as any)[fieldKey] ?? '')
+        const fieldVal = String((r as any)[fieldKey] ?? '').trim()
         if (!selected.includes(fieldVal)) return false
       }
       if (!q) return true
