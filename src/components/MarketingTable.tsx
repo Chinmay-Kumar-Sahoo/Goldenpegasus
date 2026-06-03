@@ -130,7 +130,8 @@ export default function MarketingPage({
     project_end_date: { start: '', end: '' },
   })
   const [activeTextFilter, setActiveTextFilter] = useState<string | null>(null)
-  const [textFilters, setTextFilters] = useState<Record<string, string>>({})
+  const [textFilters, setTextFilters] = useState<Record<string, string[]>>({})
+  const [textFilterSearch, setTextFilterSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<MarketingRecord | null>(null)
   const [saving, setSaving] = useState(false)
@@ -442,10 +443,23 @@ export default function MarketingPage({
     return true
   }
 
+  const uniqueValues = useMemo(() => {
+    const result: Record<string, string[]> = {}
+    for (const [header, fieldKey] of Object.entries(TEXT_FILTER_COLUMNS)) {
+      const values = new Set<string>()
+      for (const rec of records) {
+        const val = (rec as any)[fieldKey]
+        if (val != null && val !== '') values.add(String(val))
+      }
+      result[header] = Array.from(values).sort((a, b) => a.localeCompare(b))
+    }
+    return result
+  }, [records])
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
     const hasDateFilter = Object.values(dateFilters).some(r => r.start || r.end)
-    const hasTextFilter = Object.values(textFilters).some(v => v)
+    const hasTextFilter = Object.values(textFilters).some(v => v.length > 0)
     if (!q && statusFilter === 'all' && !hasDateFilter && !hasTextFilter) return records
     return records.filter(r => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false
@@ -453,11 +467,11 @@ export default function MarketingPage({
       if (!inRange(r.interview_date, dateFilters.interview_date)) return false
       if (!inRange(r.project_start_date, dateFilters.project_start_date)) return false
       if (!inRange(r.project_end_date, dateFilters.project_end_date)) return false
-      for (const [header, val] of Object.entries(textFilters)) {
-        if (!val) continue
+      for (const [header, selected] of Object.entries(textFilters)) {
+        if (selected.length === 0) continue
         const fieldKey = TEXT_FILTER_COLUMNS[header] || header.toLowerCase()
-        const fieldVal = (r as any)[fieldKey]
-        if (!fieldVal || !String(fieldVal).toLowerCase().includes(val.toLowerCase())) return false
+        const fieldVal = String((r as any)[fieldKey] ?? '')
+        if (!selected.includes(fieldVal)) return false
       }
       if (!q) return true
       const fields = [
@@ -526,7 +540,7 @@ export default function MarketingPage({
           <option value="completed">Completed</option>
           <option value="closed">Closed</option>
         </select>
-        {Object.values(dateFilters).some(r => r.start || r.end) || Object.values(textFilters).some(v => v) ? (
+        {Object.values(dateFilters).some(r => r.start || r.end) || Object.values(textFilters).some(v => v.length > 0) ? (
           <button onClick={() => { setDateFilters({ date: { start: '', end: '' }, interview_date: { start: '', end: '' }, project_start_date: { start: '', end: '' }, project_end_date: { start: '', end: '' } }); setActiveDateFilter(null); setTextFilters({}); setActiveTextFilter(null) }} suppressHydrationWarning
             className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2">
             Clear all filters
@@ -573,7 +587,7 @@ export default function MarketingPage({
                   const dateIsActive = dateKey && activeDateFilter === dateKey
                   const textIsActive = textKey && activeTextFilter === h
                   const dateHasFilter = dateKey && !!(dateFilters[dateKey as keyof typeof dateFilters]?.start || dateFilters[dateKey as keyof typeof dateFilters]?.end)
-                  const textHasFilter = textKey && !!textFilters[h]
+                  const textHasFilter = textKey && (textFilters[h]?.length ?? 0) > 0
                   return (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap relative">
                       {isFilterable ? (
@@ -619,20 +633,39 @@ export default function MarketingPage({
                         </div>
                       )}
                       {textKey && textIsActive && (
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3.5 z-[9999] shadow-2xl min-w-[220px]" onClick={e => e.stopPropagation()}>
-                          <div className="space-y-3">
-                            <div>
-                              <label className="block text-[10px] text-[#71717a] mb-1.5 font-medium">FILTER</label>
-                              <input type="text" value={textFilters[h] || ''} placeholder={`Filter ${h}...`} autoFocus
-                                onChange={e => setTextFilters(f => ({ ...f, [h]: e.target.value }))}
-                                className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 placeholder-[#3a3a3a]" />
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl z-[9999] shadow-2xl min-w-[240px]" onClick={e => e.stopPropagation()}>
+                          <div className="p-3.5 space-y-2">
+                            <input type="text" value={textFilterSearch} placeholder={`Search ${h}...`} autoFocus
+                              onChange={e => setTextFilterSearch(e.target.value)}
+                              className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 placeholder-[#3a3a3a]" />
+                            <div className="max-h-48 overflow-y-auto space-y-1">
+                              {(uniqueValues[h] || []).filter(v => !textFilterSearch || v.toLowerCase().includes(textFilterSearch.toLowerCase())).map(v => {
+                                const checked = (textFilters[h] || []).includes(v)
+                                return (
+                                  <label key={v} className="flex items-center gap-2 px-2 py-1.5 hover:bg-[#2a2a2a] rounded-lg cursor-pointer transition-colors">
+                                    <input type="checkbox" checked={checked}
+                                      onChange={() => setTextFilters(f => {
+                                        const current = f[h] || [];
+                                        const next = checked ? current.filter(x => x !== v) : [...current, v];
+                                        return { ...f, [h]: next };
+                                      })}
+                                      className="accent-[#22c55e] cursor-pointer" />
+                                    <span className="text-xs text-white truncate">{v}</span>
+                                  </label>
+                                )
+                              })}
+                              {(uniqueValues[h] || []).length === 0 && <div className="text-xs text-[#71717a] px-2 py-1">No values available</div>}
                             </div>
-                            {textHasFilter && (
-                              <button onClick={() => { setTextFilters(f => { const n = { ...f }; delete n[h]; return n }); setActiveTextFilter(null) }}
-                                className="w-full text-center text-xs text-[#71717a] hover:text-red-400 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-red-400/30 transition-colors">
+                            <div className="flex gap-2 pt-1 border-t border-[#2a2a2a]">
+                              <button onClick={() => { setTextFilters(f => ({ ...f, [h]: uniqueValues[h] || [] })); setTextFilterSearch('') }}
+                                className="flex-1 text-center text-xs text-white bg-[#22c55e]/20 hover:bg-[#22c55e]/30 py-1.5 rounded-lg border border-[#22c55e]/40 transition-colors">
+                                Select All
+                              </button>
+                              <button onClick={() => { setTextFilters(f => ({ ...f, [h]: [] })); setTextFilterSearch('') }}
+                                className="flex-1 text-center text-xs text-[#71717a] hover:text-red-400 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-red-400/30 transition-colors">
                                 Clear
                               </button>
-                            )}
+                            </div>
                           </div>
                         </div>
                       )}
