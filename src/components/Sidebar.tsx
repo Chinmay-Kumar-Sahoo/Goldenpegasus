@@ -57,7 +57,7 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
           <Link href="/" className="flex items-center gap-2">
             <BrandLogo variant="mark" size="sm" />
             <div>
-              <div className="font-bold text-white text-xs leading-tight">GoldenPegasus</div>
+              <div className="font-bold text-white text-[10px] leading-tight">GoldenPegasus IT Consulting & Services</div>
               <div className="text-[10px] text-[#22c55e] leading-tight font-medium truncate max-w-[120px]">{userName || role}</div>
             </div>
           </Link>
