@@ -278,7 +278,14 @@ export default function AdminEmployeesPage() {
       {selectedIds.size > 0 && (
         <div className="mb-4 flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5">
           <span className="text-sm text-[#a1a1aa]">{selectedIds.size} selected</span>
-          <button onClick={() => { setBulkForm({ designation: '', contact: '' }); setShowBulkModal(true) }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
+          <button onClick={() => {
+            if (selectedIds.size === 1) {
+              const id = Array.from(selectedIds)[0]
+              const emp = employees.find(e => e.id === id) || sorted.find(e => e.id === id)
+              if (emp) { openModal(emp); setSelectedIds(new Set()); return }
+            }
+            setBulkForm({ designation: '', contact: '' }); setShowBulkModal(true)
+          }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
           <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>
           <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
         </div>
