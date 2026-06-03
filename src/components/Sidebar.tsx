@@ -56,7 +56,7 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
         {!collapsed && (
           <Link href="/" className="flex items-center gap-3">
             <BrandLogo variant="mark" size="md" />
-            <div>
+            <div className="space-y-1">
               <div className="font-bold text-white text-xs leading-tight">GoldenPegasus IT Consulting & Services</div>
               <div className="text-[11px] text-[#22c55e] leading-tight font-medium truncate max-w-[140px]">{userName || role}</div>
             </div>
