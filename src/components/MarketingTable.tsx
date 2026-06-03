@@ -86,7 +86,7 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'name',
   'Employee': 'employee_name',
   'Status': 'status',
-  'Recruiter': 'recruiter_name',
+  'Recruiter Organization': 'recruiter_name',
   'Recruiter Email': 'recruiter_email',
   '2nd Up Recruiter': 'organization_name',
   'Implementation Partner': 'implementation_partner',
@@ -406,7 +406,7 @@ export default function MarketingPage({
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
     const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date, r.interviewer_email, r.project_start_date, r.project_end_date, r.notes, ...(isAdmin ? [r.last_reminder_sent_at] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -420,7 +420,7 @@ export default function MarketingPage({
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
     const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.date || '', r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', r.interview_date || '', r.interviewer_email || '', r.project_start_date || '', r.project_end_date || '', r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? new Date(r.last_reminder_sent_at).toLocaleString() : ''] : [])])
 
     autoTable(doc, {
@@ -572,7 +572,7 @@ export default function MarketingPage({
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
+                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
