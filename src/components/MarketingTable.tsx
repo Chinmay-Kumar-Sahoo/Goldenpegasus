@@ -607,8 +607,8 @@ export default function MarketingPage({
                 <tr><td colSpan={14 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
                 filtered.map(rec => (
-                  <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                    {!readOnly && <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>}
+                  <tr key={rec.id} onClick={() => openModal(rec)} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors cursor-pointer">
+                    {!readOnly && <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} onClick={e => e.stopPropagation()} className="accent-[#22c55e] cursor-pointer" /></td>}
                     <td className="px-4 py-3 text-sm text-white font-medium">{rec.name}</td>
                     {showEmployeeColumn && (
                       <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
@@ -669,7 +669,7 @@ export default function MarketingPage({
                 { label: 'Interviewer Email', name: 'interviewer_email', type: 'email', span: 1 },
                 { label: 'Comments', name: 'notes', type: 'textarea', span: 2 },
               ].map(field => {
-                const locked = field.name === 'date' || (!!editing && LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form])
+                const locked = field.name === 'date' || (!!editing && (field.name === 'name' || field.name === 'employee_name' || (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form])))
                 return (
                 <div key={field.name} className={field.span === 2 ? 'col-span-2' : ''}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
