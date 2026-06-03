@@ -669,7 +669,7 @@ export default function MarketingPage({
                 { label: 'Interviewer Email', name: 'interviewer_email', type: 'email', span: 1 },
                 { label: 'Comments', name: 'notes', type: 'textarea', span: 2 },
               ].map(field => {
-                const locked = !!editing && LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]
+                const locked = field.name === 'date' || (!!editing && LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form])
                 return (
                 <div key={field.name} className={field.span === 2 ? 'col-span-2' : ''}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
