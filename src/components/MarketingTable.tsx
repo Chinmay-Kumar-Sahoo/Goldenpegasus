@@ -692,7 +692,7 @@ export default function MarketingPage({
                 <tr><td colSpan={14 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
                 filtered.map(rec => (
-                  <tr key={rec.id} onClick={() => openModal(rec)} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors cursor-pointer">
+                  <tr key={rec.id} onClick={() => { if (!readOnly && !isAdmin) openModal(rec) }} className={`border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors ${!readOnly && !isAdmin ? 'cursor-pointer' : ''}`}>
                     {!readOnly && <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} onClick={e => e.stopPropagation()} className="accent-[#22c55e] cursor-pointer" /></td>}
                     <td className="px-4 py-3 text-sm text-white font-medium">{rec.name}</td>
                     {showEmployeeColumn && (
