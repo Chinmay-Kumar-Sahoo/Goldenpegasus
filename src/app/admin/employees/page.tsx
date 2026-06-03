@@ -290,7 +290,7 @@ export default function AdminEmployeesPage() {
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {['SELECT', 'Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Joining Date', 'Status', 'Actions'].map(h => {
+                {['SELECT', 'Employee ID', 'Full Name', 'Email', 'Contact', 'Designation', 'Joining Date', 'Status'].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -354,13 +354,13 @@ export default function AdminEmployeesPage() {
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 9 }).map((_, j) => (
+                    {Array.from({ length: 8 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-[#71717a] text-sm">No employees found.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-[#71717a] text-sm">No employees found.</td></tr>
               ) : (
                 sorted.map(emp => (
                   <tr key={emp.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
@@ -377,12 +377,6 @@ export default function AdminEmployeesPage() {
                       ) : (
                         <span className="text-[10px] px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-bold uppercase tracking-wider">Unverified</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button onClick={() => openModal(emp)} className="text-xs bg-[#1a1a1a] hover:bg-[#22c55e]/10 hover:text-[#22c55e] border border-[#2a2a2a] px-3 py-1 rounded-lg transition-all">Edit</button>
-                        <button onClick={() => handleDelete(emp.id)} className="text-xs bg-[#1a1a1a] hover:bg-red-500/10 hover:text-red-400 border border-[#2a2a2a] px-3 py-1 rounded-lg transition-all">Delete</button>
-                      </div>
                     </td>
                   </tr>
                 ))

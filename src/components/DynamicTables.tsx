@@ -285,20 +285,19 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                         <th key={f.name} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap">{f.label}</th>
                       ))}
                       <th className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">Added</th>
-                      {canEditData(activeTable) && <th className="px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {recordsLoading ? (
                       Array.from({ length: 3 }).map((_, i) => (
                         <tr key={i} className="border-b border-[#1a1a1a]">
-                          {Array.from({ length: activeTable.schema_definition.length + 2 }).map((_, j) => (
+                          {Array.from({ length: activeTable.schema_definition.length + 1 }).map((_, j) => (
                             <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                           ))}
                         </tr>
                       ))
                     ) : records.length === 0 ? (
-                      <tr><td colSpan={activeTable.schema_definition.length + 2} className="px-4 py-12 text-center text-[#71717a] text-sm">No records yet.</td></tr>
+                      <tr><td colSpan={activeTable.schema_definition.length + 1} className="px-4 py-12 text-center text-[#71717a] text-sm">No records yet.</td></tr>
                     ) : (
                       records.map(rec => (
                         <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
@@ -306,14 +305,6 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                             <td key={f.name} className="px-4 py-3 text-sm text-[#a1a1aa]">{String(rec.data[f.name] || '—')}</td>
                           ))}
                           <td className="px-4 py-3 text-xs text-[#71717a]">{new Date(rec.created_at).toLocaleDateString()}</td>
-                          <td className="px-4 py-3">
-                            {canEditData(activeTable) && (
-                              <div className="flex gap-2">
-                                <button onClick={() => openRecordModal(rec)} className="text-xs border border-[#2a2a2a] hover:bg-[#22c55e]/10 hover:text-[#22c55e] px-2 py-1 rounded-lg transition-all text-[#a1a1aa]">Edit</button>
-                                <button onClick={() => handleDeleteRecord(rec.id)} className="text-xs border border-[#2a2a2a] hover:bg-red-500/10 hover:text-red-400 px-2 py-1 rounded-lg transition-all text-[#a1a1aa]">Del</button>
-                              </div>
-                            )}
-                          </td>
                         </tr>
                       ))
                     )}
