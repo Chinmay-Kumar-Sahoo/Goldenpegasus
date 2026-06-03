@@ -82,6 +82,19 @@ const DATE_COLUMNS: Record<string, string> = {
   'Project End Date': 'project_end_date',
 }
 
+const TEXT_FILTER_COLUMNS: Record<string, string> = {
+  'Candidate Name': 'name',
+  'Employee': 'employee_name',
+  'Status': 'status',
+  'Recruiter': 'recruiter_name',
+  'Recruiter Email': 'recruiter_email',
+  '2nd Up Recruiter': 'organization_name',
+  'Implementation Partner': 'implementation_partner',
+  'Implementation Partner Email': 'implementation_poc_email',
+  'End Client': 'end_client',
+  'Interviewer Email': 'interviewer_email',
+}
+
 const LOCKABLE_FIELDS = new Set(['name', 'date', 'employee_name'])
 
 export default function MarketingPage({
@@ -116,6 +129,8 @@ export default function MarketingPage({
     project_start_date: { start: '', end: '' },
     project_end_date: { start: '', end: '' },
   })
+  const [activeTextFilter, setActiveTextFilter] = useState<string | null>(null)
+  const [textFilters, setTextFilters] = useState<Record<string, string>>({})
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<MarketingRecord | null>(null)
   const [saving, setSaving] = useState(false)
@@ -188,15 +203,16 @@ export default function MarketingPage({
   }, [showExportMenu])
 
   useEffect(() => {
-    if (!activeDateFilter) return
+    if (!activeDateFilter && !activeTextFilter) return
     const handleClick = (e: MouseEvent) => {
       if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
         setActiveDateFilter(null)
+        setActiveTextFilter(null)
       }
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [activeDateFilter])
+  }, [activeDateFilter, activeTextFilter])
 
   const canEdit = (record: MarketingRecord) => !readOnly && (isAdmin || record.owner_id === currentUserId)
 
@@ -429,13 +445,20 @@ export default function MarketingPage({
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
     const hasDateFilter = Object.values(dateFilters).some(r => r.start || r.end)
-    if (!q && statusFilter === 'all' && !hasDateFilter) return records
+    const hasTextFilter = Object.values(textFilters).some(v => v)
+    if (!q && statusFilter === 'all' && !hasDateFilter && !hasTextFilter) return records
     return records.filter(r => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false
       if (!inRange(r.date, dateFilters.date)) return false
       if (!inRange(r.interview_date, dateFilters.interview_date)) return false
       if (!inRange(r.project_start_date, dateFilters.project_start_date)) return false
       if (!inRange(r.project_end_date, dateFilters.project_end_date)) return false
+      for (const [header, val] of Object.entries(textFilters)) {
+        if (!val) continue
+        const fieldKey = TEXT_FILTER_COLUMNS[header] || header.toLowerCase()
+        const fieldVal = (r as any)[fieldKey]
+        if (!fieldVal || !String(fieldVal).toLowerCase().includes(val.toLowerCase())) return false
+      }
       if (!q) return true
       const fields = [
         r.name, r.date, r.status, r.recruiter_name, r.recruiter_email,
@@ -446,7 +469,7 @@ export default function MarketingPage({
       ]
       return fields.some(f => f && f.toLowerCase().includes(q))
     })
-  }, [records, search, statusFilter, dateFilters])
+  }, [records, search, statusFilter, dateFilters, textFilters])
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -503,12 +526,12 @@ export default function MarketingPage({
           <option value="completed">Completed</option>
           <option value="closed">Closed</option>
         </select>
-        {Object.values(dateFilters).some(r => r.start || r.end) && (
-          <button onClick={() => { setDateFilters({ date: { start: '', end: '' }, interview_date: { start: '', end: '' }, project_start_date: { start: '', end: '' }, project_end_date: { start: '', end: '' } }); setActiveDateFilter(null) }} suppressHydrationWarning
+        {Object.values(dateFilters).some(r => r.start || r.end) || Object.values(textFilters).some(v => v) ? (
+          <button onClick={() => { setDateFilters({ date: { start: '', end: '' }, interview_date: { start: '', end: '' }, project_start_date: { start: '', end: '' }, project_end_date: { start: '', end: '' } }); setActiveDateFilter(null); setTextFilters({}); setActiveTextFilter(null) }} suppressHydrationWarning
             className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2">
-            Clear all date filters
+            Clear all filters
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* Bulk Actions */}
@@ -530,8 +553,8 @@ export default function MarketingPage({
       </div>
 
       {/* Table */}
-      <div className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeDateFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
-        <div className={`flex-1 ${activeDateFilter ? 'overflow-hidden' : 'overflow-auto'}`}>
+      <div className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${(activeDateFilter || activeTextFilter) ? 'overflow-visible' : 'overflow-hidden'}`}>
+        <div className={`flex-1 ${(activeDateFilter || activeTextFilter) ? 'overflow-hidden' : 'overflow-auto'}`}>
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
@@ -545,23 +568,27 @@ export default function MarketingPage({
                     )
                   }
                   const dateKey = DATE_COLUMNS[h]
-                  const isActive = activeDateFilter === dateKey
-                  const hasFilter = dateFilters[dateKey as keyof typeof dateFilters]?.start || dateFilters[dateKey as keyof typeof dateFilters]?.end
+                  const textKey = TEXT_FILTER_COLUMNS[h]
+                  const isFilterable = dateKey || textKey
+                  const dateIsActive = dateKey && activeDateFilter === dateKey
+                  const textIsActive = textKey && activeTextFilter === h
+                  const dateHasFilter = dateKey && !!(dateFilters[dateKey as keyof typeof dateFilters]?.start || dateFilters[dateKey as keyof typeof dateFilters]?.end)
+                  const textHasFilter = textKey && !!textFilters[h]
                   return (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap relative">
-                      {dateKey ? (
+                      {isFilterable ? (
                         <div className="flex items-center gap-1.5">
                           <span>{h}</span>
-                          <button ref={dateKey === activeDateFilter ? (el) => { dateFilterBtnRef.current = el } : undefined}
-                            onClick={(e) => { e.stopPropagation(); setActiveDateFilter(isActive ? null : dateKey) }}
-                            className={`p-0.5 rounded transition-colors ${hasFilter ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
+                          <button ref={dateKey && dateKey === activeDateFilter ? (el) => { dateFilterBtnRef.current = el } : undefined}
+                            onClick={(e) => { e.stopPropagation(); if (dateKey) { setActiveDateFilter(dateIsActive ? null : dateKey); setActiveTextFilter(null) } else { setActiveTextFilter(textIsActive ? null : h); setActiveDateFilter(null) } }}
+                            className={`p-0.5 rounded transition-colors ${(dateHasFilter || textHasFilter) ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                             </svg>
                           </button>
                         </div>
                       ) : h}
-                      {dateKey && isActive && (
+                      {dateKey && dateIsActive && (
                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3.5 z-[9999] shadow-2xl min-w-[260px]" onClick={e => e.stopPropagation()}>
                           <div className="space-y-3">
                             <div>
@@ -577,7 +604,7 @@ export default function MarketingPage({
                                 className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 [color-scheme:dark]" />
                             </div>
                             <div className="flex gap-2 pt-1">
-                              {hasFilter && (
+                              {dateHasFilter && (
                                 <button onClick={() => { setDateFilters(f => ({ ...f, [dateKey]: { start: '', end: '' } })); setActiveDateFilter(null) }}
                                   className="flex-1 text-center text-xs text-[#71717a] hover:text-red-400 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-red-400/30 transition-colors">
                                   Clear
@@ -588,6 +615,24 @@ export default function MarketingPage({
                                 Apply
                               </button>
                             </div>
+                          </div>
+                        </div>
+                      )}
+                      {textKey && textIsActive && (
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3.5 z-[9999] shadow-2xl min-w-[220px]" onClick={e => e.stopPropagation()}>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-[10px] text-[#71717a] mb-1.5 font-medium">FILTER</label>
+                              <input type="text" value={textFilters[h] || ''} placeholder={`Filter ${h}...`} autoFocus
+                                onChange={e => setTextFilters(f => ({ ...f, [h]: e.target.value }))}
+                                className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 placeholder-[#3a3a3a]" />
+                            </div>
+                            {textHasFilter && (
+                              <button onClick={() => { setTextFilters(f => { const n = { ...f }; delete n[h]; return n }); setActiveTextFilter(null) }}
+                                className="w-full text-center text-xs text-[#71717a] hover:text-red-400 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-red-400/30 transition-colors">
+                                Clear
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
