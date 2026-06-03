@@ -15,7 +15,7 @@ export default async function AdminPage() {
       supabase.from('marketing_records').select('*', { count: 'exact', head: true }),
       supabase.from('Candidate_records').select('*', { count: 'exact', head: true }),
       supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }),
-      supabase.from('audit_logs').select('action, entity_type, created_at').gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()).order('created_at', { ascending: false }),
+      supabase.from('audit_logs').select('action, entity_type, created_at, user_id, profiles(full_name)').gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()).order('created_at', { ascending: false }),
     ])
 
   const stats = [
@@ -77,11 +77,13 @@ export default async function AdminPage() {
               {recentLogs.map((log, i) => (
                 <div key={i} className="flex items-start gap-3 text-sm">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#22c55e] mt-1.5 flex-shrink-0" />
-                  <div>
-                    <span className="text-white font-medium">{log.action}</span>
+                  <div className="min-w-0">
+                    <span className="text-white font-medium capitalize">{log.action.replace(/_/g, ' ')}</span>
                     {log.entity_type && <span className="text-[#71717a]"> on {log.entity_type}</span>}
-                    <div className="text-xs text-[#3a3a3a] mt-0.5">
-                      {formatDateTime(log.created_at)}
+                    <div className="flex items-center gap-2 text-xs text-[#3a3a3a] mt-0.5">
+                      <span>{(log as any).profiles?.full_name || 'System'}</span>
+                      <span>·</span>
+                      <span>{formatDateTime(log.created_at)}</span>
                     </div>
                   </div>
                 </div>
