@@ -31,12 +31,32 @@ export default async function AllMarketingPage() {
     }
   }
 
+  // Resolve backup employee names from Candidate_records
+  const candidateNames = records.map(r => r.name).filter(Boolean)
+  let backupNamesByCandidate: Record<string, string> = {}
+  if (candidateNames.length > 0) {
+    const { data: candidates } = await supabase
+      .from('Candidate_records')
+      .select('Candidate_name, backup_employee_id, backup_employee_name')
+      .in('Candidate_name', candidateNames)
+    for (const c of (candidates || []) as any[]) {
+      const name = (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null)
+      if (name) backupNamesByCandidate[(c as any).Candidate_name] = name
+    }
+  }
+
+  const enriched = records.map(r => ({
+    ...r,
+    employee_name: (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
+    backup_employee_name: backupNamesByCandidate[r.name] || null,
+  }))
+
   return (
     <MarketingTable
       isAdmin={false}
       readOnly={true}
       currentUserId={user?.id ?? null}
-      initialRecords={records}
+      initialRecords={enriched}
       initialOwnerNames={ownerNames}
     />
   )

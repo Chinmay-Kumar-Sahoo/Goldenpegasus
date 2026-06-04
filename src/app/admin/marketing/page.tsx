@@ -51,13 +51,33 @@ export default async function AdminMarketingPage() {
     }
   }
 
+  // Ensure ownerNames covers all employees for backup resolution
+  for (const opt of employeeOptions) {
+    if (!ownerNames[opt.id]) ownerNames[opt.id] = opt.full_name
+  }
+
   // Build candidate dropdown options
   const candidateOptions = (candidatesResult.data || []).map((c: any) => ({
     id: c.id,
     name: c.Candidate_name,
     owner_id: c.owner_id,
+    owner_name: ownerNames[c.owner_id] || null,
     status: c.status,
     backup_employee_id: (c as any).backup_employee_id,
+    backup_employee_name: (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null) || null,
+  }))
+
+  // Build backup name lookup from candidates
+  const backupNamesByCandidate: Record<string, string> = {}
+  for (const c of (candidatesResult.data || []) as any[]) {
+    const name = (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null)
+    if (name) backupNamesByCandidate[(c as any).Candidate_name] = name
+  }
+
+  const enrichedRecords = records.map(r => ({
+    ...r,
+    employee_name: (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
+    backup_employee_name: backupNamesByCandidate[r.name] || null,
   }))
 
   return (
@@ -65,7 +85,7 @@ export default async function AdminMarketingPage() {
       isAdmin={true}
       readOnly={false}
       currentUserId={user?.id ?? null}
-      initialRecords={records}
+      initialRecords={enrichedRecords}
       initialOwnerNames={ownerNames}
       employeeOptions={employeeOptions}
       candidateOptions={candidateOptions}

@@ -26,6 +26,7 @@ interface MarketingRecord {
   notes: string | null
   created_at: string
   employee_name?: string | null
+  backup_employee_name?: string | null
   last_reminder_sent_at?: string | null
 }
 
@@ -102,7 +103,7 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Interviewer Email': 'interviewer_email',
 }
 
-const LOCKABLE_FIELDS = new Set(['name', 'date', 'employee_name'])
+const LOCKABLE_FIELDS = new Set(['name', 'date', 'employee_name', 'backup_employee_name'])
 
 export default function MarketingPage({
   isAdmin = false,
@@ -119,7 +120,7 @@ export default function MarketingPage({
   initialRecords?: MarketingRecord[]
   initialOwnerNames?: Record<string, string>
   employeeOptions?: Array<{ id: string; full_name: string }>
-  candidateOptions?: Array<{ id: string; name: string; owner_id: string; status: string | null; backup_employee_id?: string | null }>
+  candidateOptions?: Array<{ id: string; name: string; owner_id: string; owner_name?: string | null; status: string | null; backup_employee_id?: string | null; backup_employee_name?: string | null }>
 }) {
   const showEmployeeColumn = isAdmin || readOnly
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -154,7 +155,7 @@ export default function MarketingPage({
     implementation_partner: '', end_client: '', status: 'Telephone Call',
     project_start_date: '', project_end_date: '', interview_date: '',
     implementation_poc_email: '', interviewer_email: '', notes: '',
-    employee_name: '',
+    employee_name: '', backup_employee_name: '',
   })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
@@ -241,11 +242,12 @@ export default function MarketingPage({
         implementation_poc_email: rec.implementation_poc_email || '',
         interviewer_email: rec.interviewer_email || '', notes: rec.notes || '',
         employee_name: rec.employee_name || '',
+        backup_employee_name: rec.backup_employee_name || '',
       })
-      setSelectedEmployeeId('')
+      setSelectedEmployeeId(isAdmin ? (rec.owner_id || '') : '')
     } else {
       setEditing(null)
-      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'Telephone Call', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '' })
+      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'Telephone Call', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '', backup_employee_name: '' })
       setSelectedEmployeeId('')
     }
     setError('')
@@ -256,9 +258,10 @@ export default function MarketingPage({
     e.preventDefault()
     setSaving(true)
     setError('')
-    const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
+    const { backup_employee_name: _, ...payloadFields } = form
+    const cleanForm = Object.fromEntries(Object.entries(payloadFields).map(([k, v]) => [k, v || null]))
     const payload = editing
-      ? { ...cleanForm, id: editing.id }
+      ? { ...cleanForm, id: editing.id, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}) }
       : { ...cleanForm, name: form.name, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}) }
     try {
       const res = await fetch('/api/marketing', {
@@ -422,8 +425,8 @@ export default function MarketingPage({
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date, r.interviewer_email, r.project_start_date, r.project_end_date, r.notes, ...(isAdmin ? [r.last_reminder_sent_at] : [])])
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.backup_employee_name, r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date, r.interviewer_email, r.project_start_date, r.project_end_date, r.notes, ...(isAdmin ? [r.last_reminder_sent_at] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -436,8 +439,8 @@ export default function MarketingPage({
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.date || '', r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', r.interview_date || '', r.interviewer_email || '', r.project_start_date || '', r.project_end_date || '', r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? new Date(r.last_reminder_sent_at).toLocaleString() : ''] : [])])
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.backup_employee_name || '', r.date || '', r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', r.interview_date || '', r.interviewer_email || '', r.project_start_date || '', r.project_end_date || '', r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? new Date(r.last_reminder_sent_at).toLocaleString() : ''] : [])])
 
     autoTable(doc, {
       head: [headers],
@@ -602,7 +605,7 @@ export default function MarketingPage({
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
+                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -720,7 +723,7 @@ export default function MarketingPage({
                   <div className="text-[#71717a] text-xs">{error.includes('timed') ? 'The request timed out. Try refreshing the page.' : 'Please check your connection and try again.'}</div>
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={14 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
+                <tr><td colSpan={15 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
                 filtered.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
@@ -729,6 +732,7 @@ export default function MarketingPage({
                     {showEmployeeColumn && (
                       <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
                     )}
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.backup_employee_name || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.date || '—'}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Telephone Call'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
@@ -770,7 +774,7 @@ export default function MarketingPage({
             <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
               {isAdmin && !editing && (
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Employee Name *</label>
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee *</label>
                   <select value={selectedEmployeeId} onChange={e => {
                     const empId = e.target.value
                     setSelectedEmployeeId(empId)
@@ -778,7 +782,7 @@ export default function MarketingPage({
                     setForm({ ...form, employee_name: emp?.full_name || '' })
                   }} required
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-                    <option value="">Select Employee</option>
+                    <option value="">Select Primary Employee</option>
                     {employeeOptions.map(emp => (
                       <option key={emp.id} value={emp.id}>{emp.full_name}</option>
                     ))}
@@ -787,15 +791,61 @@ export default function MarketingPage({
               )}
               {isAdmin && editing && (
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Employee Name</label>
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee</label>
+                  <select value={selectedEmployeeId} onChange={e => {
+                    const empId = e.target.value
+                    setSelectedEmployeeId(empId)
+                    const emp = employeeOptions.find(e => e.id === empId)
+                    setForm({ ...form, employee_name: emp?.full_name || '' })
+                  }}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                    <option value="">Select Primary Employee</option>
+                    {employeeOptions.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {!isAdmin && (
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee</label>
                   <input type="text" value={form.employee_name || ''} disabled
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
+                </div>
+              )}
+              {isAdmin ? (
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
+                  <input type="text" value={form.backup_employee_name || ''} onChange={e => setForm({ ...form, backup_employee_name: e.target.value })}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                </div>
+              ) : (
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
+                  <input type="text" value={form.backup_employee_name || ''} disabled
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
                 </div>
               )}
               {!editing ? (
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Candidate Name *</label>
-                  <select value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
+                  <select value={form.name} onChange={e => {
+                    const name = e.target.value
+                    const candidate = candidateOptions.find(c => c.name === name)
+                    let empName = '', backupName = '', empId = ''
+                    if (candidate) {
+                      if (candidate.owner_name) {
+                        empName = candidate.owner_name
+                      } else if (candidate.owner_id) {
+                        const emp = employeeOptions.find(e => e.id === candidate.owner_id)
+                        if (emp) empName = emp.full_name
+                      }
+                      backupName = candidate.backup_employee_name || ''
+                      empId = candidate.owner_id || ''
+                    }
+                    setForm({ ...form, name, employee_name: empName, backup_employee_name: backupName })
+                    if (isAdmin) setSelectedEmployeeId(empId)
+                  }} required
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">Select Candidate</option>
                     {filteredCandidates.map(c => (

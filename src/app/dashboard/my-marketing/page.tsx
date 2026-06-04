@@ -15,7 +15,6 @@ export default async function MyMarketingPage() {
 
   const ownedCandidateNames = (candidates || []).filter(c => c.owner_id === uid).map(c => c.Candidate_name)
   const backupCandidateNames = (candidates || []).filter(c => c.backup_employee_id === uid).map(c => c.Candidate_name)
-  const allCandidateNames = Array.from(new Set([...ownedCandidateNames, ...backupCandidateNames]))
 
   const [{ data: ownedRecords }, { data: backupRecords }] = await Promise.all([
     supabase.from('marketing_records').select('*').eq('owner_id', uid).order('created_at', { ascending: false }),
@@ -30,9 +29,9 @@ export default async function MyMarketingPage() {
     if (!recordMap.has(r.id)) recordMap.set(r.id, { ...r, is_backup_record: r.owner_id !== uid })
   }
   const mergedRecords = Array.from(recordMap.values())
-  const enrichedRecords = mergedRecords.map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
 
-  const ownerIds = Array.from(new Set(enrichedRecords.map(r => r.owner_id).filter(Boolean)))
+  // Build owner names from all records
+  const ownerIds = Array.from(new Set(mergedRecords.map(r => r.owner_id).filter(Boolean)))
   let ownerNames: Record<string, string> = {}
   if (ownerIds.length > 0) {
     const [{ data: profiles }, { data: employees }] = await Promise.all([
@@ -45,12 +44,27 @@ export default async function MyMarketingPage() {
     }
   }
 
+  // Resolve backup employee names from candidates
+  const backupNamesByCandidate: Record<string, string> = {}
+  for (const c of (candidates || []) as any[]) {
+    const name = (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null)
+    if (name) backupNamesByCandidate[(c as any).Candidate_name] = name
+  }
+
+  const enrichedRecords = mergedRecords.map(r => ({
+    ...r,
+    status: (r as any).status || 'Telephone Call',
+    employee_name: (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
+    backup_employee_name: backupNamesByCandidate[r.name] || null,
+  }))
+
   const candidateOptions = (candidates || []).map((c: any) => ({
     id: c.id,
     name: c.Candidate_name,
     owner_id: c.owner_id,
     status: c.status,
     backup_employee_id: c.backup_employee_id,
+    backup_employee_name: (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null) || null,
   }))
 
   return (

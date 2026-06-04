@@ -63,6 +63,20 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Resolve backup employee names from Candidate_records
+  const candidateNames = data.map(r => r.name).filter(Boolean)
+  let backupNamesByCandidate: Record<string, string> = {}
+  if (candidateNames.length > 0) {
+    const { data: candidates } = await supabase
+      .from('Candidate_records')
+      .select('Candidate_name, backup_employee_id, backup_employee_name')
+      .in('Candidate_name', candidateNames)
+    for (const c of (candidates || []) as any[]) {
+      const name = (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null)
+      if (name) backupNamesByCandidate[(c as any).Candidate_name] = name
+    }
+  }
+
   let lastReminderByRecord: Record<string, string> = {}
   if (data.length > 0) {
     const { data: reminderLogs } = await supabase
@@ -82,6 +96,7 @@ export async function GET(req: NextRequest) {
     ...r,
     status: (r as any).status || 'Telephone Call',
     employee_name: (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
+    backup_employee_name: backupNamesByCandidate[r.name] || null,
     last_reminder_sent_at: lastReminderByRecord[r.id] || null,
   }))
 
