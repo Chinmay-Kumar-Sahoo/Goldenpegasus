@@ -7,15 +7,20 @@ export default async function AdminMarketingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: records } = await supabase
-    .from('marketing_records')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const [recordsResult, employeeProfiles, employeesFromTable, candidatesResult] = await Promise.all([
+    supabase.from('marketing_records').select('*').order('created_at', { ascending: false }),
+    supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
+    supabase.from('employees').select('user_id, full_name, email'),
+    supabase.from('Candidate_records').select('id, Candidate_name, owner_id'),
+  ])
+
+  const records = recordsResult.data
 
   if (!records) {
     return <MarketingTable isAdmin={true} readOnly={false} currentUserId={user?.id ?? null} />
   }
 
+  // Build owner names lookup (same as before)
   const ownerIds = Array.from(new Set(records.map(r => r.owner_id).filter(Boolean)))
   let ownerNames: Record<string, string> = {}
   if (ownerIds.length > 0) {
@@ -29,6 +34,30 @@ export default async function AdminMarketingPage() {
     }
   }
 
+  // Build employee dropdown options
+  const employeeMap = new Map(((employeesFromTable?.data || []) as any[]).map((e: any) => [e.user_id, e]))
+  const employeeOptions = (employeeProfiles.data || []).map((p: any) => {
+    const emp = employeeMap.get(p.id)
+    return {
+      id: p.id,
+      full_name: emp?.full_name || p.full_name || p.email || 'Unknown',
+    }
+  })
+  // Also add employees that only exist in the employees table but not in profiles
+  const profileIds = new Set((employeeProfiles.data || []).map((p: any) => p.id))
+  for (const e of ((employeesFromTable?.data || []) as any[])) {
+    if (e.user_id && !profileIds.has(e.user_id)) {
+      employeeOptions.push({ id: e.user_id, full_name: e.full_name || e.email || 'Unknown' })
+    }
+  }
+
+  // Build candidate dropdown options
+  const candidateOptions = (candidatesResult.data || []).map((c: any) => ({
+    id: c.id,
+    name: c.Candidate_name,
+    owner_id: c.owner_id,
+  }))
+
   return (
     <MarketingTable
       isAdmin={true}
@@ -36,6 +65,8 @@ export default async function AdminMarketingPage() {
       currentUserId={user?.id ?? null}
       initialRecords={records}
       initialOwnerNames={ownerNames}
+      employeeOptions={employeeOptions}
+      candidateOptions={candidateOptions}
     />
   )
 }

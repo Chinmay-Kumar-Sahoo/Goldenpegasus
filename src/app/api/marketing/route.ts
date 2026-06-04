@@ -59,18 +59,29 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
+  const { selectedEmployeeId, ...recordData } = body
 
-  if (!body.employee_name) {
+  let effectiveOwnerId = user.id
+
+  // If an admin created this record for a specific employee, look up that employee's info
+  if (selectedEmployeeId) {
+    effectiveOwnerId = selectedEmployeeId
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId).single()
+    if (profile?.full_name) recordData.employee_name = profile.full_name
+    const { data: employee } = await supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId).single()
+    if (employee?.full_name) recordData.employee_name = employee.full_name
+  } else if (!recordData.employee_name) {
+    // Employee creating their own record — look up their own name
     const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
-    if (profile?.full_name) body.employee_name = profile.full_name
+    if (profile?.full_name) recordData.employee_name = profile.full_name
     const { data: employee } = await supabase.from('employees').select('full_name').eq('user_id', user.id).single()
-    if (employee?.full_name) body.employee_name = employee.full_name
+    if (employee?.full_name) recordData.employee_name = employee.full_name
   }
 
   if (body.id) {
     const { error } = await supabase
       .from('marketing_records')
-      .update({ ...body, updated_at: new Date().toISOString() })
+      .update({ ...recordData, updated_at: new Date().toISOString() })
       .eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     await supabase.from('audit_logs').insert({ action: 'updated', entity_type: 'marketing_record', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })
@@ -79,7 +90,7 @@ export async function POST(req: NextRequest) {
 
   const { data: inserted, error } = await supabase
     .from('marketing_records')
-    .insert({ ...body, owner_id: user.id })
+    .insert({ ...recordData, owner_id: effectiveOwnerId })
     .select('id')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

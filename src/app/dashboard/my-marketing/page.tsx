@@ -7,11 +7,12 @@ export default async function MyMarketingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: records } = await supabase
-    .from('marketing_records')
-    .select('*')
-    .eq('owner_id', user?.id ?? '')
-    .order('created_at', { ascending: false })
+  const [recordsResult, candidatesResult] = await Promise.all([
+    supabase.from('marketing_records').select('*').eq('owner_id', user?.id ?? '').order('created_at', { ascending: false }),
+    supabase.from('Candidate_records').select('id, Candidate_name, owner_id').eq('owner_id', user?.id ?? ''),
+  ])
+
+  const records = recordsResult.data
 
   if (!records) {
     return <MarketingTable isAdmin={false} readOnly={false} currentUserId={user?.id ?? null} />
@@ -30,6 +31,12 @@ export default async function MyMarketingPage() {
     }
   }
 
+  const candidateOptions = (candidatesResult.data || []).map((c: any) => ({
+    id: c.id,
+    name: c.Candidate_name,
+    owner_id: c.owner_id,
+  }))
+
   return (
     <MarketingTable
       isAdmin={false}
@@ -37,6 +44,7 @@ export default async function MyMarketingPage() {
       currentUserId={user?.id ?? null}
       initialRecords={records}
       initialOwnerNames={ownerNames}
+      candidateOptions={candidateOptions}
     />
   )
 }

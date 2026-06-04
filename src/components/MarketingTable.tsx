@@ -103,12 +103,16 @@ export default function MarketingPage({
   currentUserId: propUserId = null,
   initialRecords: serverRecords = [],
   initialOwnerNames: serverOwnerNames = {},
+  employeeOptions = [],
+  candidateOptions = [],
 }: {
   isAdmin?: boolean
   readOnly?: boolean
   currentUserId?: string | null
   initialRecords?: MarketingRecord[]
   initialOwnerNames?: Record<string, string>
+  employeeOptions?: Array<{ id: string; full_name: string }>
+  candidateOptions?: Array<{ id: string; name: string; owner_id: string }>
 }) {
   const showEmployeeColumn = isAdmin || readOnly
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -146,6 +150,7 @@ export default function MarketingPage({
     employee_name: '',
   })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkForm, setBulkForm] = useState({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', interviewer_email: '' })
   const [bulkSaving, setBulkSaving] = useState(false)
@@ -230,9 +235,11 @@ export default function MarketingPage({
         interviewer_email: rec.interviewer_email || '', notes: rec.notes || '',
         employee_name: rec.employee_name || '',
       })
+      setSelectedEmployeeId('')
     } else {
       setEditing(null)
-      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'active', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: isAdmin ? 'Admin' : '' })
+      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'active', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '' })
+      setSelectedEmployeeId('')
     }
     setError('')
     setShowModal(true)
@@ -243,7 +250,9 @@ export default function MarketingPage({
     setSaving(true)
     setError('')
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
-    const payload = editing ? { ...cleanForm, id: editing.id } : { ...cleanForm, name: form.name }
+    const payload = editing
+      ? { ...cleanForm, id: editing.id }
+      : { ...cleanForm, name: form.name, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}) }
     try {
       const res = await fetch('/api/marketing', {
         method: 'POST',
@@ -485,6 +494,15 @@ export default function MarketingPage({
     })
   }, [records, search, statusFilter, dateFilters, textFilters])
 
+  const filteredCandidates = useMemo(() => {
+    if (editing) return []
+    if (isAdmin) {
+      if (!selectedEmployeeId) return []
+      return candidateOptions.filter(c => c.owner_id === selectedEmployeeId)
+    }
+    return candidateOptions.filter(c => c.owner_id === currentUserId)
+  }, [candidateOptions, selectedEmployeeId, isAdmin, currentUserId, editing])
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="shrink-0 space-y-4 mb-4">
@@ -640,8 +658,9 @@ export default function MarketingPage({
                               className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 placeholder-[#3a3a3a]" />
                             <div className="max-h-48 overflow-y-auto space-y-1">
                               {(uniqueValues[h] || []).filter(v => !textFilterSearch || v.toLowerCase().includes(textFilterSearch.toLowerCase())).map(v => {
-                                const checked = (textFilters[h] || []).includes(v)
-                                return (
+                                                          const checked = (textFilters[h] || []).includes(v)
+
+  return (
                                   <label key={v} className="flex items-center gap-2 px-2 py-1.5 hover:bg-[#2a2a2a] rounded-lg cursor-pointer transition-colors">
                                     <input type="checkbox" checked={checked}
                                       onChange={() => setTextFilters(f => {
@@ -737,9 +756,49 @@ export default function MarketingPage({
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-white mb-6">{editing ? 'Edit Record' : 'Add Marketing Record'}</h2>
             <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
+              {isAdmin && !editing && (
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Employee Name</label>
+                  <select value={selectedEmployeeId} onChange={e => {
+                    const empId = e.target.value
+                    setSelectedEmployeeId(empId)
+                    const emp = employeeOptions.find(e => e.id === empId)
+                    setForm({ ...form, employee_name: emp?.full_name || '' })
+                  }} required
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                    <option value="">Select Employee</option>
+                    {employeeOptions.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {isAdmin && editing && (
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Employee Name</label>
+                  <input type="text" value={form.employee_name || ''} disabled
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
+                </div>
+              )}
+              {!editing ? (
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Candidate Name *</label>
+                  <select value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                    <option value="">{isAdmin && !selectedEmployeeId ? 'Select an employee first' : 'Select Candidate'}</option>
+                    {filteredCandidates.map(c => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Candidate Name</label>
+                  <input type="text" value={form.name} disabled
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
+                </div>
+              )}
               {[
-                ...(isAdmin ? [{ label: 'Employee Name', name: 'employee_name' as const, type: 'text' as const, span: 1 as const }] : []),
-                { label: 'Candidate Name *', name: 'name', type: 'text', required: true, span: 2 },
                 { label: 'Created Date', name: 'date', type: 'date', span: 1 },
                 { label: 'Status', name: 'status', type: 'select', options: ['active', 'pending', 'completed', 'closed'], span: 1 },
                 { label: 'Recruiter Name', name: 'recruiter_name', type: 'text', span: 1 },
@@ -754,7 +813,7 @@ export default function MarketingPage({
                 { label: 'Interviewer Email', name: 'interviewer_email', type: 'email', span: 1 },
                 { label: 'Comments', name: 'notes', type: 'textarea', span: 2 },
               ].map(field => {
-                const locked = field.name === 'date' || (!!editing && (field.name === 'name' || field.name === 'employee_name' || (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form])))
+                const locked = field.name === 'date' || (!!editing && (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]))
                 return (
                 <div key={field.name} className={field.span === 2 ? 'col-span-2' : ''}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
@@ -767,7 +826,7 @@ export default function MarketingPage({
                     <textarea value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} rows={2} disabled={locked}
                       className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-none ${locked ? 'opacity-50 cursor-not-allowed' : ''}`} />
                   ) : (
-                    <input type={field.type} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} required={field.required} disabled={locked}
+                    <input type={field.type} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} disabled={locked}
                       className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${locked ? 'opacity-50 cursor-not-allowed' : ''}`} />
                   )}
                   {locked && <p className="text-[10px] text-[#71717a] mt-1">Locked after save</p>}
