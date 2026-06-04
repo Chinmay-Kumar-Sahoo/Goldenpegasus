@@ -780,8 +780,8 @@ export default function MarketingPage({
                     setSelectedEmployeeId(empId)
                     const emp = employeeOptions.find(e => e.id === empId)
                     setForm({ ...form, employee_name: emp?.full_name || '' })
-                  }} required
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                  }} required disabled={!!form.name && !!selectedEmployeeId}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 disabled:opacity-50 disabled:cursor-not-allowed">
                     <option value="">Select Primary Employee</option>
                     {employeeOptions.map(emp => (
                       <option key={emp.id} value={emp.id}>{emp.full_name}</option>
@@ -792,18 +792,8 @@ export default function MarketingPage({
               {isAdmin && editing && (
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee</label>
-                  <select value={selectedEmployeeId} onChange={e => {
-                    const empId = e.target.value
-                    setSelectedEmployeeId(empId)
-                    const emp = employeeOptions.find(e => e.id === empId)
-                    setForm({ ...form, employee_name: emp?.full_name || '' })
-                  }}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-                    <option value="">Select Primary Employee</option>
-                    {employeeOptions.map(emp => (
-                      <option key={emp.id} value={emp.id}>{emp.full_name}</option>
-                    ))}
-                  </select>
+                  <input type="text" value={form.employee_name || ''} disabled
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
                 </div>
               )}
               {!isAdmin && (
@@ -817,7 +807,8 @@ export default function MarketingPage({
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
                   <input type="text" value={form.backup_employee_name || ''} onChange={e => setForm({ ...form, backup_employee_name: e.target.value })}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                    disabled={!!form.name && !!form.backup_employee_name}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 disabled:opacity-50 disabled:cursor-not-allowed" />
                 </div>
               ) : (
                 <div className="col-span-2">
