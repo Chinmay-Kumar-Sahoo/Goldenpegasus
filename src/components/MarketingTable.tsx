@@ -464,8 +464,9 @@ export default function MarketingPage({
     for (const [header, fieldKey] of Object.entries(TEXT_FILTER_COLUMNS)) {
       const values = new Set<string>()
       for (const rec of records) {
-        const val = (rec as any)[fieldKey]
-        if (val != null && val !== '') values.add(String(val).trim())
+        let val = (rec as any)[fieldKey]
+        if (val == null || val === '') val = fieldKey === 'status' ? 'Telephone Call' : null
+        if (val != null) values.add(String(val).trim())
       }
       result[header] = Array.from(values).sort((a, b) => a.localeCompare(b))
     }
@@ -478,7 +479,8 @@ export default function MarketingPage({
     const hasTextFilter = Object.values(textFilters).some(v => v.length > 0)
     if (!q && statusFilter === 'all' && !hasDateFilter && !hasTextFilter) return records
     return records.filter(r => {
-      if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      const displayStatus = r.status || 'Telephone Call'
+      if (statusFilter !== 'all' && displayStatus !== statusFilter) return false
       if (!inRange(r.date, dateFilters.date)) return false
       if (!inRange(r.interview_date, dateFilters.interview_date)) return false
       if (!inRange(r.project_start_date, dateFilters.project_start_date)) return false
@@ -486,7 +488,8 @@ export default function MarketingPage({
       for (const [header, selected] of Object.entries(textFilters)) {
         if (selected.length === 0) continue
         const fieldKey = TEXT_FILTER_COLUMNS[header] || header.toLowerCase()
-        const fieldVal = String((r as any)[fieldKey] ?? '').trim()
+        let fieldVal = String((r as any)[fieldKey] ?? '').trim()
+        if (!fieldVal && fieldKey === 'status') fieldVal = 'Telephone Call'
         if (!selected.includes(fieldVal)) return false
       }
       if (!q) return true
