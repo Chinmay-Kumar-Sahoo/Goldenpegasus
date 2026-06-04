@@ -68,7 +68,7 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
 
   if (loading) {
     return (
-      <div>
+      <div className="flex flex-col flex-1 overflow-hidden">
         <PageHeader title="Personal Details" subtitle="Update your personal information" />
         <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-8 space-y-4">
           {Array.from({ length: 6 }).map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}
@@ -78,10 +78,13 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
   }
 
   return (
-    <div>
-      <PageHeader title="Personal Details" subtitle="Update your personal information" />
-      <div className="max-w-2xl">
-        <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-8">
+    <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="shrink-0">
+        <PageHeader title="Personal Details" subtitle="Update your personal information" />
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0 mt-6">
+        <div className="max-w-2xl">
+          <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-8">
           <form onSubmit={handleSave} className="space-y-5">
             <div>
               <div className="text-xs font-semibold text-[#22c55e] uppercase tracking-wider mb-4">Account Information</div>
@@ -137,6 +140,7 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
               </button>
             )}
           </form>
+        </div>
         </div>
       </div>
     </div>

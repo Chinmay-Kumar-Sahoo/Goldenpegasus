@@ -92,7 +92,7 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="flex flex-col flex-1 overflow-hidden">
         <PageHeader title="Personal Details" subtitle="Update your personal information" />
         <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-8 space-y-4 max-w-2xl mt-6">
           {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-10 bg-[#1a1a1a] animate-pulse rounded-xl w-full" />)}
@@ -102,10 +102,13 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
   }
 
   return (
-    <div className="p-6">
-      <PageHeader title="Personal Details" subtitle="Update your personal information" />
-      <div className="max-w-2xl mt-6">
-        <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-8">
+    <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="shrink-0">
+        <PageHeader title="Personal Details" subtitle="Update your personal information" />
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0 mt-6">
+        <div className="max-w-2xl">
+          <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-8">
           <form onSubmit={handleSave} className="space-y-5">
             <div>
               <div className="text-xs font-semibold text-[#22c55e] uppercase tracking-wider mb-4">Account Information</div>
@@ -175,6 +178,7 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
               {saving ? 'Saving...' : 'Save All Changes'}
             </button>
           </form>
+        </div>
         </div>
       </div>
     </div>
