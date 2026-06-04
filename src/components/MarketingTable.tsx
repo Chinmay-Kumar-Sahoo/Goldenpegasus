@@ -119,7 +119,7 @@ export default function MarketingPage({
   initialRecords?: MarketingRecord[]
   initialOwnerNames?: Record<string, string>
   employeeOptions?: Array<{ id: string; full_name: string }>
-  candidateOptions?: Array<{ id: string; name: string; owner_id: string; status: string | null }>
+  candidateOptions?: Array<{ id: string; name: string; owner_id: string; status: string | null; backup_employee_id?: string | null }>
 }) {
   const showEmployeeColumn = isAdmin || readOnly
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -227,7 +227,7 @@ export default function MarketingPage({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [activeDateFilter, activeTextFilter])
 
-  const canEdit = (record: MarketingRecord) => !readOnly && (isAdmin || record.owner_id === currentUserId)
+  const canEdit = (record: MarketingRecord) => !readOnly && (isAdmin || record.owner_id === currentUserId || (record as any).is_backup_record)
 
   const openModal = (rec?: MarketingRecord) => {
     if (rec) {
@@ -508,7 +508,7 @@ export default function MarketingPage({
     if (editing) return []
     const available = isAdmin
       ? candidateOptions
-      : candidateOptions.filter(c => c.owner_id === currentUserId)
+      : candidateOptions.filter(c => c.owner_id === currentUserId || c.backup_employee_id === currentUserId)
     return available.filter(c => c.status !== 'Closed')
   }, [candidateOptions, selectedEmployeeId, isAdmin, currentUserId, editing])
 

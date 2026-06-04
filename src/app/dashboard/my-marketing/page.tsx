@@ -6,19 +6,33 @@ export const metadata = { title: 'My Marketing Records | GoldenPegasus' }
 export default async function MyMarketingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const uid = user?.id ?? ''
 
-  const [recordsResult, candidatesResult] = await Promise.all([
-    supabase.from('marketing_records').select('*').eq('owner_id', user?.id ?? '').order('created_at', { ascending: false }),
-    supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status').eq('owner_id', user?.id ?? ''),
+  const { data: candidates } = await supabase
+    .from('Candidate_records')
+    .select('id, Candidate_name, owner_id, status, backup_employee_id')
+    .or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+
+  const ownedCandidateNames = (candidates || []).filter(c => c.owner_id === uid).map(c => c.Candidate_name)
+  const backupCandidateNames = (candidates || []).filter(c => c.backup_employee_id === uid).map(c => c.Candidate_name)
+  const allCandidateNames = Array.from(new Set([...ownedCandidateNames, ...backupCandidateNames]))
+
+  const [{ data: ownedRecords }, { data: backupRecords }] = await Promise.all([
+    supabase.from('marketing_records').select('*').eq('owner_id', uid).order('created_at', { ascending: false }),
+    backupCandidateNames.length > 0
+      ? supabase.from('marketing_records').select('*').in('name', backupCandidateNames).order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
   ])
 
-  const records = (recordsResult.data || []).map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
-
-  if (!records) {
-    return <MarketingTable isAdmin={false} readOnly={false} currentUserId={user?.id ?? null} />
+  const recordMap = new Map<string, any>()
+  for (const r of (ownedRecords || [])) recordMap.set(r.id, { ...r, is_backup_record: false })
+  for (const r of (backupRecords || [])) {
+    if (!recordMap.has(r.id)) recordMap.set(r.id, { ...r, is_backup_record: r.owner_id !== uid })
   }
+  const mergedRecords = Array.from(recordMap.values())
+  const enrichedRecords = mergedRecords.map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
 
-  const ownerIds = Array.from(new Set(records.map(r => r.owner_id).filter(Boolean)))
+  const ownerIds = Array.from(new Set(enrichedRecords.map(r => r.owner_id).filter(Boolean)))
   let ownerNames: Record<string, string> = {}
   if (ownerIds.length > 0) {
     const [{ data: profiles }, { data: employees }] = await Promise.all([
@@ -31,19 +45,20 @@ export default async function MyMarketingPage() {
     }
   }
 
-  const candidateOptions = (candidatesResult.data || []).map((c: any) => ({
+  const candidateOptions = (candidates || []).map((c: any) => ({
     id: c.id,
     name: c.Candidate_name,
     owner_id: c.owner_id,
     status: c.status,
+    backup_employee_id: c.backup_employee_id,
   }))
 
   return (
     <MarketingTable
       isAdmin={false}
       readOnly={false}
-      currentUserId={user?.id ?? null}
-      initialRecords={records}
+      currentUserId={uid}
+      initialRecords={enrichedRecords}
       initialOwnerNames={ownerNames}
       candidateOptions={candidateOptions}
     />

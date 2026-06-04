@@ -19,6 +19,8 @@ interface CandidateRecord {
   notes: string | null
   created_at: string
   employee_name?: string | null
+  backup_employee_id?: string | null
+  backup_employee_name?: string | null
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -55,19 +57,21 @@ function wordScore(val: string | null, q: string): number {
   return 0
 }
 
-export default function CandidatesPage({ isAdmin = false, initialRecords = [], employeeOptions = [], initialOwnerNames = {} }: { isAdmin?: boolean; initialRecords?: CandidateRecord[]; employeeOptions?: Array<{ id: string; full_name: string }>; initialOwnerNames?: Record<string, string> }) {
+export default function CandidatesPage({ isAdmin = false, initialRecords = [], employeeOptions = [], initialOwnerNames = {}, currentUserId: propUserId = null }: { isAdmin?: boolean; initialRecords?: CandidateRecord[]; employeeOptions?: Array<{ id: string; full_name: string }>; initialOwnerNames?: Record<string, string>; currentUserId?: string | null }) {
   const [records, setRecords] = useState<CandidateRecord[]>(initialRecords.map(r => ({
     ...r,
     employee_name: (r.employee_name || initialOwnerNames[r.owner_id] || null),
+    backup_employee_name: (r.backup_employee_name || (r.backup_employee_id ? initialOwnerNames[r.backup_employee_id] : null) || null),
   })))
   const [loading, setLoading] = useState(initialRecords.length === 0)
+  const [currentUserId] = useState<string | null>(propUserId)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<CandidateRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '' })
+  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '' })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
@@ -89,7 +93,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
       const res = await fetch('/api/candidates')
       if (!res.ok) throw new Error('Failed to load')
       const json = await res.json()
-      setRecords((json.records || []).map((r: any) => ({ ...r, employee_name: r.employee_name || initialOwnerNames[r.owner_id] || null })))
+      setRecords((json.records || []).map((r: any) => ({ ...r, employee_name: r.employee_name || initialOwnerNames[r.owner_id] || null, backup_employee_name: r.backup_employee_name || (r.backup_employee_id ? initialOwnerNames[r.backup_employee_id] : null) || null })))
     } catch (err: any) {
       toast.error('Failed to load candidates')
     } finally {
@@ -131,11 +135,11 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   const openModal = (rec?: CandidateRecord) => {
     if (rec) {
       setEditing(rec)
-      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', contract_start: rec.contract_start || '', contract_end: rec.contract_end || '', project_type: rec.project_type || '', notes: rec.notes || '' })
+      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', contract_start: rec.contract_start || '', contract_end: rec.contract_end || '', project_type: rec.project_type || '', notes: rec.notes || '', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '' })
       setSelectedEmployeeId('')
     } else {
       setEditing(null)
-      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '' })
+      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '' })
       setSelectedEmployeeId('')
     }
     setError('')
@@ -148,8 +152,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     setError('')
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
     const payload = editing
-      ? { ...cleanForm, id: editing.id }
-      : { ...cleanForm, Candidate_name: form.Candidate_name, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}) }
+      ? { ...cleanForm, id: editing.id, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}), ...(form.backup_employee_id ? { backupEmployeeId: form.backup_employee_id } : {}) }
+      : { ...cleanForm, Candidate_name: form.Candidate_name, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}), ...(form.backup_employee_id ? { backupEmployeeId: form.backup_employee_id } : {}) }
     try {
       const res = await fetch('/api/candidates', {
         method: 'POST',
@@ -370,7 +374,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {['SELECT', 'Candidate Name', 'Email', 'Phone', 'Company', 'Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End'].map(h => {
+                {['SELECT', 'Candidate Name', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End'].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -434,13 +438,13 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 10 }).map((_, j) => (
+                    {Array.from({ length: 11 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                <tr><td colSpan={11} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 sorted.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
@@ -450,6 +454,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.client_phone || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.company_name || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.employee_name || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.backup_employee_name || '—'}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Active'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
                         {rec.status || 'Active'}
@@ -472,9 +477,10 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-white mb-6">{editing ? 'Edit Candidate' : 'Add Candidate'}</h2>
             <form onSubmit={handleSave} className="space-y-3">
-              {isAdmin && !editing && (
+              {/* Primary Employee */}
+              {!editing && isAdmin && (
                 <div>
-                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Employee Name *</label>
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee *</label>
                   <select value={selectedEmployeeId} onChange={e => {
                     setSelectedEmployeeId(e.target.value)
                   }} required
@@ -486,6 +492,47 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
                   </select>
                 </div>
               )}
+              {!editing && !isAdmin && (
+                <div>
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee *</label>
+                  <input type="text" value={employeeOptions.find(e => e.id === currentUserId)?.full_name || 'You'} disabled
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
+                </div>
+              )}
+              {editing && (
+                <div>
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee</label>
+                  {isAdmin ? (
+                    <select value={selectedEmployeeId || editing.owner_id} onChange={e => setSelectedEmployeeId(e.target.value)}
+                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                      {employeeOptions.map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input type="text" value={form.employee_name || editing.employee_name || 'You'} disabled
+                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
+                  )}
+                </div>
+              )}
+
+              {/* Backup Employee */}
+              <div>
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
+                <select value={form.backup_employee_id} onChange={e => {
+                  const empId = e.target.value
+                  const emp = employeeOptions.find(e => e.id === empId)
+                  setForm({ ...form, backup_employee_id: empId, backup_employee_name: emp?.full_name || '' })
+                }}
+                  disabled={!!editing && !isAdmin}
+                  className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <option value="">No Backup Employee</option>
+                  {employeeOptions.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                  ))}
+                </select>
+                {!!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can change backup employee</p>}
+              </div>
               {[
                 { label: 'Candidate Name *', name: 'Candidate_name', type: 'text', required: true },
                 { label: 'Email', name: 'Candidate_email', type: 'email' },

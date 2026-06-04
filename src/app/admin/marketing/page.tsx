@@ -11,7 +11,7 @@ export default async function AdminMarketingPage() {
     supabase.from('marketing_records').select('*').order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
     supabase.from('employees').select('user_id, full_name, email'),
-    supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status'),
+    supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status, backup_employee_id'),
   ])
 
   const records = (recordsResult.data || []).map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
@@ -57,6 +57,7 @@ export default async function AdminMarketingPage() {
     name: c.Candidate_name,
     owner_id: c.owner_id,
     status: c.status,
+    backup_employee_id: (c as any).backup_employee_id,
   }))
 
   return (
