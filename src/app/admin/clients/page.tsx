@@ -10,7 +10,7 @@ export default async function AdminClientsPage() {
     supabase.from('employees').select('user_id, full_name, email'),
   ])
 
-  const records = recordsResult.data
+  const rawRecords = recordsResult.data
 
   const employeeMap = new Map(((employeesFromTable?.data || []) as any[]).map((e: any) => [e.user_id, e]))
   const employeeOptions = (employeeProfiles.data || []).map((p: any) => {
@@ -24,5 +24,12 @@ export default async function AdminClientsPage() {
     }
   }
 
-  return <ClientsTable isAdmin={true} initialRecords={records || []} employeeOptions={employeeOptions} />
+  const ownerNames: Record<string, string> = {}
+  for (const opt of employeeOptions) {
+    ownerNames[opt.id] = opt.full_name
+  }
+
+  const records = (rawRecords || []).map(r => ({ ...r, employee_name: r.employee_name || ownerNames[r.owner_id] || null }))
+
+  return <ClientsTable isAdmin={true} initialRecords={records} employeeOptions={employeeOptions} initialOwnerNames={ownerNames} />
 }

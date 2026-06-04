@@ -18,6 +18,7 @@ interface CandidateRecord {
   project_type: string | null
   notes: string | null
   created_at: string
+  employee_name?: string | null
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -54,8 +55,11 @@ function wordScore(val: string | null, q: string): number {
   return 0
 }
 
-export default function CandidatesPage({ isAdmin = false, initialRecords = [], employeeOptions = [] }: { isAdmin?: boolean; initialRecords?: CandidateRecord[]; employeeOptions?: Array<{ id: string; full_name: string }> }) {
-  const [records, setRecords] = useState<CandidateRecord[]>(initialRecords)
+export default function CandidatesPage({ isAdmin = false, initialRecords = [], employeeOptions = [], initialOwnerNames = {} }: { isAdmin?: boolean; initialRecords?: CandidateRecord[]; employeeOptions?: Array<{ id: string; full_name: string }>; initialOwnerNames?: Record<string, string> }) {
+  const [records, setRecords] = useState<CandidateRecord[]>(initialRecords.map(r => ({
+    ...r,
+    employee_name: (r.employee_name || initialOwnerNames[r.owner_id] || null),
+  })))
   const [loading, setLoading] = useState(initialRecords.length === 0)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -85,13 +89,13 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
       const res = await fetch('/api/candidates')
       if (!res.ok) throw new Error('Failed to load')
       const json = await res.json()
-      setRecords(json.records || [])
+      setRecords((json.records || []).map((r: any) => ({ ...r, employee_name: r.employee_name || initialOwnerNames[r.owner_id] || null })))
     } catch (err: any) {
       toast.error('Failed to load candidates')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [initialOwnerNames])
 
   const fetchedRef = useRef(initialRecords.length > 0)
 
@@ -227,8 +231,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
-    const rows = filtered.map(r => [r.Candidate_name, r.Candidate_email, r.client_phone, r.company_name, r.status, r.project_type, r.contract_start, r.contract_end, r.notes])
+    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
+    const rows = filtered.map(r => [r.Candidate_name, r.Candidate_email, r.client_phone, r.company_name, r.employee_name, r.status, r.project_type, r.contract_start, r.contract_end, r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -241,8 +245,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
-    const data = filtered.map(r => [r.Candidate_name, r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.status || '', r.project_type || '', r.contract_start || '', r.contract_end || '', r.notes || ''])
+    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
+    const data = filtered.map(r => [r.Candidate_name, r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.status || '', r.project_type || '', r.contract_start || '', r.contract_end || '', r.notes || ''])
 
     autoTable(doc, {
       head: [headers],
@@ -366,7 +370,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {['SELECT', 'Candidate Name', 'Email', 'Phone', 'Company', 'Status', 'Project Type', 'Contract Start', 'Contract End'].map(h => {
+                {['SELECT', 'Candidate Name', 'Email', 'Phone', 'Company', 'Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End'].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -430,13 +434,13 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 9 }).map((_, j) => (
+                    {Array.from({ length: 10 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                <tr><td colSpan={10} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 sorted.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
@@ -445,6 +449,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.client_phone || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.company_name || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.employee_name || '—'}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Active'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
                         {rec.status || 'Active'}

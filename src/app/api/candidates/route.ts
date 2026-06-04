@@ -12,7 +12,23 @@ export async function GET() {
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ records: data || [] })
+
+  const records = data || []
+  const ownerIds = Array.from(new Set(records.map(r => r.owner_id).filter(Boolean)))
+  const [{ data: profiles }, { data: employees }] = await Promise.all([
+    supabase.from('profiles').select('id, full_name, email').in('id', ownerIds.length > 0 ? ownerIds : ['']),
+    supabase.from('employees').select('user_id, full_name, email').in('user_id', ownerIds.length > 0 ? ownerIds : ['']),
+  ])
+  const ownerNames: Record<string, string> = {}
+  for (const p of (profiles || [])) if (p.id) ownerNames[p.id] = p.full_name || p.email || 'Unknown employee'
+  for (const e of (employees || [])) if (e.user_id) ownerNames[e.user_id] = e.full_name || e.email || ownerNames[e.user_id] || 'Unknown employee'
+
+  const enriched = records.map(r => ({
+    ...r,
+    employee_name: ownerNames[r.owner_id] || null,
+  }))
+
+  return NextResponse.json({ records: enriched })
 }
 
 export async function POST(req: NextRequest) {
