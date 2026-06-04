@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
 
   const enriched = records.map(r => ({
     ...r,
+    status: (r as any).status || 'Telephone Call',
     employee_name: (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
     last_reminder_sent_at: lastReminderByRecord[r.id] || null,
   }))

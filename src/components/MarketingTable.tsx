@@ -236,7 +236,7 @@ export default function MarketingPage({
         name: rec.name, date: rec.date || '', recruiter_name: rec.recruiter_name || '',
         recruiter_email: rec.recruiter_email || '', organization_name: rec.organization_name || '',
         implementation_partner: rec.implementation_partner || '', end_client: rec.end_client || '',
-        status: rec.status || 'active', project_start_date: rec.project_start_date || '',
+        status: rec.status || 'Telephone Call', project_start_date: rec.project_start_date || '',
         project_end_date: rec.project_end_date || '', interview_date: rec.interview_date || '',
         implementation_poc_email: rec.implementation_poc_email || '',
         interviewer_email: rec.interviewer_email || '', notes: rec.notes || '',
