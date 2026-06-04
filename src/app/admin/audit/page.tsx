@@ -29,12 +29,12 @@ function getDayLabel(dateStr: string): string {
 
 export default async function AuditLogsPage() {
   const supabase = await createClient()
-  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data: logsData } = await supabase
     .from('audit_logs')
     .select('*, profiles(full_name, email)')
-    .gte('created_at', threeDaysAgo)
+    .gte('created_at', sevenDaysAgo)
     .order('created_at', { ascending: false })
 
   const entityIds = [...new Set((logsData || []).filter(l => l.entity_type === 'employee').map(l => l.entity_id).filter(Boolean))]
@@ -77,9 +77,9 @@ export default async function AuditLogsPage() {
 
   return (
     <div>
-      <PageHeader title="Audit Logs" subtitle="Track all admin and system activity (last 3 days)" />
+      <PageHeader title="Audit Logs" subtitle="Track all admin and system activity (last 7 days)" />
       {logs.length === 0 ? (
-        <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl px-4 py-12 text-center text-[#71717a] text-sm">No audit logs found in the last 3 days.</div>
+        <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl px-4 py-12 text-center text-[#71717a] text-sm">No audit logs found in the last 7 days.</div>
       ) : (
         <div className="space-y-8">
           {weekGroups.map(week => {
