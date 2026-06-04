@@ -21,11 +21,17 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
+  const { selectedEmployeeId, ...recordData } = body
+
+  let effectiveOwnerId = user.id
+  if (selectedEmployeeId) {
+    effectiveOwnerId = selectedEmployeeId
+  }
 
   if (body.id) {
     const { error } = await supabase
       .from('Candidate_records')
-      .update({ ...body, updated_at: new Date().toISOString() })
+      .update({ ...recordData, updated_at: new Date().toISOString() })
       .eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     await supabase.from('audit_logs').insert({ action: 'updated', entity_type: 'candidate_record', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })
@@ -34,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const { data: inserted, error } = await supabase
     .from('Candidate_records')
-    .insert({ ...body, owner_id: user.id })
+    .insert({ ...recordData, owner_id: effectiveOwnerId })
     .select('id')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -54,7 +54,7 @@ function wordScore(val: string | null, q: string): number {
   return 0
 }
 
-export default function CandidatesPage({ isAdmin = false, initialRecords = [] }: { isAdmin?: boolean; initialRecords?: CandidateRecord[] }) {
+export default function CandidatesPage({ isAdmin = false, initialRecords = [], employeeOptions = [] }: { isAdmin?: boolean; initialRecords?: CandidateRecord[]; employeeOptions?: Array<{ id: string; full_name: string }> }) {
   const [records, setRecords] = useState<CandidateRecord[]>(initialRecords)
   const [loading, setLoading] = useState(initialRecords.length === 0)
   const [search, setSearch] = useState('')
@@ -65,6 +65,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
   const [error, setError] = useState('')
   const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '' })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkForm, setBulkForm] = useState({ status: '', notes: '', project_type: '', company_name: '', address: '' })
   const [bulkSaving, setBulkSaving] = useState(false)
@@ -126,10 +127,12 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
   const openModal = (rec?: CandidateRecord) => {
     if (rec) {
       setEditing(rec)
-      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'active', contract_start: rec.contract_start || '', contract_end: rec.contract_end || '', project_type: rec.project_type || '', notes: rec.notes || '' })
+      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', contract_start: rec.contract_start || '', contract_end: rec.contract_end || '', project_type: rec.project_type || '', notes: rec.notes || '' })
+      setSelectedEmployeeId('')
     } else {
       setEditing(null)
       setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '' })
+      setSelectedEmployeeId('')
     }
     setError('')
     setShowModal(true)
@@ -140,7 +143,9 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
     setSaving(true)
     setError('')
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
-    const payload = editing ? { ...cleanForm, id: editing.id } : { ...cleanForm, Candidate_name: form.Candidate_name }
+    const payload = editing
+      ? { ...cleanForm, id: editing.id }
+      : { ...cleanForm, Candidate_name: form.Candidate_name, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}) }
     try {
       const res = await fetch('/api/candidates', {
         method: 'POST',
@@ -462,6 +467,20 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-white mb-6">{editing ? 'Edit Candidate' : 'Add Candidate'}</h2>
             <form onSubmit={handleSave} className="space-y-3">
+              {isAdmin && !editing && (
+                <div>
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Employee Name *</label>
+                  <select value={selectedEmployeeId} onChange={e => {
+                    setSelectedEmployeeId(e.target.value)
+                  }} required
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                    <option value="">Select Employee</option>
+                    {employeeOptions.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {[
                 { label: 'Candidate Name *', name: 'Candidate_name', type: 'text', required: true },
                 { label: 'Email', name: 'Candidate_email', type: 'email' },

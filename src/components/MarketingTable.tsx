@@ -151,7 +151,7 @@ export default function MarketingPage({
   const [currentUserId, setCurrentUserId] = useState<string | null>(propUserId)
   const [form, setForm] = useState({
     name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '',
-    implementation_partner: '', end_client: '', status: 'Initial Screening',
+    implementation_partner: '', end_client: '', status: 'Telephone Call',
     project_start_date: '', project_end_date: '', interview_date: '',
     implementation_poc_email: '', interviewer_email: '', notes: '',
     employee_name: '',
@@ -245,7 +245,7 @@ export default function MarketingPage({
       setSelectedEmployeeId('')
     } else {
       setEditing(null)
-      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'active', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '' })
+      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'Telephone Call', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '' })
       setSelectedEmployeeId('')
     }
     setError('')
@@ -728,8 +728,8 @@ export default function MarketingPage({
                     )}
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.date || '—'}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Initial Screening'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                        {rec.status || 'Initial Screening'}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Telephone Call'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                        {rec.status || 'Telephone Call'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_name || '—'}</td>
