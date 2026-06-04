@@ -7,14 +7,16 @@ export default async function AllMarketingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: records } = await supabase
+  const { data: rawRecords } = await supabase
     .from('marketing_records')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (!records) {
+  if (!rawRecords) {
     return <MarketingTable isAdmin={false} readOnly={true} currentUserId={user?.id ?? null} />
   }
+
+  const records = rawRecords.map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
 
   const ownerIds = Array.from(new Set(records.map(r => r.owner_id).filter(Boolean)))
   let ownerNames: Record<string, string> = {}

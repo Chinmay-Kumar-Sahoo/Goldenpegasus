@@ -12,7 +12,7 @@ export default async function MyMarketingPage() {
     supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status').eq('owner_id', user?.id ?? ''),
   ])
 
-  const records = recordsResult.data
+  const records = (recordsResult.data || []).map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
 
   if (!records) {
     return <MarketingTable isAdmin={false} readOnly={false} currentUserId={user?.id ?? null} />
