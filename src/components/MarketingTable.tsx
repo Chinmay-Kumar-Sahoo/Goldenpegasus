@@ -497,8 +497,7 @@ export default function MarketingPage({
   const filteredCandidates = useMemo(() => {
     if (editing) return []
     if (isAdmin) {
-      if (!selectedEmployeeId) return []
-      return candidateOptions.filter(c => c.owner_id === selectedEmployeeId)
+      return candidateOptions
     }
     return candidateOptions.filter(c => c.owner_id === currentUserId)
   }, [candidateOptions, selectedEmployeeId, isAdmin, currentUserId, editing])
@@ -785,7 +784,7 @@ export default function MarketingPage({
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Candidate Name *</label>
                   <select value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-                    <option value="">{isAdmin && !selectedEmployeeId ? 'Select an employee first' : 'Select Candidate'}</option>
+                    <option value="">Select Candidate</option>
                     {filteredCandidates.map(c => (
                       <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
