@@ -69,10 +69,17 @@ const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDat
 ]
 
 const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-green-500/10 text-green-400 border-green-500/20',
-  pending: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  closed: 'bg-red-500/10 text-red-400 border-red-500/20',
-  completed: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  'active': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  'pending': 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  'completed': 'bg-green-500/10 text-green-400 border-green-500/20',
+  'closed': 'bg-red-500/10 text-red-400 border-red-500/20',
+  'Initial Screening': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  'Introductory call': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  'Project Received': 'bg-green-500/10 text-green-400 border-green-500/20',
+  'RTR Confirmed': 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  'Screening Call': 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  'Technical Interview': 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  'Telephone Call': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
 }
 
 const DATE_COLUMNS: Record<string, string> = {
@@ -112,7 +119,7 @@ export default function MarketingPage({
   initialRecords?: MarketingRecord[]
   initialOwnerNames?: Record<string, string>
   employeeOptions?: Array<{ id: string; full_name: string }>
-  candidateOptions?: Array<{ id: string; name: string; owner_id: string }>
+  candidateOptions?: Array<{ id: string; name: string; owner_id: string; status: string | null }>
 }) {
   const showEmployeeColumn = isAdmin || readOnly
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -144,7 +151,7 @@ export default function MarketingPage({
   const [currentUserId, setCurrentUserId] = useState<string | null>(propUserId)
   const [form, setForm] = useState({
     name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '',
-    implementation_partner: '', end_client: '', status: 'active',
+    implementation_partner: '', end_client: '', status: 'Initial Screening',
     project_start_date: '', project_end_date: '', interview_date: '',
     implementation_poc_email: '', interviewer_email: '', notes: '',
     employee_name: '',
@@ -496,10 +503,10 @@ export default function MarketingPage({
 
   const filteredCandidates = useMemo(() => {
     if (editing) return []
-    if (isAdmin) {
-      return candidateOptions
-    }
-    return candidateOptions.filter(c => c.owner_id === currentUserId)
+    const available = isAdmin
+      ? candidateOptions
+      : candidateOptions.filter(c => c.owner_id === currentUserId)
+    return available.filter(c => c.status !== 'Closed')
   }, [candidateOptions, selectedEmployeeId, isAdmin, currentUserId, editing])
 
   return (
@@ -552,10 +559,13 @@ export default function MarketingPage({
           suppressHydrationWarning
           className="bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
           <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="pending">Pending</option>
-          <option value="completed">Completed</option>
-          <option value="closed">Closed</option>
+          <option value="Initial Screening">Initial Screening</option>
+          <option value="Introductory call">Introductory call</option>
+          <option value="Project Received">Project Received</option>
+          <option value="RTR Confirmed">RTR Confirmed</option>
+          <option value="Screening Call">Screening Call</option>
+          <option value="Technical Interview">Technical Interview</option>
+          <option value="Telephone Call">Telephone Call</option>
         </select>
         {Object.values(dateFilters).some(r => r.start || r.end) || Object.values(textFilters).some(v => v.length > 0) ? (
           <button onClick={() => { setDateFilters({ date: { start: '', end: '' }, interview_date: { start: '', end: '' }, project_start_date: { start: '', end: '' }, project_end_date: { start: '', end: '' } }); setActiveDateFilter(null); setTextFilters({}); setActiveTextFilter(null) }} suppressHydrationWarning
@@ -718,8 +728,8 @@ export default function MarketingPage({
                     )}
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.date || '—'}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'active'] || STATUS_COLORS.active}`}>
-                        {rec.status || 'active'}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Initial Screening'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                        {rec.status || 'Initial Screening'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_name || '—'}</td>
@@ -799,7 +809,7 @@ export default function MarketingPage({
               )}
               {[
                 { label: 'Created Date', name: 'date', type: 'date', span: 1 },
-                { label: 'Status', name: 'status', type: 'select', options: ['active', 'pending', 'completed', 'closed'], span: 1 },
+                { label: 'Status', name: 'status', type: 'select', options: ['Initial Screening', 'Introductory call', 'Project Received', 'RTR Confirmed', 'Screening Call', 'Technical Interview', 'Telephone Call'], span: 1 },
                 { label: 'Recruiter Name', name: 'recruiter_name', type: 'text', span: 1 },
                 { label: 'Recruiter Email', name: 'recruiter_email', type: 'email', span: 1 },
                 { label: '2nd Up Recruiter', name: 'organization_name', type: 'text', span: 1 },
@@ -852,7 +862,7 @@ export default function MarketingPage({
             <p className="text-xs text-[#71717a] mb-5">Only filled fields will be updated.</p>
             <div className="space-y-3">
               {[
-                { label: 'Status', name: 'status', type: 'select', options: ['', 'active', 'pending', 'completed', 'closed'] },
+                { label: 'Status', name: 'status', type: 'select', options: ['', 'Initial Screening', 'Introductory call', 'Project Received', 'RTR Confirmed', 'Screening Call', 'Technical Interview', 'Telephone Call'] },
                 { label: 'Notes', name: 'notes', type: 'textarea' },
                 { label: 'Recruiter Name', name: 'recruiter_name', type: 'text' },
                 { label: '2nd Up Recruiter', name: 'organization_name', type: 'text' },

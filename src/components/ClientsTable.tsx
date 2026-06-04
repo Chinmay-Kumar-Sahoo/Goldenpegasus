@@ -21,9 +21,12 @@ interface CandidateRecord {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-green-500/10 text-green-400 border-green-500/20',
-  inactive: 'bg-red-500/10 text-red-400 border-red-500/20',
-  prospect: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  'active': 'bg-green-500/10 text-green-400 border-green-500/20',
+  'inactive': 'bg-red-500/10 text-red-400 border-red-500/20',
+  'prospect': 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  'Active': 'bg-green-500/10 text-green-400 border-green-500/20',
+  'In-active': 'bg-red-500/10 text-red-400 border-red-500/20',
+  'Closed': 'bg-gray-500/10 text-gray-400 border-gray-500/20',
 }
 
 const DATE_COLUMNS: Record<string, string> = {
@@ -60,7 +63,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
   const [editing, setEditing] = useState<CandidateRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'active', contract_start: '', contract_end: '', project_type: '', notes: '' })
+  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '' })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkForm, setBulkForm] = useState({ status: '', notes: '', project_type: '', company_name: '', address: '' })
@@ -126,7 +129,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
       setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'active', contract_start: rec.contract_start || '', contract_end: rec.contract_end || '', project_type: rec.project_type || '', notes: rec.notes || '' })
     } else {
       setEditing(null)
-      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'active', contract_start: '', contract_end: '', project_type: '', notes: '' })
+      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '' })
     }
     setError('')
     setShowModal(true)
@@ -321,9 +324,9 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
           className="bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
           <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="prospect">Prospect</option>
+          <option value="Active">Active</option>
+          <option value="In-active">In-active</option>
+          <option value="Closed">Closed</option>
         </select>
         {search && (
           <span className="text-xs text-[#71717a] whitespace-nowrap">{sorted.length} result{sorted.length !== 1 ? 's' : ''}</span>
@@ -438,8 +441,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.client_phone || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.company_name || '—'}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'active'] || STATUS_COLORS.active}`}>
-                        {rec.status || 'active'}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Active'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+                        {rec.status || 'Active'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.project_type || '—'}</td>
@@ -476,13 +479,16 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
                 </div>
               ))}
               <div>
-                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Status</label>
-                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="prospect">Prospect</option>
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Status *</label>
+                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} required
+                  disabled={!!editing && !isAdmin}
+                  className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <option value="">Select Status</option>
+                  <option value="Active">Active</option>
+                  <option value="In-active">In-active</option>
+                  <option value="Closed">Closed</option>
                 </select>
+                {!!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can change status</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Notes</label>
@@ -509,7 +515,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [] }:
             <p className="text-xs text-[#71717a] mb-5">Only filled fields will be updated.</p>
             <div className="space-y-3">
               {[
-                { label: 'Status', name: 'status', type: 'select', options: ['', 'active', 'inactive', 'prospect'] },
+                { label: 'Status', name: 'status', type: 'select', options: ['', 'Active', 'In-active', 'Closed'] },
                 { label: 'Notes', name: 'notes', type: 'textarea' },
                 { label: 'Project Type', name: 'project_type', type: 'text' },
                 { label: 'Company Name', name: 'company_name', type: 'text' },

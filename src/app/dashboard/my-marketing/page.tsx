@@ -9,7 +9,7 @@ export default async function MyMarketingPage() {
 
   const [recordsResult, candidatesResult] = await Promise.all([
     supabase.from('marketing_records').select('*').eq('owner_id', user?.id ?? '').order('created_at', { ascending: false }),
-    supabase.from('Candidate_records').select('id, Candidate_name, owner_id').eq('owner_id', user?.id ?? ''),
+    supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status').eq('owner_id', user?.id ?? ''),
   ])
 
   const records = recordsResult.data
@@ -35,6 +35,7 @@ export default async function MyMarketingPage() {
     id: c.id,
     name: c.Candidate_name,
     owner_id: c.owner_id,
+    status: c.status,
   }))
 
   return (
