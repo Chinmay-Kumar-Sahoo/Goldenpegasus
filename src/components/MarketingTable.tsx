@@ -757,7 +757,7 @@ export default function MarketingPage({
             <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
               {isAdmin && !editing && (
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Employee Name</label>
+                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Employee Name *</label>
                   <select value={selectedEmployeeId} onChange={e => {
                     const empId = e.target.value
                     setSelectedEmployeeId(empId)
