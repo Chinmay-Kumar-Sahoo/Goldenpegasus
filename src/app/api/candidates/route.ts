@@ -65,6 +65,27 @@ export async function POST(req: NextRequest) {
       .update(updateData)
       .eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // Sync marketing records when primary employee changes
+    if (selectedEmployeeId) {
+      const { data: candidate } = await supabase
+        .from('Candidate_records')
+        .select('Candidate_name')
+        .eq('id', body.id)
+        .single()
+      if (candidate?.Candidate_name) {
+        let empName = ''
+        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId).maybeSingle()
+        if (profile?.full_name) empName = profile.full_name
+        const { data: employee } = await supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId).maybeSingle()
+        if (employee?.full_name) empName = employee.full_name
+        await supabase
+          .from('marketing_records')
+          .update({ owner_id: selectedEmployeeId, employee_name: empName || null, updated_at: new Date().toISOString() })
+          .eq('name', candidate.Candidate_name)
+      }
+    }
+
     await supabase.from('audit_logs').insert({ action: 'updated', entity_type: 'candidate_record', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })
     return NextResponse.json({ success: true })
   }
