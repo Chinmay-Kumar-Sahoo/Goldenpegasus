@@ -48,6 +48,8 @@ type MarketingImportField =
   | 'implementation_poc_email'
   | 'interviewer_email'
   | 'notes'
+  | 'employee_name'
+  | 'backup_employee_name'
 
 const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDate?: boolean }> = [
   { key: 'name', labels: ['Name', 'Candidate Name'] },
@@ -67,6 +69,8 @@ const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDat
   { key: 'implementation_poc_email', labels: ['Implementation POC Email'] },
   { key: 'interviewer_email', labels: ['Interviewer Email'] },
   { key: 'notes', labels: ['Notes'] },
+  { key: 'employee_name', labels: ['Primary Employee', 'Employee', 'Employee Name', 'Primary Owner'] },
+  { key: 'backup_employee_name', labels: ['Backup Employee', 'Backup Employee Name', 'Secondary Employee'] },
 ]
 
 const STATUS_COLORS: Record<string, string> = {
@@ -492,12 +496,38 @@ export default function MarketingPage({
         return { ...record, name: record.name || '' }
       })
 
+      const employeeNameMap = new Map<string, string>()
+      for (const emp of employeeOptions) {
+        if (emp.full_name) employeeNameMap.set(emp.full_name.toLowerCase().trim(), emp.id)
+      }
+
+      let importedCount = 0
+      let errorCount = 0
       for (const row of importRows) {
-        await fetch('/api/marketing', {
+        const payload: Record<string, any> = { ...row }
+        const empName = row.employee_name?.trim()
+        if (empName) {
+          const matchedId = employeeNameMap.get(empName.toLowerCase())
+          if (matchedId) {
+            payload.selectedEmployeeId = matchedId
+          }
+        }
+        if (!payload.backup_employee_name) delete payload.backup_employee_name
+        const res = await fetch('/api/marketing', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(row),
+          body: JSON.stringify(payload),
         })
+        if (res.ok) importedCount++
+        else errorCount++
+      }
+
+      if (errorCount === 0) {
+        toast.success(`Imported ${importedCount} marketing record${importedCount === 1 ? '' : 's'}`)
+      } else if (importedCount > 0) {
+        toast.success(`Imported ${importedCount} record${importedCount === 1 ? '' : 's'} (${errorCount} failed)`)
+      } else {
+        throw new Error('Failed to import any records')
       }
 
       toast.success(`Imported ${importRows.length} marketing record${importRows.length === 1 ? '' : 's'}`)

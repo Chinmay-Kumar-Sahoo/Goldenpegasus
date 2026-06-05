@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { selectedEmployeeId, ...recordData } = body
+  const { selectedEmployeeId, backup_employee_name: importBackupName, ...recordData } = body
 
   let effectiveOwnerId = user.id
 
@@ -147,6 +147,20 @@ export async function POST(req: NextRequest) {
     ])
     if (profileResult.data?.full_name) recordData.employee_name = profileResult.data.full_name
     if (employeeResult.data?.full_name) recordData.employee_name = employeeResult.data.full_name
+  }
+
+  if (importBackupName && body.name) {
+    const [backupProfileResult, backupEmployeeResult] = await Promise.all([
+      supabase.from('profiles').select('id').eq('full_name', importBackupName).maybeSingle(),
+      supabase.from('employees').select('user_id').eq('full_name', importBackupName).maybeSingle(),
+    ])
+    const backupUserId = backupProfileResult.data?.id || backupEmployeeResult.data?.user_id
+    if (backupUserId) {
+      await supabase
+        .from('Candidate_records')
+        .update({ backup_employee_id: backupUserId, backup_employee_name: importBackupName })
+        .eq('Candidate_name', body.name)
+    }
   }
 
   if (body.id) {
