@@ -6,13 +6,19 @@ export default async function EmployeeClientsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const uid = user?.id ?? ''
 
-  const [recordsResult, employeeProfiles, employeesFromTable] = await Promise.all([
-    supabase.from('Candidate_records').select('*').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`).order('created_at', { ascending: false }),
+  const [ownedResult, backupResult, employeeProfiles, employeesFromTable] = await Promise.all([
+    supabase.from('Candidate_records').select('*').eq('owner_id', uid).order('created_at', { ascending: false }),
+    supabase.from('Candidate_records').select('*').eq('backup_employee_id', uid).order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
     supabase.from('employees').select('user_id, full_name, email'),
   ])
 
-  const rawRecords = recordsResult.data
+  const recordMap = new Map<string, any>()
+  for (const r of (ownedResult.data || [])) recordMap.set(r.id, r)
+  for (const r of (backupResult.data || [])) {
+    if (!recordMap.has(r.id)) recordMap.set(r.id, r)
+  }
+  const rawRecords = Array.from(recordMap.values())
 
   // Build employee name lookup map
   const employeeMap = new Map(((employeesFromTable?.data || []) as any[]).map((e: any) => [e.user_id, e]))

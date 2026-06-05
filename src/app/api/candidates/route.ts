@@ -9,17 +9,28 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const ownerFilter = searchParams.get('owner_id')
 
-  let query = supabase.from('Candidate_records').select('*')
-
+  let records: any[] = []
   if (ownerFilter) {
-    query = query.or(`owner_id.eq.${ownerFilter},backup_employee_id.eq.${ownerFilter}`)
+    const [ownedResult, backupResult] = await Promise.all([
+      supabase.from('Candidate_records').select('*').eq('owner_id', ownerFilter).order('created_at', { ascending: false }),
+      supabase.from('Candidate_records').select('*').eq('backup_employee_id', ownerFilter).order('created_at', { ascending: false }),
+    ])
+    if (ownedResult.error) return NextResponse.json({ error: ownedResult.error.message }, { status: 500 })
+    if (backupResult.error) return NextResponse.json({ error: backupResult.error.message }, { status: 500 })
+    const recordMap = new Map<string, any>()
+    for (const r of (ownedResult.data || [])) recordMap.set(r.id, r)
+    for (const r of (backupResult.data || [])) {
+      if (!recordMap.has(r.id)) recordMap.set(r.id, r)
+    }
+    records = Array.from(recordMap.values())
+  } else {
+    const { data, error } = await supabase
+      .from('Candidate_records')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    records = data || []
   }
-
-  const { data, error } = await query.order('created_at', { ascending: false })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  const records = data || []
 
   if (records.length === 0) {
     return NextResponse.json({ records: [] })
