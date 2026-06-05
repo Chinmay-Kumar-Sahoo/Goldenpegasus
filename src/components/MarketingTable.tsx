@@ -496,21 +496,12 @@ export default function MarketingPage({
         return { ...record, name: record.name || '' }
       })
 
-      const employeeNameMap = new Map<string, string>()
-      for (const emp of employeeOptions) {
-        if (emp.full_name) employeeNameMap.set(emp.full_name.toLowerCase().trim(), emp.id)
-      }
-
       const batchRecords = importRows.map(row => {
-        const payload: Record<string, any> = { ...row }
-        const empName = row.employee_name?.trim()
-        if (empName) {
-          const matchedId = employeeNameMap.get(empName.toLowerCase())
-          if (matchedId) payload.selectedEmployeeId = matchedId
+        const payload: Record<string, any> = { name: row.name || '' }
+        for (const key of Object.keys(row)) {
+          const val = (row as any)[key]
+          if (val !== null && val !== '') payload[key] = val
         }
-        if (!payload.backup_employee_name) delete payload.backup_employee_name
-        if (!payload.selectedEmployeeId) delete payload.selectedEmployeeId
-        Object.keys(payload).forEach(k => { if (payload[k] === null) delete payload[k] })
         return payload
       })
 
@@ -522,7 +513,15 @@ export default function MarketingPage({
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Failed to import records')
 
-      toast.success(`Imported ${result.count || batchRecords.length} marketing records`)
+      const errors = result.errors || []
+      if (errors.length > 0) {
+        const firstFew = errors.slice(0, 5).map((e: any) => `${e.name}: ${e.issues.join(', ')}`)
+        const more = errors.length > 5 ? `...and ${errors.length - 5} more` : ''
+        setError(`Imported ${result.imported}/${result.total}. Errors:\n${firstFew.join('\n')}${more ? '\n' + more : ''}`)
+        toast.error(`Imported ${result.imported}/${result.total} — ${errors.length} row${errors.length === 1 ? '' : 's'} failed`)
+      } else {
+        toast.success(`Imported ${result.imported} marketing records`)
+      }
       fetchRecords()
     } catch (err: any) {
       const message = err.message || 'Failed to import Excel file.'
