@@ -69,14 +69,18 @@ export default async function AdminMarketingPage() {
 
   // Build backup name lookup from candidates
   const backupNamesByCandidate: Record<string, string> = {}
+  const primaryOwnerByCandidate: Record<string, string> = {}
   for (const c of (candidatesResult.data || []) as any[]) {
     const name = (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null)
     if (name) backupNamesByCandidate[(c as any).Candidate_name] = name
+    if ((c as any).owner_id && ownerNames[(c as any).owner_id]) {
+      primaryOwnerByCandidate[(c as any).Candidate_name] = ownerNames[(c as any).owner_id]
+    }
   }
 
   const enrichedRecords = records.map(r => ({
     ...r,
-    employee_name: (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
+    employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
     backup_employee_name: backupNamesByCandidate[r.name] || null,
   }))
 

@@ -47,7 +47,9 @@ export default async function MyMarketingPage() {
   // Resolve backup employee names from candidates
   // Include backup employee IDs not already in ownerNames
   const candidateBackupIds = Array.from(new Set((candidates || []).map((c: any) => c.backup_employee_id).filter(Boolean))) as string[]
-  const missingIds = candidateBackupIds.filter(id => !ownerNames[id])
+  const candidateOwnerIds = Array.from(new Set((candidates || []).map((c: any) => c.owner_id).filter(Boolean))) as string[]
+  const allCandidateIds = Array.from(new Set([...candidateBackupIds, ...candidateOwnerIds]))
+  const missingIds = allCandidateIds.filter(id => !ownerNames[id])
   if (missingIds.length > 0) {
     const [{ data: bp }, { data: be }] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email').in('id', missingIds),
@@ -62,15 +64,19 @@ export default async function MyMarketingPage() {
   }
 
   const backupNamesByCandidate: Record<string, string> = {}
+  const primaryOwnerByCandidate: Record<string, string> = {}
   for (const c of (candidates || []) as any[]) {
     const name = (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null)
     if (name) backupNamesByCandidate[(c as any).Candidate_name] = name
+    if ((c as any).owner_id && ownerNames[(c as any).owner_id]) {
+      primaryOwnerByCandidate[(c as any).Candidate_name] = ownerNames[(c as any).owner_id]
+    }
   }
 
   const enrichedRecords = mergedRecords.map(r => ({
     ...r,
     status: (r as any).status || 'Telephone Call',
-    employee_name: (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
+    employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
     backup_employee_name: backupNamesByCandidate[r.name] || null,
   }))
 
