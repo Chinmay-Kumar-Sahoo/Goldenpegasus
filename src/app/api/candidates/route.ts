@@ -1,8 +1,9 @@
+import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -11,10 +12,17 @@ export async function GET(req: NextRequest) {
 
   let records: any[] = []
   if (ownerFilter) {
-    const [ownedResult, backupResult] = await Promise.all([
-      supabase.from('Candidate_records').select('*').eq('owner_id', ownerFilter).order('created_at', { ascending: false }),
-      supabase.from('Candidate_records').select('*').eq('backup_employee_id', ownerFilter).order('created_at', { ascending: false }),
-    ])
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+    const supabaseAdmin = serviceRoleKey
+      ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      : null
+
+    const ownedQuery = supabase.from('Candidate_records').select('*').eq('owner_id', ownerFilter).order('created_at', { ascending: false })
+    const backupQuery = supabaseAdmin
+      ? supabaseAdmin.from('Candidate_records').select('*').eq('backup_employee_id', ownerFilter).order('created_at', { ascending: false })
+      : supabase.from('Candidate_records').select('*').eq('backup_employee_id', ownerFilter).order('created_at', { ascending: false })
+
+    const [ownedResult, backupResult] = await Promise.all([ownedQuery, backupQuery])
     if (ownedResult.error) return NextResponse.json({ error: ownedResult.error.message }, { status: 500 })
     if (backupResult.error) return NextResponse.json({ error: backupResult.error.message }, { status: 500 })
     const recordMap = new Map<string, any>()
@@ -59,7 +67,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -142,7 +150,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

@@ -15,6 +15,9 @@ export default async function EmployeeClientsPage() {
 
   const recordMap = new Map<string, any>()
   for (const r of (ownedResult.data || [])) recordMap.set(r.id, r)
+  if (backupResult.error) {
+    console.error('Backup query error:', backupResult.error)
+  }
   for (const r of (backupResult.data || [])) {
     if (!recordMap.has(r.id)) recordMap.set(r.id, r)
   }
