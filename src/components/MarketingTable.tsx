@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import PageHeader from '@/components/PageHeader'
+import { formatDate, formatDateTime } from '@/lib/format'
 import toast from 'react-hot-toast'
 
 interface MarketingRecord {
@@ -134,7 +135,7 @@ const TableRow = memo(function TableRow({
         <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
       )}
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.backup_employee_name || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.date || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{formatDate(rec.date)}</td>
       <td className="px-4 py-3">
         <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Telephone Call'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
           {rec.status || 'Telephone Call'}
@@ -146,14 +147,14 @@ const TableRow = memo(function TableRow({
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_partner || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_poc_email || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.end_client || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interview_date || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{formatDate(rec.interview_date)}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interviewer_email || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.project_start_date || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.project_end_date || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{formatDate(rec.project_start_date)}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{formatDate(rec.project_end_date)}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] max-w-[200px] truncate" title={rec.notes || ''}>{rec.notes || '—'}</td>
       {isAdmin && (
         <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">
-          {rec.last_reminder_sent_at ? new Date(rec.last_reminder_sent_at).toLocaleString() : '—'}
+          {rec.last_reminder_sent_at ? formatDateTime(rec.last_reminder_sent_at) : '—'}
         </td>
       )}
     </tr>
@@ -443,10 +444,50 @@ export default function MarketingPage({
         return `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`
       }
     }
-    const text = String(value).trim()
+    let text = String(value).trim()
     if (!text) return null
+
+    // Strip ordinal suffixes: "17th" → "17", "1st" → "1", "2nd" → "2", "3rd" → "3"
+    text = text.replace(/(\d+)(st|nd|rd|th)\b/gi, '$1')
+
+    // Try standard Date parsing
     const parsed = new Date(text)
-    return Number.isNaN(parsed.getTime()) ? text : parsed.toISOString().slice(0, 10)
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
+
+    // Try "DD Month YYYY" (e.g. "17 June 2025")
+    const dmyMatch = text.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
+    if (dmyMatch) {
+      const MONTHS: Record<string, number> = {
+        jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+        apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+        aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
+        nov: 10, november: 10, dec: 11, december: 11,
+      }
+      const month = MONTHS[dmyMatch[2].toLowerCase()]
+      if (month !== undefined) {
+        const d = new Date(+dmyMatch[3], month, +dmyMatch[1])
+        if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10)
+      }
+    }
+
+    // Try "Month DD, YYYY" or "Month DD YYYY" (e.g. "June 17, 2025")
+    const mdyMatch = text.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/)
+    if (mdyMatch) {
+      const MONTHS: Record<string, number> = {
+        jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+        apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+        aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
+        nov: 10, november: 10, dec: 11, december: 11,
+      }
+      const month = MONTHS[mdyMatch[1].toLowerCase()]
+      if (month !== undefined) {
+        const d = new Date(+mdyMatch[3], month, +mdyMatch[2])
+        if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10)
+      }
+    }
+
+    // Could not parse — store as null rather than passing invalid text to PostgreSQL
+    return null
   }
 
   const handleImportExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -606,7 +647,7 @@ export default function MarketingPage({
 
   const exportCSV = useCallback(() => {
     const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.backup_employee_name, r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date, r.interviewer_email, r.project_start_date, r.project_end_date, r.notes, ...(isAdmin ? [r.last_reminder_sent_at] : [])])
+    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.backup_employee_name, formatDate(r.date), r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -620,7 +661,7 @@ export default function MarketingPage({
     const doc = new jsPDF({ orientation: 'landscape' })
 
     const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.backup_employee_name || '', r.date || '', r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', r.interview_date || '', r.interviewer_email || '', r.project_start_date || '', r.project_end_date || '', r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? new Date(r.last_reminder_sent_at).toLocaleString() : ''] : [])])
+    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.backup_employee_name || '', formatDate(r.date), r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
 
     autoTable(doc, {
       head: [headers],

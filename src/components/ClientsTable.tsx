@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import PageHeader from '@/components/PageHeader'
+import { formatDate } from '@/lib/format'
 import toast from 'react-hot-toast'
 
 interface CandidateRecord {
@@ -81,8 +82,8 @@ const TableRow = memo(function TableRow({
         </span>
       </td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.project_type || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{(rec.contract_start || '').split('T')[0] || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{(rec.contract_end || '').split('T')[0] || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{formatDate(rec.contract_start)}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{formatDate(rec.contract_end)}</td>
     </tr>
   )
 })
@@ -301,7 +302,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
 
   const exportCSV = () => {
     const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
-    const rows = filtered.map(r => [r.Candidate_name, r.Candidate_email, r.client_phone, r.company_name, r.employee_name, r.status, r.project_type, r.contract_start, r.contract_end, r.notes])
+    const rows = filtered.map(r => [r.Candidate_name, r.Candidate_email, r.client_phone, r.company_name, r.employee_name, r.status, r.project_type, formatDate(r.contract_start), formatDate(r.contract_end), r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -315,7 +316,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     const doc = new jsPDF({ orientation: 'landscape' })
 
     const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
-    const data = filtered.map(r => [r.Candidate_name, r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.status || '', r.project_type || '', r.contract_start || '', r.contract_end || '', r.notes || ''])
+    const data = filtered.map(r => [r.Candidate_name, r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.status || '', r.project_type || '', formatDate(r.contract_start), formatDate(r.contract_end), r.notes || ''])
 
     autoTable(doc, {
       head: [headers],

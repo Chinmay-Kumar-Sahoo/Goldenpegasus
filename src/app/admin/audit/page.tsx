@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import PageHeader from '@/components/PageHeader'
-import { formatDateTime } from '@/lib/format'
+import { formatDate, formatDateTime } from '@/lib/format'
 
 export const metadata = { title: 'Audit Logs | Admin | GoldenPegasus' }
 
@@ -24,7 +24,7 @@ function getDayLabel(dateStr: string): string {
 
   if (d === t) return 'Today'
   if (d === y) return 'Yesterday'
-  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
+  return formatDate(dateStr)
 }
 
 export default async function AuditLogsPage() {

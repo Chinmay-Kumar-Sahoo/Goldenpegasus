@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import PageHeader from '@/components/PageHeader'
+import { formatDate } from '@/lib/format'
 import toast from 'react-hot-toast'
 
 interface Employee {
@@ -377,7 +378,7 @@ export default function AdminEmployeesPage() {
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.email}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.contact || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.designation || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.joining_date || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{formatDate(emp.joining_date)}</td>
                     <td className="px-4 py-3">
                       {emp.email_confirmed_at ? (
                         <span className="text-[10px] px-2 py-1 rounded-full bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 font-bold uppercase tracking-wider">Verified</span>

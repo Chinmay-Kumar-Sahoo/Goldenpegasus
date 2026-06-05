@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { formatDate } from '@/lib/format'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
         type: 'marketing' as const,
         title: r.name,
         subtitle: [r.organization_name, r.end_client].filter(Boolean).join(' → ') || 'Marketing Record',
-        meta: r.date ? new Date(r.date).toLocaleDateString() : 'No date',
+        meta: r.date ? formatDate(r.date) : 'No date',
         status: r.status
       })))
     }

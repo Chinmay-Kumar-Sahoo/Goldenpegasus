@@ -30,6 +30,11 @@ export async function PUT(req: NextRequest) {
   const normalize = (s: string) => s.toLowerCase().trim()
   const denormalize = (s: string) => s.trim()
 
+  const isValidISODate = (s: string | null) => {
+    if (!s) return true
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime())
+  }
+
   const existingCandidates = new Set((candidatesResult.data || []).map((c: any) => normalize(c.Candidate_name)))
   const candidateNameMap = new Map<string, string>()
   for (const c of (candidatesResult.data || [])) {
@@ -81,16 +86,16 @@ export async function PUT(req: NextRequest) {
   if (validRecords.length > 0) {
     const insertRecords = validRecords.map((r: any) => ({
       name: r.name,
-      date: r.date || null,
+      date: isValidISODate(r.date) ? r.date : null,
       status: r.status || 'Telephone Call',
       recruiter_name: r.recruiter_name || null,
       recruiter_email: r.recruiter_email || null,
       organization_name: r.organization_name || null,
       implementation_partner: r.implementation_partner || null,
       end_client: r.end_client || null,
-      project_start_date: r.project_start_date || null,
-      project_end_date: r.project_end_date || null,
-      interview_date: r.interview_date || null,
+      project_start_date: isValidISODate(r.project_start_date) ? r.project_start_date : null,
+      project_end_date: isValidISODate(r.project_end_date) ? r.project_end_date : null,
+      interview_date: isValidISODate(r.interview_date) ? r.interview_date : null,
       interview_type: r.interview_type || null,
       client_name: r.client_name || null,
       client_email: r.client_email || null,

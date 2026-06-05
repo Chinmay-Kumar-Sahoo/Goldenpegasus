@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import PageHeader from '@/components/PageHeader'
+import { formatDate } from '@/lib/format'
 
 interface Admin {
   id: string
@@ -66,7 +67,7 @@ export default function AdminManagementPage() {
                         <span className="text-[10px] px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-bold uppercase tracking-wider">Unverified</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{new Date(adm.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{formatDate(adm.created_at)}</td>
                   </tr>
                 ))
               )}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import PageHeader from '@/components/PageHeader'
+import { formatDate } from '@/lib/format'
 import toast from 'react-hot-toast'
 
 interface FieldDef { name: string; label: string; type: string; required: boolean }
@@ -304,7 +305,7 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                           {activeTable.schema_definition.map(f => (
                             <td key={f.name} className="px-4 py-3 text-sm text-[#a1a1aa]">{String(rec.data[f.name] || '—')}</td>
                           ))}
-                          <td className="px-4 py-3 text-xs text-[#71717a]">{new Date(rec.created_at).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 text-xs text-[#71717a]">{formatDate(rec.created_at)}</td>
                         </tr>
                       ))
                     )}
