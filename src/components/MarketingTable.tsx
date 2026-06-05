@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
 
@@ -105,6 +105,57 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
 
 const LOCKABLE_FIELDS = new Set(['name', 'date', 'employee_name', 'backup_employee_name'])
 
+const PAGE_SIZES = [25, 50, 100] as const
+
+const TableRow = memo(function TableRow({
+  rec, showEmployeeColumn, isAdmin, readOnly, selectedIds, toggleSelect
+}: {
+  rec: MarketingRecord
+  showEmployeeColumn: boolean
+  isAdmin: boolean
+  readOnly: boolean
+  selectedIds: Set<string>
+  toggleSelect: (id: string) => void
+}) {
+  return (
+    <tr className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
+      {!readOnly && (
+        <td className="px-2 py-3">
+          <input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)}
+            onClick={e => e.stopPropagation()} className="accent-[#22c55e] cursor-pointer" />
+        </td>
+      )}
+      <td className="px-4 py-3 text-sm text-white font-medium">{rec.name}</td>
+      {showEmployeeColumn && (
+        <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
+      )}
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.backup_employee_name || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.date || '—'}</td>
+      <td className="px-4 py-3">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Telephone Call'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+          {rec.status || 'Telephone Call'}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_name || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_email || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.organization_name || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_partner || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_poc_email || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.end_client || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interview_date || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interviewer_email || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.project_start_date || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.project_end_date || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] max-w-[200px] truncate" title={rec.notes || ''}>{rec.notes || '—'}</td>
+      {isAdmin && (
+        <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">
+          {rec.last_reminder_sent_at ? new Date(rec.last_reminder_sent_at).toLocaleString() : '—'}
+        </td>
+      )}
+    </tr>
+  )
+})
+
 export default function MarketingPage({
   isAdmin = false,
   readOnly = false,
@@ -127,12 +178,14 @@ export default function MarketingPage({
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const todayIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
-  const [records, setRecords] = useState<MarketingRecord[]>(serverRecords.map(r => ({
-    ...r,
-    employee_name: (r.employee_name || serverOwnerNames[r.owner_id] || 'Unknown employee').trim(),
-  })))
+  const [records, setRecords] = useState<MarketingRecord[]>(() =>
+    serverRecords.map(r => ({ ...r, employee_name: (r.employee_name || serverOwnerNames[r.owner_id] || 'Unknown employee').trim() }))
+  )
   const [loading, setLoading] = useState(serverRecords.length === 0)
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const statusFilterRef = useRef('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [activeDateFilter, setActiveDateFilter] = useState<string | null>(null)
   const [dateFilters, setDateFilters] = useState({
@@ -149,7 +202,8 @@ export default function MarketingPage({
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
-  const [currentUserId, setCurrentUserId] = useState<string | null>(propUserId)
+  const currentUserIdRef = useRef(propUserId)
+  const serverOwnerNamesRef = useRef(serverOwnerNames)
   const [form, setForm] = useState({
     name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '',
     implementation_partner: '', end_client: '', status: 'Telephone Call',
@@ -162,6 +216,15 @@ export default function MarketingPage({
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkForm, setBulkForm] = useState({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', interviewer_email: '' })
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState<number>(50)
+
+  const fetchingRef = useRef(false)
+  const fetchedRef = useRef(serverRecords.length > 0)
+  const toastRef = useRef(toast)
+
+  useEffect(() => { currentUserIdRef.current = propUserId }, [propUserId])
+  useEffect(() => { serverOwnerNamesRef.current = serverOwnerNames }, [serverOwnerNames])
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
@@ -171,36 +234,63 @@ export default function MarketingPage({
   }
 
   const fetchRecords = useCallback(async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     setLoading(true)
     setError('')
     try {
       const params = new URLSearchParams()
-      if (!isAdmin && currentUserId) params.set('owner_id', currentUserId)
+      if (!isAdmin && currentUserIdRef.current) params.set('owner_id', currentUserIdRef.current)
       const qs = params.toString()
       const url = `/api/marketing${qs ? '?' + qs : ''}`
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 20000)
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
       const res = await fetch(url, { signal: controller.signal })
       clearTimeout(timeoutId)
       if (!res.ok) throw new Error('Failed to load records')
       const json = await res.json()
-      setRecords((json.records || []).map((r: any) => ({ ...r, employee_name: r.employee_name || serverOwnerNames[r.owner_id] || 'Unknown employee' })))
+      const ownerNames = serverOwnerNamesRef.current
+      setRecords((json.records || []).map((r: any) => ({ ...r, employee_name: r.employee_name || ownerNames[r.owner_id] || 'Unknown employee' })))
+      setPage(0)
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        toast.error('Request timed out. Please try again or check your network connection.')
+        toastRef.current.error('Request timed out. Please try again.')
         setError('Request timed out')
       } else {
-        toast.error('Failed to load records. Check your connection.')
+        toastRef.current.error('Failed to load records.')
         setError(err.message || 'Failed to load records')
       }
     } finally {
       setLoading(false)
+      fetchingRef.current = false
     }
-  }, [isAdmin, currentUserId])
+  }, [isAdmin])
 
   useEffect(() => {
-    if (records.length === 0) fetchRecords()
+    if (!fetchedRef.current) {
+      fetchedRef.current = true
+      fetchRecords()
+    }
   }, [fetchRecords])
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchInput(value)
+    clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setSearch(value)
+      setPage(0)
+    }, 300)
+  }, [])
+
+  useEffect(() => {
+    return () => clearTimeout(searchDebounceRef.current)
+  }, [])
+
+  const handleStatusFilterChange = useCallback((value: string) => {
+    setStatusFilter(value)
+    statusFilterRef.current = value
+    setPage(0)
+  }, [])
 
   const dateFilterRef = useRef<HTMLTableSectionElement>(null)
   const dateFilterBtnRef = useRef<HTMLButtonElement | null>(null)
@@ -228,7 +318,7 @@ export default function MarketingPage({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [activeDateFilter, activeTextFilter])
 
-  const canEdit = (record: MarketingRecord) => !readOnly && (isAdmin || record.owner_id === currentUserId || (record as any).is_backup_record)
+  const canEdit = (record: MarketingRecord) => !readOnly && (isAdmin || record.owner_id === currentUserIdRef.current || (record as any).is_backup_record)
 
   const openModal = (rec?: MarketingRecord) => {
     if (rec) {
@@ -399,10 +489,7 @@ export default function MarketingPage({
           return [column.key, value]
         })) as Record<MarketingImportField, string | null>
 
-        return {
-          ...record,
-          name: record.name || '',
-        }
+        return { ...record, name: record.name || '' }
       })
 
       for (const row of importRows) {
@@ -424,34 +511,13 @@ export default function MarketingPage({
     }
   }
 
-  const exportCSV = () => {
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.backup_employee_name, r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date, r.interviewer_email, r.project_start_date, r.project_end_date, r.notes, ...(isAdmin ? [r.last_reminder_sent_at] : [])])
-    const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'marketing_records.csv'; a.click()
-    setShowExportMenu(false)
-  }
-
-  const exportPDF = async () => {
-    const { default: jsPDF } = await import('jspdf')
-    const { default: autoTable } = await import('jspdf-autotable')
-    const doc = new jsPDF({ orientation: 'landscape' })
-
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.backup_employee_name || '', r.date || '', r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', r.interview_date || '', r.interviewer_email || '', r.project_start_date || '', r.project_end_date || '', r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? new Date(r.last_reminder_sent_at).toLocaleString() : ''] : [])])
-
-    autoTable(doc, {
-      head: [headers],
-      body: data,
-      styles: { fontSize: 7 },
-      headStyles: { fillColor: [34, 197, 94] },
-    })
-
-    doc.save('marketing_records.pdf')
-    setShowExportMenu(false)
-  }
+  const filteredCandidates = useMemo(() => {
+    if (editing) return []
+    const available = isAdmin
+      ? candidateOptions
+      : candidateOptions.filter(c => c.owner_id === currentUserIdRef.current || c.backup_employee_id === currentUserIdRef.current)
+    return available.filter(c => c.status !== 'Closed')
+  }, [candidateOptions, isAdmin, editing])
 
   const inRange = (val: string | null, range: { start: string; end: string }) => {
     if (!range.start && !range.end) return true
@@ -507,13 +573,44 @@ export default function MarketingPage({
     })
   }, [records, search, statusFilter, dateFilters, textFilters])
 
-  const filteredCandidates = useMemo(() => {
-    if (editing) return []
-    const available = isAdmin
-      ? candidateOptions
-      : candidateOptions.filter(c => c.owner_id === currentUserId || c.backup_employee_id === currentUserId)
-    return available.filter(c => c.status !== 'Closed')
-  }, [candidateOptions, selectedEmployeeId, isAdmin, currentUserId, editing])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paginated = useMemo(() => {
+    const start = page * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  useEffect(() => {
+    if (page >= totalPages && totalPages > 0) setPage(0)
+  }, [page, totalPages])
+
+  const exportCSV = useCallback(() => {
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.backup_employee_name, r.date, r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date, r.interviewer_email, r.project_start_date, r.project_end_date, r.notes, ...(isAdmin ? [r.last_reminder_sent_at] : [])])
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'marketing_records.csv'; a.click()
+    setShowExportMenu(false)
+  }, [filtered, showEmployeeColumn, isAdmin])
+
+  const exportPDF = useCallback(async () => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const doc = new jsPDF({ orientation: 'landscape' })
+
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.backup_employee_name || '', r.date || '', r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', r.interview_date || '', r.interviewer_email || '', r.project_start_date || '', r.project_end_date || '', r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? new Date(r.last_reminder_sent_at).toLocaleString() : ''] : [])])
+
+    autoTable(doc, {
+      head: [headers],
+      body: data,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [34, 197, 94] },
+    })
+
+    doc.save('marketing_records.pdf')
+    setShowExportMenu(false)
+  }, [filtered, showEmployeeColumn, isAdmin])
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -558,10 +655,10 @@ export default function MarketingPage({
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-4">
-        <input type="text" placeholder="Search records..." value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder="Search records..." value={searchInput} onChange={e => handleSearchChange(e.target.value)}
           suppressHydrationWarning
           className="flex-1 min-w-[200px] bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60" />
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+        <select value={statusFilter} onChange={e => handleStatusFilterChange(e.target.value)}
           suppressHydrationWarning
           className="bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
           <option value="all">All Status</option>
@@ -673,9 +770,8 @@ export default function MarketingPage({
                               className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 placeholder-[#3a3a3a]" />
                             <div className="max-h-48 overflow-y-auto space-y-1">
                               {(uniqueValues[h] || []).filter(v => !textFilterSearch || v.toLowerCase().includes(textFilterSearch.toLowerCase())).map(v => {
-                                                          const checked = (textFilters[h] || []).includes(v)
-
-  return (
+                                const checked = (textFilters[h] || []).includes(v)
+                                return (
                                   <label key={v} className="flex items-center gap-2 px-2 py-1.5 hover:bg-[#2a2a2a] rounded-lg cursor-pointer transition-colors">
                                     <input type="checkbox" checked={checked}
                                       onChange={() => setTextFilters(f => {
@@ -725,44 +821,36 @@ export default function MarketingPage({
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={15 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
-                filtered.map(rec => (
-                  <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                    {!readOnly && <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} onClick={e => e.stopPropagation()} className="accent-[#22c55e] cursor-pointer" /></td>}
-                    <td className="px-4 py-3 text-sm text-white font-medium">{rec.name}</td>
-                    {showEmployeeColumn && (
-                      <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
-                    )}
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.backup_employee_name || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.date || '—'}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Telephone Call'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                        {rec.status || 'Telephone Call'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_name || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_email || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.organization_name || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_partner || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_poc_email || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.end_client || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interview_date || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interviewer_email || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.project_start_date || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.project_end_date || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] max-w-[200px] truncate" title={rec.notes || ''}>{rec.notes || '—'}</td>
-                    {isAdmin && (
-                      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">
-                        {rec.last_reminder_sent_at ? new Date(rec.last_reminder_sent_at).toLocaleString() : '—'}
-                      </td>
-                    )}
-                  </tr>
+                paginated.map(rec => (
+                  <TableRow key={rec.id} rec={rec} showEmployeeColumn={showEmployeeColumn} isAdmin={isAdmin} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} />
                 ))
               )}
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t border-[#2a2a2a] text-xs text-[#71717a]">
-          Showing {filtered.length} of {records.length} records
+        <div className="px-4 py-3 border-t border-[#2a2a2a] flex items-center justify-between text-xs text-[#71717a]">
+          <div className="flex items-center gap-2">
+            <span>Show</span>
+            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0) }}
+              className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-[#22c55e]/60">
+              {PAGE_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <span>per page</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span>Showing {(page * pageSize) + 1}-{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length} records</span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                className="px-2 py-1 rounded-lg border border-[#2a2a2a] hover:bg-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                Prev
+              </button>
+              <span className="px-2 text-white">{page + 1}/{totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+                className="px-2 py-1 rounded-lg border border-[#2a2a2a] hover:bg-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

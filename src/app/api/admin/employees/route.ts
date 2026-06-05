@@ -123,8 +123,21 @@ export async function DELETE(req: NextRequest) {
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
     const { id } = await req.json()
-    const { error } = await supabase.from('employees').delete().eq('user_id', id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+    if (!serviceRoleKey) {
+      return NextResponse.json({ error: 'Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is missing' }, { status: 500 })
+    }
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(id)
+    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
+
     await logAudit(supabase, auth.user.id, 'deleted', 'employee', id)
     return NextResponse.json({ success: true })
   } catch (error: any) {

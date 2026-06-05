@@ -16,11 +16,10 @@ export default async function AdminMarketingPage() {
 
   const records = (recordsResult.data || []).map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
 
-  if (!records) {
+  if (!records || records.length === 0) {
     return <MarketingTable isAdmin={true} readOnly={false} currentUserId={user?.id ?? null} />
   }
 
-  // Build owner names lookup (same as before)
   const ownerIds = Array.from(new Set(records.map(r => r.owner_id).filter(Boolean)))
   let ownerNames: Record<string, string> = {}
   if (ownerIds.length > 0) {
@@ -34,29 +33,24 @@ export default async function AdminMarketingPage() {
     }
   }
 
-  // Build employee dropdown options
   const employeeMap = new Map(((employeesFromTable?.data || []) as any[]).map((e: any) => [e.user_id, e]))
+  const profileIds = new Set((employeeProfiles.data || []).map((p: any) => p.id))
+
   const employeeOptions = (employeeProfiles.data || []).map((p: any) => {
     const emp = employeeMap.get(p.id)
-    return {
-      id: p.id,
-      full_name: emp?.full_name || p.full_name || p.email || 'Unknown',
-    }
+    return { id: p.id, full_name: emp?.full_name || p.full_name || p.email || 'Unknown' }
   })
-  // Also add employees that only exist in the employees table but not in profiles
-  const profileIds = new Set((employeeProfiles.data || []).map((p: any) => p.id))
+
   for (const e of ((employeesFromTable?.data || []) as any[])) {
     if (e.user_id && !profileIds.has(e.user_id)) {
       employeeOptions.push({ id: e.user_id, full_name: e.full_name || e.email || 'Unknown' })
     }
   }
 
-  // Ensure ownerNames covers all employees for backup resolution
   for (const opt of employeeOptions) {
     if (!ownerNames[opt.id]) ownerNames[opt.id] = opt.full_name
   }
 
-  // Build candidate dropdown options
   const candidateOptions = (candidatesResult.data || []).map((c: any) => ({
     id: c.id,
     name: c.Candidate_name,
@@ -67,7 +61,6 @@ export default async function AdminMarketingPage() {
     backup_employee_name: (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null) || null,
   }))
 
-  // Build backup name lookup from candidates
   const backupNamesByCandidate: Record<string, string> = {}
   const primaryOwnerByCandidate: Record<string, string> = {}
   for (const c of (candidatesResult.data || []) as any[]) {

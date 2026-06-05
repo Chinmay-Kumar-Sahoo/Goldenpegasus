@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
 
@@ -37,6 +37,8 @@ const DATE_COLUMNS: Record<string, string> = {
   'Contract End': 'contract_end',
 }
 
+const PAGE_SIZES = [25, 50, 100] as const
+
 function inRange(val: string | null, range: { start: string; end: string }): boolean {
   if (!range.start && !range.end) return true
   const d = (val || '').split('T')[0]
@@ -57,15 +59,48 @@ function wordScore(val: string | null, q: string): number {
   return 0
 }
 
+const TableRow = memo(function TableRow({
+  rec, selectedIds, toggleSelect
+}: {
+  rec: CandidateRecord
+  selectedIds: Set<string>
+  toggleSelect: (id: string) => void
+}) {
+  return (
+    <tr className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
+      <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>
+      <td className="px-4 py-3 text-sm text-white font-medium">{rec.Candidate_name}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.client_phone || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.company_name || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.employee_name || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.backup_employee_name || '—'}</td>
+      <td className="px-4 py-3">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Active'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+          {rec.status || 'Active'}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.project_type || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{(rec.contract_start || '').split('T')[0] || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{(rec.contract_end || '').split('T')[0] || '—'}</td>
+    </tr>
+  )
+})
+
 export default function CandidatesPage({ isAdmin = false, initialRecords = [], employeeOptions = [], initialOwnerNames = {}, currentUserId: propUserId = null }: { isAdmin?: boolean; initialRecords?: CandidateRecord[]; employeeOptions?: Array<{ id: string; full_name: string }>; initialOwnerNames?: Record<string, string>; currentUserId?: string | null }) {
-  const [records, setRecords] = useState<CandidateRecord[]>(initialRecords.map(r => ({
-    ...r,
-    employee_name: (r.employee_name || initialOwnerNames[r.owner_id] || null),
-    backup_employee_name: (r.backup_employee_name || (r.backup_employee_id ? initialOwnerNames[r.backup_employee_id] : null) || null),
-  })))
+  const [records, setRecords] = useState<CandidateRecord[]>(() =>
+    initialRecords.map(r => ({
+      ...r,
+      employee_name: (r.employee_name || initialOwnerNames[r.owner_id] || null),
+      backup_employee_name: (r.backup_employee_name || (r.backup_employee_id ? initialOwnerNames[r.backup_employee_id] : null) || null),
+    }))
+  )
   const [loading, setLoading] = useState(initialRecords.length === 0)
-  const [currentUserId] = useState<string | null>(propUserId)
+  const currentUserIdRef = useRef(propUserId)
+  const initialOwnerNamesRef = useRef(initialOwnerNames)
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>()
   const [statusFilter, setStatusFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<CandidateRecord | null>(null)
@@ -82,26 +117,38 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     contract_start: { start: '', end: '' },
     contract_end: { start: '', end: '' },
   })
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState<number>(50)
 
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const dateFilterRef = useRef<HTMLTableSectionElement>(null)
 
+  const fetchingRef = useRef(false)
+  const fetchedRef = useRef(initialRecords.length > 0)
+  const toastRef = useRef(toast)
+
+  useEffect(() => { currentUserIdRef.current = propUserId }, [propUserId])
+  useEffect(() => { initialOwnerNamesRef.current = initialOwnerNames }, [initialOwnerNames])
+
   const fetchRecords = useCallback(async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     setLoading(true)
     try {
       const res = await fetch('/api/candidates')
       if (!res.ok) throw new Error('Failed to load')
       const json = await res.json()
-      setRecords((json.records || []).map((r: any) => ({ ...r, employee_name: r.employee_name || initialOwnerNames[r.owner_id] || null, backup_employee_name: r.backup_employee_name || (r.backup_employee_id ? initialOwnerNames[r.backup_employee_id] : null) || null })))
+      const ownerNames = initialOwnerNamesRef.current
+      setRecords((json.records || []).map((r: any) => ({ ...r, employee_name: r.employee_name || ownerNames[r.owner_id] || null, backup_employee_name: r.backup_employee_name || (r.backup_employee_id ? ownerNames[r.backup_employee_id] : null) || null })))
+      setPage(0)
     } catch (err: any) {
-      toast.error('Failed to load candidates')
+      toastRef.current.error('Failed to load candidates')
     } finally {
       setLoading(false)
+      fetchingRef.current = false
     }
-  }, [initialOwnerNames])
-
-  const fetchedRef = useRef(initialRecords.length > 0)
+  }, [])
 
   useEffect(() => {
     if (!fetchedRef.current) {
@@ -109,6 +156,19 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
       fetchRecords()
     }
   }, [fetchRecords])
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchInput(value)
+    clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setSearch(value)
+      setPage(0)
+    }, 300)
+  }, [])
+
+  useEffect(() => {
+    return () => clearTimeout(searchDebounceRef.current)
+  }, [])
 
   useEffect(() => {
     if (!showExportMenu) return
@@ -308,6 +368,16 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     return scored.map(x => x.rec)
   }, [filtered, query])
 
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
+  const paginated = useMemo(() => {
+    const start = page * pageSize
+    return sorted.slice(start, start + pageSize)
+  }, [sorted, page, pageSize])
+
+  useEffect(() => {
+    if (page >= totalPages && totalPages > 0) setPage(0)
+  }, [page, totalPages])
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <PageHeader title={isAdmin ? 'All Candidate Records' : 'My Candidates'} subtitle="Manage candidate information">
@@ -328,20 +398,20 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
       <div className="shrink-0 space-y-4 mb-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-md">
-          <input type="text" placeholder="Search candidates..." value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="Search candidates..." value={searchInput} onChange={e => handleSearchChange(e.target.value)}
             className="w-full bg-[#111111] border border-[#2a2a2a] rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60" />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717a] hover:text-white transition-colors text-lg leading-none">&times;</button>
+          {searchInput && (
+            <button onClick={() => { setSearchInput(''); setSearch(''); setPage(0) }} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717a] hover:text-white transition-colors text-lg leading-none">&times;</button>
           )}
         </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0) }}
           className="bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
           <option value="all">All Status</option>
           <option value="Active">Active</option>
           <option value="In-active">In-active</option>
           <option value="Closed">Closed</option>
         </select>
-        {search && (
+        {searchInput && (
           <span className="text-xs text-[#71717a] whitespace-nowrap">{sorted.length} result{sorted.length !== 1 ? 's' : ''}</span>
         )}
         {hasDateFilter && (
@@ -446,30 +516,37 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
               ) : sorted.length === 0 ? (
                 <tr><td colSpan={11} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
-                sorted.map(rec => (
-                  <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                    <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>
-                    <td className="px-4 py-3 text-sm text-white font-medium">{rec.Candidate_name}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.client_phone || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.company_name || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.employee_name || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.backup_employee_name || '—'}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Active'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                        {rec.status || 'Active'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.project_type || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{(rec.contract_start || '').split('T')[0] || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{(rec.contract_end || '').split('T')[0] || '—'}</td>
-                  </tr>
+                paginated.map(rec => (
+                  <TableRow key={rec.id} rec={rec} selectedIds={selectedIds} toggleSelect={toggleSelect} />
                 ))
               )}
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t border-[#2a2a2a] text-xs text-[#71717a]">Showing {sorted.length} of {records.length} records</div>
+        <div className="px-4 py-3 border-t border-[#2a2a2a] flex items-center justify-between text-xs text-[#71717a]">
+          <div className="flex items-center gap-2">
+            <span>Show</span>
+            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0) }}
+              className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-[#22c55e]/60">
+              {PAGE_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <span>per page</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span>Showing {(page * pageSize) + 1}-{Math.min((page + 1) * pageSize, sorted.length)} of {sorted.length} records</span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                className="px-2 py-1 rounded-lg border border-[#2a2a2a] hover:bg-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                Prev
+              </button>
+              <span className="px-2 text-white">{page + 1}/{totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+                className="px-2 py-1 rounded-lg border border-[#2a2a2a] hover:bg-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {showModal && (
@@ -495,7 +572,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
               {!editing && !isAdmin && (
                 <div>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee *</label>
-                  <input type="text" value={employeeOptions.find(e => e.id === currentUserId)?.full_name || 'You'} disabled
+                  <input type="text" value={employeeOptions.find(e => e.id === currentUserIdRef.current)?.full_name || 'You'} disabled
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
                 </div>
               )}

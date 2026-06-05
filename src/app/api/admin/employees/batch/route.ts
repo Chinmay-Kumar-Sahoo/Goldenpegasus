@@ -1,8 +1,9 @@
+import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -17,11 +18,13 @@ export async function POST(req: NextRequest) {
   const { error } = await supabase.from('employees').update(updates).in('user_id', ids)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_updated', entity_type: 'employee', entity_id: id, user_id: user.id })))
+
   return NextResponse.json({ success: true })
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -33,11 +36,23 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'No records specified' }, { status: 400 })
   }
 
-  const { error: err1 } = await supabase.from('employees').delete().in('user_id', ids)
-  if (err1) return NextResponse.json({ error: err1.message }, { status: 500 })
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceRoleKey) {
+    return NextResponse.json({ error: 'Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is missing' }, { status: 500 })
+  }
 
-  const { error: err2 } = await supabase.from('profiles').delete().in('id', ids)
-  if (err2) return NextResponse.json({ error: err2.message }, { status: 500 })
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceRoleKey,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
+  for (const id of ids) {
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'employee', entity_id: id, user_id: user.id })))
 
   return NextResponse.json({ success: true })
 }

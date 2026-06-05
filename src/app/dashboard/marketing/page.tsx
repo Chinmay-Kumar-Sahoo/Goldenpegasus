@@ -18,6 +18,10 @@ export default async function AllMarketingPage() {
 
   const records = rawRecords.map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
 
+  if (records.length === 0) {
+    return <MarketingTable isAdmin={false} readOnly={true} currentUserId={user?.id ?? null} />
+  }
+
   const ownerIds = Array.from(new Set(records.map(r => r.owner_id).filter(Boolean)))
   let ownerNames: Record<string, string> = {}
   if (ownerIds.length > 0) {
@@ -31,20 +35,22 @@ export default async function AllMarketingPage() {
     }
   }
 
-  // Resolve backup employee names from Candidate_records
-  const candidateNames = records.map(r => r.name).filter(Boolean)
+  // Resolve backup + primary employee names from Candidate_records
+  const candidateNames = records.map(r => r.name).filter(Boolean) as string[]
   let backupNamesByCandidate: Record<string, string> = {}
   let primaryOwnerByCandidate: Record<string, string> = {}
+
   if (candidateNames.length > 0) {
     const { data: candidates } = await supabase
       .from('Candidate_records')
       .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name')
       .in('Candidate_name', candidateNames)
 
-    // Include candidate owner/backup IDs not already in ownerNames
-    const candidateBackupIds = Array.from(new Set((candidates || []).map((c: any) => c.backup_employee_id).filter(Boolean))) as string[]
-    const candidateOwnerIds = Array.from(new Set((candidates || []).map((c: any) => c.owner_id).filter(Boolean))) as string[]
-    const allCandidateIds = Array.from(new Set([...candidateBackupIds, ...candidateOwnerIds]))
+    const allCandidateIds = Array.from(new Set([
+      ...(candidates || []).map((c: any) => c.backup_employee_id).filter(Boolean),
+      ...(candidates || []).map((c: any) => c.owner_id).filter(Boolean),
+    ])) as string[]
+
     const missingIds = allCandidateIds.filter(id => !ownerNames[id])
     if (missingIds.length > 0) {
       const [{ data: bp }, { data: be }] = await Promise.all([
@@ -60,10 +66,10 @@ export default async function AllMarketingPage() {
     }
 
     for (const c of (candidates || []) as any[]) {
-      const name = (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null)
-      if (name) backupNamesByCandidate[(c as any).Candidate_name] = name
-      if ((c as any).owner_id && ownerNames[(c as any).owner_id]) {
-        primaryOwnerByCandidate[(c as any).Candidate_name] = ownerNames[(c as any).owner_id]
+      const name = c.backup_employee_name || (c.backup_employee_id ? ownerNames[c.backup_employee_id] : null)
+      if (name) backupNamesByCandidate[c.Candidate_name] = name
+      if (c.owner_id && ownerNames[c.owner_id]) {
+        primaryOwnerByCandidate[c.Candidate_name] = ownerNames[c.owner_id]
       }
     }
   }
