@@ -39,6 +39,23 @@ export default async function AllMarketingPage() {
       .from('Candidate_records')
       .select('Candidate_name, backup_employee_id, backup_employee_name')
       .in('Candidate_name', candidateNames)
+
+    // Include backup employee IDs not already in ownerNames
+    const backupIds = Array.from(new Set((candidates || []).map((c: any) => c.backup_employee_id).filter(Boolean))) as string[]
+    const missingIds = backupIds.filter(id => !ownerNames[id])
+    if (missingIds.length > 0) {
+      const [{ data: bp }, { data: be }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email').in('id', missingIds),
+        supabase.from('employees').select('user_id, full_name, email').in('user_id', missingIds),
+      ])
+      for (const p of (bp || []) as any[]) {
+        if (p.id) ownerNames[p.id] = p.full_name || p.email || 'Unknown employee'
+      }
+      for (const e of (be || []) as any[]) {
+        if (e.user_id) ownerNames[e.user_id] = e.full_name || e.email || ownerNames[e.user_id] || 'Unknown employee'
+      }
+    }
+
     for (const c of (candidates || []) as any[]) {
       const name = (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null)
       if (name) backupNamesByCandidate[(c as any).Candidate_name] = name

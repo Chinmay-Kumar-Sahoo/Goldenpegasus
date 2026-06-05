@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
 
   if (body.id) {
     const updateData: any = { ...recordData, updated_at: new Date().toISOString() }
+    if (selectedEmployeeId) updateData.owner_id = selectedEmployeeId
     if (backupEmployeeId !== undefined) updateData.backup_employee_id = backupEmployeeId || null
     if (backupName !== null) updateData.backup_employee_name = backupName
     const { error } = await supabase

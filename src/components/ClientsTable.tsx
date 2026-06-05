@@ -136,7 +136,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     if (rec) {
       setEditing(rec)
       setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', contract_start: rec.contract_start || '', contract_end: rec.contract_end || '', project_type: rec.project_type || '', notes: rec.notes || '', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '' })
-      setSelectedEmployeeId('')
+      setSelectedEmployeeId(rec.owner_id || '')
     } else {
       setEditing(null)
       setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '' })
