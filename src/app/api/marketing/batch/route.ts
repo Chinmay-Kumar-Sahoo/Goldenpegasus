@@ -113,32 +113,41 @@ export async function PUT(req: NextRequest) {
     for (const item of (inserted || [])) insertedList.push(item)
 
     if (supabaseAdmin) {
-      const candidateBackupMap = new Map<string, { backupName: string; actualCandidateName: string }>()
+      const candidateUpdates = new Map<string, { primaryUserId?: string; backupName?: string }>()
       for (const r of validRecords) {
-        if (r._candidateExists && r.backup_employee_name && r.name) {
+        if (r._candidateExists && r.name) {
           const actualName = candidateNameMap.get(normalize(r.name))
           if (actualName) {
-            candidateBackupMap.set(actualName, { backupName: r.backup_employee_name, actualCandidateName: actualName })
+            const existing = candidateUpdates.get(actualName) || {}
+            if (r._owner_id) existing.primaryUserId = r._owner_id
+            if (r.backup_employee_name) existing.backupName = r.backup_employee_name
+            candidateUpdates.set(actualName, existing)
           }
         }
       }
-      if (candidateBackupMap.size > 0) {
-        const allBackupNames = [...new Set(Array.from(candidateBackupMap.values()).map(b => b.backupName))] as string[]
-        const [bpResult, beResult] = await Promise.all([
-          supabaseAdmin.from('profiles').select('id, full_name').in('full_name', allBackupNames.length > 0 ? allBackupNames : ['']),
-          supabaseAdmin.from('employees').select('user_id, full_name').in('full_name', allBackupNames.length > 0 ? allBackupNames : ['']),
-        ])
-        const backupNameToId = new Map<string, string>()
-        for (const p of (bpResult.data || [])) if (p.full_name) backupNameToId.set(normalize(p.full_name), p.id)
-        for (const e of (beResult.data || [])) if (e.full_name) backupNameToId.set(normalize(e.full_name), e.user_id)
-
-        for (const { backupName, actualCandidateName } of candidateBackupMap.values()) {
-          const userId = backupNameToId.get(normalize(backupName))
-          if (userId) {
-            await supabaseAdmin
-              .from('Candidate_records')
-              .update({ backup_employee_id: userId, backup_employee_name: denormalize(backupName) })
-              .eq('Candidate_name', actualCandidateName)
+      if (candidateUpdates.size > 0) {
+        const allBackupNames = [...new Set(Array.from(candidateUpdates.values()).map(b => b.backupName).filter(Boolean))] as string[]
+        let backupNameToId = new Map<string, string>()
+        if (allBackupNames.length > 0) {
+          const [bpResult, beResult] = await Promise.all([
+            supabaseAdmin.from('profiles').select('id, full_name').in('full_name', allBackupNames),
+            supabaseAdmin.from('employees').select('user_id, full_name').in('full_name', allBackupNames),
+          ])
+          for (const p of (bpResult.data || [])) if (p.full_name) backupNameToId.set(normalize(p.full_name), p.id)
+          for (const e of (beResult.data || [])) if (e.full_name) backupNameToId.set(normalize(e.full_name), e.user_id)
+        }
+        for (const [actualCandidateName, update] of candidateUpdates) {
+          const candidatePayload: any = {}
+          if (update.primaryUserId) candidatePayload.owner_id = update.primaryUserId
+          if (update.backupName) {
+            const userId = backupNameToId.get(normalize(update.backupName))
+            if (userId) {
+              candidatePayload.backup_employee_id = userId
+              candidatePayload.backup_employee_name = denormalize(update.backupName)
+            }
+          }
+          if (Object.keys(candidatePayload).length > 0) {
+            await supabaseAdmin.from('Candidate_records').update(candidatePayload).eq('Candidate_name', actualCandidateName)
           }
         }
       }
