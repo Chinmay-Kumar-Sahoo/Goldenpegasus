@@ -27,10 +27,28 @@ export async function PUT(req: NextRequest) {
     supabase.from('employees').select('user_id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
   ])
 
-  const existingCandidates = new Set((candidatesResult.data || []).map((c: any) => c.Candidate_name))
+  const normalize = (s: string) => s.toLowerCase().trim()
+  const denormalize = (s: string) => s.trim()
+
+  const existingCandidates = new Set((candidatesResult.data || []).map((c: any) => normalize(c.Candidate_name)))
+  const candidateNameMap = new Map<string, string>()
+  for (const c of (candidatesResult.data || [])) {
+    if (c.Candidate_name) candidateNameMap.set(normalize(c.Candidate_name), c.Candidate_name)
+  }
   const primaryEmployeeMap = new Map<string, string>()
-  for (const p of (profilesResult.data || [])) if (p.full_name) primaryEmployeeMap.set(p.full_name, p.id)
-  for (const e of (employeesResult.data || [])) if (e.full_name) primaryEmployeeMap.set(e.full_name, e.user_id)
+  const employeeIdToName = new Map<string, string>()
+  for (const p of (profilesResult.data || [])) {
+    if (p.full_name) {
+      primaryEmployeeMap.set(normalize(p.full_name), p.id)
+      employeeIdToName.set(p.id, p.full_name)
+    }
+  }
+  for (const e of (employeesResult.data || [])) {
+    if (e.full_name) {
+      primaryEmployeeMap.set(normalize(e.full_name), e.user_id)
+      if (e.user_id && !employeeIdToName.has(e.user_id)) employeeIdToName.set(e.user_id, e.full_name)
+    }
+  }
 
   const now = new Date().toISOString()
   const validRecords: any[] = []
@@ -39,18 +57,17 @@ export async function PUT(req: NextRequest) {
   for (const r of records) {
     const issues: string[] = []
 
-    const candidateExists = r.name && existingCandidates.has(r.name)
-    if (!candidateExists) {
-      issues.push('Candidate Not Found in records — record added without candidate link')
+    const candidateExists = r.name && existingCandidates.has(normalize(r.name))
+    if (!candidateExists && r.employee_name && !primaryEmployeeMap.has(normalize(r.employee_name))) {
+      issues.push('Candidate not in records and Primary Employee unresolved')
     }
 
     const primaryUserId = r.employee_name
-      ? (primaryEmployeeMap.get(r.employee_name) || null)
+      ? (primaryEmployeeMap.get(normalize(r.employee_name)) || null)
       : user.id
 
     if (r.employee_name && !primaryUserId) {
       issues.push('Primary Employee Not Found — record skipped')
-      r._owner_id = null
       errors.push({ name: r.name || '(empty)', issues })
       continue
     }
@@ -80,7 +97,7 @@ export async function PUT(req: NextRequest) {
       implementation_poc_email: r.implementation_poc_email || null,
       interviewer_email: r.interviewer_email || null,
       notes: r.notes || null,
-      employee_name: r.employee_name || null,
+      employee_name: employeeIdToName.get(r._owner_id) || r.employee_name || null,
       owner_id: r._owner_id || user.id,
       created_at: now,
       updated_at: now,
@@ -96,29 +113,32 @@ export async function PUT(req: NextRequest) {
     for (const item of (inserted || [])) insertedList.push(item)
 
     if (supabaseAdmin) {
-      const candidateBackupMap = new Map<string, string>()
+      const candidateBackupMap = new Map<string, { backupName: string; actualCandidateName: string }>()
       for (const r of validRecords) {
         if (r._candidateExists && r.backup_employee_name && r.name) {
-          candidateBackupMap.set(r.name, r.backup_employee_name)
+          const actualName = candidateNameMap.get(normalize(r.name))
+          if (actualName) {
+            candidateBackupMap.set(actualName, { backupName: r.backup_employee_name, actualCandidateName: actualName })
+          }
         }
       }
       if (candidateBackupMap.size > 0) {
-        const backupNames = [...new Set(Array.from(candidateBackupMap.values()))] as string[]
+        const allBackupNames = [...new Set(Array.from(candidateBackupMap.values()).map(b => b.backupName))] as string[]
         const [bpResult, beResult] = await Promise.all([
-          supabaseAdmin.from('profiles').select('id, full_name').in('full_name', backupNames.length > 0 ? backupNames : ['']),
-          supabaseAdmin.from('employees').select('user_id, full_name').in('full_name', backupNames.length > 0 ? backupNames : ['']),
+          supabaseAdmin.from('profiles').select('id, full_name').in('full_name', allBackupNames.length > 0 ? allBackupNames : ['']),
+          supabaseAdmin.from('employees').select('user_id, full_name').in('full_name', allBackupNames.length > 0 ? allBackupNames : ['']),
         ])
         const backupNameToId = new Map<string, string>()
-        for (const p of (bpResult.data || [])) if (p.full_name) backupNameToId.set(p.full_name, p.id)
-        for (const e of (beResult.data || [])) if (e.full_name) backupNameToId.set(e.full_name, e.user_id)
+        for (const p of (bpResult.data || [])) if (p.full_name) backupNameToId.set(normalize(p.full_name), p.id)
+        for (const e of (beResult.data || [])) if (e.full_name) backupNameToId.set(normalize(e.full_name), e.user_id)
 
-        for (const [candidateName, employeeName] of candidateBackupMap) {
-          const userId = backupNameToId.get(employeeName)
+        for (const { backupName, actualCandidateName } of candidateBackupMap.values()) {
+          const userId = backupNameToId.get(normalize(backupName))
           if (userId) {
             await supabaseAdmin
               .from('Candidate_records')
-              .update({ backup_employee_id: userId, backup_employee_name: employeeName })
-              .eq('Candidate_name', candidateName)
+              .update({ backup_employee_id: userId, backup_employee_name: denormalize(backupName) })
+              .eq('Candidate_name', actualCandidateName)
           }
         }
       }
