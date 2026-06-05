@@ -136,7 +136,12 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     fetchingRef.current = true
     setLoading(true)
     try {
-      const res = await fetch('/api/candidates')
+      const params = new URLSearchParams()
+      if (!isAdmin && currentUserIdRef.current)
+        params.set('owner_id', currentUserIdRef.current)
+      const qs = params.toString()
+      const url = `/api/candidates${qs ? '?' + qs : ''}`
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to load')
       const json = await res.json()
       const ownerNames = initialOwnerNamesRef.current
@@ -148,7 +153,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
       setLoading(false)
       fetchingRef.current = false
     }
-  }, [])
+  }, [isAdmin])
 
   useEffect(() => {
     if (!fetchedRef.current) {

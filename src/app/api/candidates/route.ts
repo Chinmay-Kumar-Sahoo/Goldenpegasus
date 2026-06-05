@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
-    .from('Candidate_records')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const { searchParams } = new URL(req.url)
+  const ownerFilter = searchParams.get('owner_id')
+
+  let query = supabase.from('Candidate_records').select('*')
+
+  if (ownerFilter) {
+    query = query.or(`owner_id.eq.${ownerFilter},backup_employee_id.eq.${ownerFilter}`)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
