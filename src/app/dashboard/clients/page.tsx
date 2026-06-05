@@ -1,3 +1,4 @@
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import ClientsTable from "@/components/ClientsTable";
 export const metadata = { title: "My Candidates | GoldenPegasus" };
@@ -6,9 +7,20 @@ export default async function EmployeeClientsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const uid = user?.id ?? ''
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  const supabaseAdmin = serviceRoleKey
+    ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : null
+
+  const ownedQuery = supabase.from('Candidate_records').select('*').eq('owner_id', uid).order('created_at', { ascending: false })
+  const backupQuery = supabaseAdmin
+    ? supabaseAdmin.from('Candidate_records').select('*').eq('backup_employee_id', uid).order('created_at', { ascending: false })
+    : supabase.from('Candidate_records').select('*').eq('backup_employee_id', uid).order('created_at', { ascending: false })
+
   const [ownedResult, backupResult, employeeProfiles, employeesFromTable] = await Promise.all([
-    supabase.from('Candidate_records').select('*').eq('owner_id', uid).order('created_at', { ascending: false }),
-    supabase.from('Candidate_records').select('*').eq('backup_employee_id', uid).order('created_at', { ascending: false }),
+    ownedQuery,
+    backupQuery,
     supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
     supabase.from('employees').select('user_id, full_name, email'),
   ])
