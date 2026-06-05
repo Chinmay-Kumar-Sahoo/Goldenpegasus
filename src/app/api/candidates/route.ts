@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { selectedEmployeeId, backupEmployeeId, ...recordData } = body
+  const { selectedEmployeeId, backupEmployeeId, employee_name, ...recordData } = body
 
   let effectiveOwnerId = user.id
   if (selectedEmployeeId) {
