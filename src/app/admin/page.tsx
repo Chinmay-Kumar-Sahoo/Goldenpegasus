@@ -15,8 +15,26 @@ export default async function AdminPage() {
       supabase.from('marketing_records').select('*', { count: 'exact', head: true }),
       supabase.from('Candidate_records').select('*', { count: 'exact', head: true }),
       supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }),
-      supabase.from('audit_logs').select('action, entity_type, created_at, user_id, profiles(full_name)').gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()).order('created_at', { ascending: false }),
+      supabase.from('audit_logs').select('action, entity_type, entity_id, created_at, user_id, profiles(full_name)').gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()).order('created_at', { ascending: false }),
     ])
+
+  const entityNames: Record<string, string> = {}
+  const employeeIds = [...new Set((recentLogs || []).filter(l => l.entity_type === 'employee').map(l => l.entity_id).filter(Boolean))]
+  const marketingIds = [...new Set((recentLogs || []).filter(l => l.entity_type === 'marketing_record').map(l => l.entity_id).filter(Boolean))]
+  const candidateIds = [...new Set((recentLogs || []).filter(l => l.entity_type === 'candidate_record').map(l => l.entity_id).filter(Boolean))]
+
+  if (employeeIds.length > 0) {
+    const { data: eps } = await supabase.from('profiles').select('id, full_name').in('id', employeeIds)
+    for (const ep of eps || []) entityNames[ep.id] = ep.full_name || ep.id
+  }
+  if (marketingIds.length > 0) {
+    const { data: mrs } = await supabase.from('marketing_records').select('id, name').in('id', marketingIds)
+    for (const mr of mrs || []) entityNames[mr.id] = mr.name || mr.id
+  }
+  if (candidateIds.length > 0) {
+    const { data: crs } = await supabase.from('Candidate_records').select('id, Candidate_name').in('id', candidateIds)
+    for (const cr of crs || []) entityNames[cr.id] = cr.Candidate_name || cr.id
+  }
 
   const stats = [
     { label: 'Employees', value: employeeCount ?? 0, icon: '👥', href: '/admin/employees' },
@@ -74,12 +92,19 @@ export default async function AdminPage() {
           <h2 className="font-semibold text-white mb-4">Recent Audit Activity</h2>
           {recentLogs && recentLogs.length > 0 ? (
             <div className="space-y-3">
-              {recentLogs.map((log, i) => (
+              {recentLogs.map((log, i) => {
+                const entityName = log.entity_id ? entityNames[log.entity_id] : null
+                const entityLabel = log.entity_type?.replace(/_/g, ' ')
+                return (
                 <div key={i} className="flex items-start gap-3 text-sm">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#22c55e] mt-1.5 flex-shrink-0" />
                   <div className="min-w-0">
                     <span className="text-white font-medium capitalize">{log.action.replace(/_/g, ' ')}</span>
-                    {log.entity_type && <span className="text-[#71717a]"> on {log.entity_type}</span>}
+                    {entityName ? (
+                      <span className="text-[#a1a1aa]"> — <span className="text-white">{entityName}</span></span>
+                    ) : entityLabel && (
+                      <span className="text-[#71717a]"> on {entityLabel}</span>
+                    )}
                     <div className="flex items-center gap-2 text-xs text-[#3a3a3a] mt-0.5">
                       <span>{(log as any).profiles?.full_name || 'System'}</span>
                       <span>·</span>
@@ -87,7 +112,8 @@ export default async function AdminPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <p className="text-sm text-[#71717a]">No activity yet.</p>

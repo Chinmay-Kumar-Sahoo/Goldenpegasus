@@ -37,18 +37,32 @@ export default async function AuditLogsPage() {
     .gte('created_at', sevenDaysAgo)
     .order('created_at', { ascending: false })
 
-  const entityIds = [...new Set((logsData || []).filter(l => l.entity_type === 'employee').map(l => l.entity_id).filter(Boolean))]
+  const entityNames: Record<string, string> = {}
+  const entityProfiles: Record<string, { email_confirmed_at: string | null }> = {}
 
-  let entityProfiles: Record<string, { email_confirmed_at: string | null }> = {}
-  if (entityIds.length > 0) {
-    const { data: eps } = await supabase.from('profiles').select('id, email_confirmed_at').in('id', entityIds)
+  const employeeIds = [...new Set((logsData || []).filter(l => l.entity_type === 'employee').map(l => l.entity_id).filter(Boolean))]
+  const marketingIds = [...new Set((logsData || []).filter(l => l.entity_type === 'marketing_record').map(l => l.entity_id).filter(Boolean))]
+  const candidateIds = [...new Set((logsData || []).filter(l => l.entity_type === 'candidate_record').map(l => l.entity_id).filter(Boolean))]
+
+  if (employeeIds.length > 0) {
+    const { data: eps } = await supabase.from('profiles').select('id, full_name, email_confirmed_at').in('id', employeeIds)
     for (const ep of eps || []) {
       entityProfiles[ep.id] = ep
+      entityNames[ep.id] = ep.full_name || ep.id
     }
+  }
+  if (marketingIds.length > 0) {
+    const { data: mrs } = await supabase.from('marketing_records').select('id, name').in('id', marketingIds)
+    for (const mr of mrs || []) entityNames[mr.id] = mr.name || mr.id
+  }
+  if (candidateIds.length > 0) {
+    const { data: crs } = await supabase.from('Candidate_records').select('id, Candidate_name').in('id', candidateIds)
+    for (const cr of crs || []) entityNames[cr.id] = cr.Candidate_name || cr.id
   }
 
   const logs = (logsData || []).map(log => ({
     ...log,
+    entity_name: log.entity_id ? entityNames[log.entity_id] : null,
     entity_profile: log.entity_id ? entityProfiles[log.entity_id] : null,
   }))
 
@@ -108,8 +122,14 @@ export default async function AuditLogsPage() {
                                 <td className="px-4 py-3 text-xs text-[#71717a] whitespace-nowrap">{formatDateTime(log.created_at)}</td>
                                 <td className="px-4 py-3 text-sm text-white">{(log.profiles as { full_name?: string })?.full_name || 'System'}</td>
                                 <td className="px-4 py-3"><span className="text-xs bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 px-2 py-0.5 rounded-md">{log.action}</span></td>
-                                <td className="px-4 py-3 text-sm text-[#a1a1aa]">{log.entity_type || '—'}</td>
-                                <td className="px-4 py-3 text-xs text-[#71717a] font-mono">{log.entity_id || '—'}</td>
+                                 <td className="px-4 py-3 text-sm text-[#a1a1aa]">{(log.entity_type || '').replace(/_/g, ' ')}</td>
+                                 <td className="px-4 py-3 text-xs text-[#71717a]">
+                                   {log.entity_name ? (
+                                     <span className="text-white font-medium">{log.entity_name}</span>
+                                   ) : log.entity_id ? (
+                                     <span className="font-mono">{log.entity_id}</span>
+                                   ) : '—'}
+                                 </td>
                                 <td className="px-4 py-3">
                                   {log.entity_profile?.email_confirmed_at ? (
                                     <span className="text-[10px] px-2 py-1 rounded-full bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 font-bold uppercase tracking-wider">Confirmed</span>
