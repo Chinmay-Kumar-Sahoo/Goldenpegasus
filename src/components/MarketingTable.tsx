@@ -501,36 +501,28 @@ export default function MarketingPage({
         if (emp.full_name) employeeNameMap.set(emp.full_name.toLowerCase().trim(), emp.id)
       }
 
-      let importedCount = 0
-      let errorCount = 0
-      for (const row of importRows) {
+      const batchRecords = importRows.map(row => {
         const payload: Record<string, any> = { ...row }
         const empName = row.employee_name?.trim()
         if (empName) {
           const matchedId = employeeNameMap.get(empName.toLowerCase())
-          if (matchedId) {
-            payload.selectedEmployeeId = matchedId
-          }
+          if (matchedId) payload.selectedEmployeeId = matchedId
         }
         if (!payload.backup_employee_name) delete payload.backup_employee_name
-        const res = await fetch('/api/marketing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-        if (res.ok) importedCount++
-        else errorCount++
-      }
+        if (!payload.selectedEmployeeId) delete payload.selectedEmployeeId
+        Object.keys(payload).forEach(k => { if (payload[k] === null) delete payload[k] })
+        return payload
+      })
 
-      if (errorCount === 0) {
-        toast.success(`Imported ${importedCount} marketing record${importedCount === 1 ? '' : 's'}`)
-      } else if (importedCount > 0) {
-        toast.success(`Imported ${importedCount} record${importedCount === 1 ? '' : 's'} (${errorCount} failed)`)
-      } else {
-        throw new Error('Failed to import any records')
-      }
+      const res = await fetch('/api/marketing/batch', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: batchRecords }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed to import records')
 
-      toast.success(`Imported ${importRows.length} marketing record${importRows.length === 1 ? '' : 's'}`)
+      toast.success(`Imported ${result.count || batchRecords.length} marketing records`)
       fetchRecords()
     } catch (err: any) {
       const message = err.message || 'Failed to import Excel file.'
