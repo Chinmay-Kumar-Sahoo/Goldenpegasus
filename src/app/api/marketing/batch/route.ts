@@ -39,8 +39,9 @@ export async function PUT(req: NextRequest) {
   for (const r of records) {
     const issues: string[] = []
 
-    if (!r.name || !existingCandidates.has(r.name)) {
-      issues.push('Candidate Not Found')
+    const candidateExists = r.name && existingCandidates.has(r.name)
+    if (!candidateExists) {
+      issues.push('Candidate Not Found in records — record added without candidate link')
     }
 
     const primaryUserId = r.employee_name
@@ -48,17 +49,14 @@ export async function PUT(req: NextRequest) {
       : user.id
 
     if (r.employee_name && !primaryUserId) {
-      issues.push('Primary Employee Not Found')
+      issues.push('Primary Employee Not Found — record skipped')
       r._owner_id = null
-    } else {
-      r._owner_id = primaryUserId
-    }
-
-    if (issues.length > 0) {
       errors.push({ name: r.name || '(empty)', issues })
       continue
     }
 
+    r._owner_id = primaryUserId
+    r._candidateExists = candidateExists
     validRecords.push(r)
   }
 
@@ -100,7 +98,7 @@ export async function PUT(req: NextRequest) {
     if (supabaseAdmin) {
       const candidateBackupMap = new Map<string, string>()
       for (const r of validRecords) {
-        if (r.backup_employee_name && r.name) {
+        if (r._candidateExists && r.backup_employee_name && r.name) {
           candidateBackupMap.set(r.name, r.backup_employee_name)
         }
       }
