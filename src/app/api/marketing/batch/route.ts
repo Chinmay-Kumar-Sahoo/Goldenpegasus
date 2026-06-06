@@ -12,6 +12,9 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'No records specified' }, { status: 400 })
   }
 
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const isAdmin = profile?.role === 'admin'
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
   const supabaseAdmin = serviceRoleKey
@@ -54,6 +57,13 @@ export async function PUT(req: NextRequest) {
         candidatesData = [...candidatesData, ...fallback]
       }
     }
+  }
+
+  // If employee, restrict to only candidates they are assigned to
+  if (!isAdmin) {
+    candidatesData = candidatesData.filter((c: any) =>
+      c.owner_id === user.id || c.backup_employee_id === user.id
+    )
   }
 
   // Fetch profiles and employees to resolve names (exact match first)
@@ -140,27 +150,40 @@ export async function PUT(req: NextRequest) {
     const issues: string[] = []
     const name = r.name || ''
     const tech = r.technology || ''
-    const lookupKey = normalize(name) + '|' + (tech ? normalize(tech) : '')
-    const nameOnlyKey = normalize(name) + '|'
+    const empName = r.employee_name
 
-    // --- Step 1: Find candidate by Name + Technology ---
-    let candidateInfo = candidateLookup.get(lookupKey)
-    // If not found with tech, try name-only match (for candidates with null technology)
-    if (!candidateInfo) {
-      candidateInfo = candidateLookup.get(nameOnlyKey)
-    }
+    // --- Step 1: Find candidate by name (case-insensitive) ---
+    const candidatesWithName = candidatesData.filter((c: any) => normalize(c.Candidate_name) === normalize(name))
 
-    if (!candidateInfo) {
+    if (candidatesWithName.length === 0) {
       issues.push(`Candidate "${name}" not found in All Candidates Records`)
       hasCriticalError = true
       errors.push({ name, issues })
       continue
     }
 
-    // --- Step 2: Resolve primary employee ---
+    // --- Step 2: Check Technology match (no name-only fallback) ---
+    let candidateInfo: any = null
+    if (tech) {
+      candidateInfo = candidatesWithName.find((c: any) => c.technology && normalize(c.technology) === normalize(tech)) || null
+    } else {
+      candidateInfo = candidatesWithName.find((c: any) => !c.technology) || null
+    }
+
+    if (!candidateInfo) {
+      const existingTechs = [...new Set(candidatesWithName.map((c: any) => c.technology).filter(Boolean))]
+      const errorMsg = existingTechs.length > 0
+        ? `Technology mismatch for "${name}" — Candidate has ${existingTechs.map(t => `"${t}"`).join(', ')} but Excel specifies "${tech || 'N/A'}"`
+        : `Technology mismatch for "${name}" — Candidate has no technology but Excel specifies "${tech}"`
+      issues.push(errorMsg)
+      hasCriticalError = true
+      errors.push({ name, issues })
+      continue
+    }
+
+    // --- Step 3: Resolve primary employee ---
     let primaryUserId: string | null = null
     let primaryUserName: string | null = null
-    const empName = r.employee_name
 
     if (empName) {
       primaryUserId = primaryEmployeeMap.get(normalize(empName)) || null
@@ -173,20 +196,18 @@ export async function PUT(req: NextRequest) {
       primaryUserName = empName
     }
 
-    // --- Step 3: Check if employee matches candidate record's primary employee ---
+    // --- Step 4: Check if employee matches candidate record's primary employee ---
     if (candidateInfo.owner_id && primaryUserId) {
-      const expectedOwnerName = idToName.get(candidateInfo.owner_id) || ''
       if (primaryUserId !== candidateInfo.owner_id) {
-        // Check if this is just a name variant issue
         const actualOwnerName = idToName.get(candidateInfo.owner_id) || ''
-        issues.push(`Record Mismatch — Candidate "${name}" with Technology "${tech || 'N/A'}" already assigned to "${actualOwnerName}" but Excel specifies "${empName}"`)
+        issues.push(`Employee mismatch for "${name}" — Candidate already assigned to "${actualOwnerName}" but Excel specifies "${empName}"`)
         hasCriticalError = true
         errors.push({ name: r.name || '', issues })
         continue
       }
     }
 
-    // --- Step 4: Fetch Backup Employee from Candidate_records ---
+    // --- Step 5: Fetch Backup Employee from Candidate_records ---
     let backupEmployeeName = r.backup_employee_name || ''
     if (!backupEmployeeName && candidateInfo.backup_employee_name) {
       backupEmployeeName = candidateInfo.backup_employee_name

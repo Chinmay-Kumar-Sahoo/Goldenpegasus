@@ -1079,7 +1079,7 @@ export default function MarketingPage({
                 { label: 'Comments', name: 'notes', type: 'textarea', span: 2 },
               ].map(field => {
                 const locked = field.name === 'date'
-                  ? !isAdmin && !!editing
+                  ? !editing
                   : field.name === 'technology'
                     ? !editing && !!form.name
                     : (!!editing && (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]))
