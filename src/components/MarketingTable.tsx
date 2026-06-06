@@ -875,7 +875,7 @@ export default function MarketingPage({
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
+                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
