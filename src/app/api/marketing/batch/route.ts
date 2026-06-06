@@ -67,9 +67,10 @@ export async function PUT(req: NextRequest) {
   }
 
   // Fetch profiles and employees to resolve names (exact match first)
+  const lookupClient = supabaseAdmin || supabase
   const [profilesResult, employeesResult] = await Promise.all([
-    supabase.from('profiles').select('id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
-    supabase.from('employees').select('user_id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
+    lookupClient.from('profiles').select('id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
+    lookupClient.from('employees').select('user_id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
   ])
 
   // Build employee name-to-ID map from exact matches
@@ -94,8 +95,8 @@ export async function PUT(req: NextRequest) {
     const unmatched = primaryNames.filter(n => !foundNames.has(normalize(n)))
     for (const name of unmatched) {
       const [{ data: mp }, { data: me }] = await Promise.all([
-        supabase.from('profiles').select('id, full_name').ilike('full_name', `%${name}%`),
-        supabase.from('employees').select('user_id, full_name').ilike('full_name', `%${name}%`),
+        lookupClient.from('profiles').select('id, full_name').ilike('full_name', `%${name}%`),
+        lookupClient.from('employees').select('user_id, full_name').ilike('full_name', `%${name}%`),
       ])
       for (const p of (mp || [])) {
         if (p.full_name && !primaryEmployeeMap.has(normalize(p.full_name))) {
