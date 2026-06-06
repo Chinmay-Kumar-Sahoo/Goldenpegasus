@@ -39,6 +39,17 @@ const DATE_COLUMNS: Record<string, string> = {
   'Contract End': 'contract_end',
 }
 
+const TEXT_FILTER_COLUMNS: Record<string, string> = {
+  'Candidate Name': 'Candidate_name',
+  'Email': 'Candidate_email',
+  'Company': 'company_name',
+  'Technology': 'technology',
+  'Primary Employee': 'employee_name',
+  'Backup Employee': 'backup_employee_name',
+  'Status': 'status',
+  'Project Type': 'project_type',
+}
+
 const PAGE_SIZES = [25, 50, 100] as const
 
 function inRange(val: string | null, range: { start: string; end: string }): boolean {
@@ -120,6 +131,9 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     contract_start: { start: '', end: '' },
     contract_end: { start: '', end: '' },
   })
+  const [activeTextFilter, setActiveTextFilter] = useState<string | null>(null)
+  const [textFilters, setTextFilters] = useState<Record<string, string[]>>({})
+  const [textFilterSearch, setTextFilterSearch] = useState('')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(50)
 
@@ -190,15 +204,16 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   }, [showExportMenu])
 
   useEffect(() => {
-    if (!activeDateFilter) return
+    if (!activeDateFilter && !activeTextFilter) return
     const handleClick = (e: MouseEvent) => {
       if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
         setActiveDateFilter(null)
+        setActiveTextFilter(null)
       }
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [activeDateFilter])
+  }, [activeDateFilter, activeTextFilter])
 
   const openModal = (rec?: CandidateRecord) => {
     if (rec) {
@@ -303,8 +318,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Technology', 'Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
-    const rows = filtered.map(r => [r.Candidate_name, r.Candidate_email, r.client_phone, r.company_name, r.technology, r.employee_name, r.status, r.project_type, formatDate(r.contract_start), formatDate(r.contract_end), r.notes])
+    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Technology', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
+    const rows = filtered.map(r => [r.Candidate_name, r.Candidate_email, r.client_phone, r.company_name, r.technology, r.employee_name, r.backup_employee_name, r.status, r.project_type, formatDate(r.contract_start), formatDate(r.contract_end), r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -317,8 +332,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Technology', 'Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
-    const data = filtered.map(r => [r.Candidate_name, r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.technology || '', r.employee_name || '', r.status || '', r.project_type || '', formatDate(r.contract_start), formatDate(r.contract_end), r.notes || ''])
+    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Technology', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
+    const data = filtered.map(r => [r.Candidate_name, r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.technology || '', r.employee_name || '', r.backup_employee_name || '', r.status || '', r.project_type || '', formatDate(r.contract_start), formatDate(r.contract_end), r.notes || ''])
 
     autoTable(doc, {
       head: [headers],
@@ -333,16 +348,38 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
 
   const query = search.trim().toLowerCase()
 
+  const uniqueValues = useMemo(() => {
+    const result: Record<string, string[]> = {}
+    for (const [header, fieldKey] of Object.entries(TEXT_FILTER_COLUMNS)) {
+      const values = new Set<string>()
+      for (const rec of records) {
+        let val = (rec as any)[fieldKey]
+        if (val == null || val === '') val = fieldKey === 'status' ? 'Active' : null
+        if (val != null) values.add(String(val).trim())
+      }
+      result[header] = Array.from(values).sort((a, b) => a.localeCompare(b))
+    }
+    return result
+  }, [records])
+
   const hasDateFilter = Object.values(dateFilters).some(r => r.start || r.end)
+  const hasTextFilter = Object.values(textFilters).some(v => v.length > 0)
 
   const filtered = useMemo(() => {
     const hasSearch = !!query
     const hasStatus = statusFilter !== 'all'
-    if (!hasSearch && !hasStatus && !hasDateFilter) return records
+    if (!hasSearch && !hasStatus && !hasDateFilter && !hasTextFilter) return records
     return records.filter(r => {
       if (hasStatus && r.status !== statusFilter) return false
       if (!inRange(r.contract_start, dateFilters.contract_start)) return false
       if (!inRange(r.contract_end, dateFilters.contract_end)) return false
+      for (const [header, selected] of Object.entries(textFilters)) {
+        if (selected.length === 0) continue
+        const fieldKey = TEXT_FILTER_COLUMNS[header]
+        let fieldVal = String((r as any)[fieldKey] ?? '').trim()
+        if (!fieldVal && fieldKey === 'status') fieldVal = 'Active'
+        if (!selected.includes(fieldVal)) return false
+      }
       if (!hasSearch) return true
       return         wordScore(r.Candidate_name, query) > 0 ||
         wordScore(r.company_name, query) > 0 ||
@@ -355,7 +392,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
         wordScore(r.contract_start, query) > 0 ||
         wordScore(r.contract_end, query) > 0
     })
-  }, [records, query, statusFilter, dateFilters, hasDateFilter])
+  }, [records, query, statusFilter, dateFilters, textFilters, hasDateFilter, hasTextFilter])
 
   const sorted = useMemo(() => {
     if (!query) return filtered
@@ -387,6 +424,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   useEffect(() => {
     if (page >= totalPages && totalPages > 0) setPage(0)
   }, [page, totalPages])
+
+  const anyFilterActive = hasDateFilter || hasTextFilter || statusFilter !== 'all' || !!searchInput
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -424,10 +463,10 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
         {searchInput && (
           <span className="text-xs text-[#71717a] whitespace-nowrap">{sorted.length} result{sorted.length !== 1 ? 's' : ''}</span>
         )}
-        {hasDateFilter && (
-          <button onClick={() => { setDateFilters({ contract_start: { start: '', end: '' }, contract_end: { start: '', end: '' } }); setActiveDateFilter(null) }}
+        {anyFilterActive && (
+          <button onClick={() => { setDateFilters({ contract_start: { start: '', end: '' }, contract_end: { start: '', end: '' } }); setActiveDateFilter(null); setTextFilters({}); setActiveTextFilter(null); setStatusFilter('all'); setSearchInput(''); setSearch('') }}
             className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2">
-            Clear all date filters
+            Clear all filters
           </button>
         )}
       </div>
@@ -449,8 +488,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
       )}
       </div>
 
-      <div className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeDateFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
-        <div className={`flex-1 ${activeDateFilter ? 'overflow-hidden' : 'overflow-auto'}`}>
+      <div className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${(activeDateFilter || activeTextFilter) ? 'overflow-visible' : 'overflow-hidden'}`}>
+        <div className={`flex-1 ${(activeDateFilter || activeTextFilter) ? 'overflow-hidden' : 'overflow-auto'}`}>
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
@@ -464,22 +503,26 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
                     )
                   }
                   const dateKey = DATE_COLUMNS[h]
-                  const isActive = activeDateFilter === dateKey
-                  const hasFilter = dateKey && !!(dateFilters[dateKey as keyof typeof dateFilters]?.start || dateFilters[dateKey as keyof typeof dateFilters]?.end)
+                  const textKey = TEXT_FILTER_COLUMNS[h]
+                  const isFilterable = dateKey || textKey
+                  const dateIsActive = dateKey && activeDateFilter === dateKey
+                  const textIsActive = textKey && activeTextFilter === h
+                  const dateHasFilter = dateKey && !!(dateFilters[dateKey as keyof typeof dateFilters]?.start || dateFilters[dateKey as keyof typeof dateFilters]?.end)
+                  const textHasFilter = textKey && (textFilters[h]?.length ?? 0) > 0
                   return (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap relative">
-                      {dateKey ? (
+                      {isFilterable ? (
                         <div className="flex items-center gap-1.5">
                           <span>{h}</span>
-                          <button onClick={(e) => { e.stopPropagation(); setActiveDateFilter(isActive ? null : dateKey) }}
-                            className={`p-0.5 rounded transition-colors ${hasFilter ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
+                          <button onClick={(e) => { e.stopPropagation(); if (dateKey) { setActiveDateFilter(dateIsActive ? null : dateKey); setActiveTextFilter(null) } else { setActiveTextFilter(textIsActive ? null : h); setActiveDateFilter(null) } }}
+                            className={`p-0.5 rounded transition-colors ${(dateHasFilter || textHasFilter) ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                             </svg>
                           </button>
                         </div>
                       ) : h}
-                      {dateKey && isActive && (
+                      {dateKey && dateIsActive && (
                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3.5 z-[9999] shadow-2xl min-w-[260px]" onClick={e => e.stopPropagation()}>
                           <div className="space-y-3">
                             <div>
@@ -495,7 +538,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
                                 className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 [color-scheme:dark]" />
                             </div>
                             <div className="flex gap-2 pt-1">
-                              {hasFilter && (
+                              {dateHasFilter && (
                                 <button onClick={() => { setDateFilters(f => ({ ...f, [dateKey]: { start: '', end: '' } })); setActiveDateFilter(null) }}
                                   className="flex-1 text-center text-xs text-[#71717a] hover:text-red-400 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-red-400/30 transition-colors">
                                   Clear
@@ -504,6 +547,43 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
                               <button onClick={() => setActiveDateFilter(null)}
                                 className="flex-1 text-center text-xs text-white bg-[#22c55e]/20 hover:bg-[#22c55e]/30 py-1.5 rounded-lg border border-[#22c55e]/40 transition-colors">
                                 Apply
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {textKey && textIsActive && (
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl z-[9999] shadow-2xl min-w-[240px]" onClick={e => e.stopPropagation()}>
+                          <div className="p-3.5 space-y-2">
+                            <input type="text" value={textFilterSearch} placeholder={`Search ${h}...`} autoFocus
+                              onChange={e => setTextFilterSearch(e.target.value)}
+                              className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 placeholder-[#3a3a3a]" />
+                            <div className="max-h-48 overflow-y-auto space-y-1">
+                              {(uniqueValues[h] || []).filter(v => !textFilterSearch || v.toLowerCase().includes(textFilterSearch.toLowerCase())).map(v => {
+                                const checked = (textFilters[h] || []).includes(v)
+                                return (
+                                  <label key={v} className="flex items-center gap-2 px-2 py-1.5 hover:bg-[#2a2a2a] rounded-lg cursor-pointer transition-colors">
+                                    <input type="checkbox" checked={checked}
+                                      onChange={() => setTextFilters(f => {
+                                        const current = f[h] || [];
+                                        const next = checked ? current.filter(x => x !== v) : [...current, v];
+                                        return { ...f, [h]: next };
+                                      })}
+                                      className="accent-[#22c55e] cursor-pointer" />
+                                    <span className="text-xs text-white truncate">{v}</span>
+                                  </label>
+                                )
+                              })}
+                              {(uniqueValues[h] || []).length === 0 && <div className="text-xs text-[#71717a] px-2 py-1">No values available</div>}
+                            </div>
+                            <div className="flex gap-2 pt-1 border-t border-[#2a2a2a]">
+                              <button onClick={() => { setTextFilters(f => ({ ...f, [h]: uniqueValues[h] || [] })); setTextFilterSearch('') }}
+                                className="flex-1 text-center text-xs text-white bg-[#22c55e]/20 hover:bg-[#22c55e]/30 py-1.5 rounded-lg border border-[#22c55e]/40 transition-colors">
+                                Select All
+                              </button>
+                              <button onClick={() => { setTextFilters(f => ({ ...f, [h]: [] })); setTextFilterSearch('') }}
+                                className="flex-1 text-center text-xs text-[#71717a] hover:text-red-400 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-red-400/30 transition-colors">
+                                Clear
                               </button>
                             </div>
                           </div>
