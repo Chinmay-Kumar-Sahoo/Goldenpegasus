@@ -29,18 +29,17 @@ export async function PUT(req: NextRequest) {
     return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime())
   }
 
-  // Gather unique candidate names, technologies, and employee names from the import
+  // Gather unique candidate names and employee names from the import
   const rawCandidateNames = [...new Set(records.map((r: any) => (r.name || '').trim()).filter(Boolean))] as string[]
-  const technologies = [...new Set(records.map((r: any) => r.technology).filter(Boolean))] as string[]
   const primaryNames = [...new Set(records.map((r: any) => (r.employee_name || '').trim()).filter(Boolean))] as string[]
 
-  // Fetch Candidate_records with both name and technology (exact match first)
+  // Fetch Candidate_records by name
   let candidatesData: any[] = []
   if (rawCandidateNames.length > 0) {
     const client = supabaseAdmin || supabase
     const { data } = await client
       .from('Candidate_records')
-      .select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name, status')
+      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status')
       .in('Candidate_name', rawCandidateNames)
     candidatesData = data || []
 
@@ -51,7 +50,7 @@ export async function PUT(req: NextRequest) {
       const client = supabaseAdmin || supabase
       const { data: fallback } = await client
         .from('Candidate_records')
-        .select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name, status')
+        .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status')
         .ilike('Candidate_name', cName)
       if (fallback) {
         candidatesData = [...candidatesData, ...fallback]
@@ -128,17 +127,12 @@ export async function PUT(req: NextRequest) {
     for (const e of (be || [])) if (e.full_name) idToName.set(e.user_id, e.full_name)
   }
 
-  // Build candidate lookup keys: "name|tech" -> candidate record
+  // Build candidate lookup by name
   const candidateLookup = new Map<string, any>()
   for (const c of candidatesData) {
-    const key = normalize(c.Candidate_name) + '|' + (c.technology ? normalize(c.technology) : '')
+    const key = normalize(c.Candidate_name)
     if (!candidateLookup.has(key)) {
       candidateLookup.set(key, c)
-    }
-    // Also store under name-only key for fallback
-    const nameKey = normalize(c.Candidate_name) + '|'
-    if (!candidateLookup.has(nameKey)) {
-      candidateLookup.set(nameKey, c)
     }
   }
 
@@ -150,7 +144,6 @@ export async function PUT(req: NextRequest) {
   for (const r of records) {
     const issues: string[] = []
     const name = r.name || ''
-    const tech = r.technology || ''
     const empName = r.employee_name
 
     // --- Step 1: Find candidate by name (case-insensitive) ---
@@ -163,25 +156,8 @@ export async function PUT(req: NextRequest) {
       continue
     }
 
-    // --- Step 2: Check Technology match ---
-    let candidateInfo: any = null
-    if (tech) {
-      // Excel specified a technology — must match candidate's technology
-      candidateInfo = candidatesWithName.find((c: any) => c.technology && normalize(c.technology) === normalize(tech)) || null
-      if (!candidateInfo) {
-        const existingTechs = [...new Set(candidatesWithName.map((c: any) => c.technology).filter(Boolean))]
-        const errorMsg = existingTechs.length > 0
-          ? `Technology mismatch for "${name}" — Candidate has ${existingTechs.map(t => `"${t}"`).join(', ')} but Excel specifies "${tech}"`
-          : `Technology mismatch for "${name}" — Candidate has no technology but Excel specifies "${tech}"`
-        issues.push(errorMsg)
-        hasCriticalError = true
-        errors.push({ name, issues })
-        continue
-      }
-    } else {
-      // Excel didn't specify technology — accept any match by name
-      candidateInfo = candidatesWithName[0]
-    }
+    // --- Step 2: Take the first matching candidate ---
+    const candidateInfo: any = candidatesWithName[0]
 
     // --- Step 3: Resolve primary employee ---
     let primaryUserId: string | null = null
@@ -256,7 +232,6 @@ export async function PUT(req: NextRequest) {
       organization_name: r.organization_name || null,
       implementation_partner: r.implementation_partner || null,
       end_client: r.end_client || null,
-      technology: r.technology || null,
       project_start_date: isValidISODate(r.project_start_date) ? r.project_start_date : null,
       project_end_date: isValidISODate(r.project_end_date) ? r.project_end_date : null,
       interview_date: isValidISODate(r.interview_date) ? r.interview_date : null,

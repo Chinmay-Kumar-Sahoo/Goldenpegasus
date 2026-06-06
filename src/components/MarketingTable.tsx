@@ -16,7 +16,7 @@ interface MarketingRecord {
   implementation_partner: string | null
   end_client: string | null
   status: string | null
-  technology: string | null
+
   project_start_date: string | null
   project_end_date: string | null
   interview_date: string | null
@@ -41,7 +41,6 @@ type MarketingImportField =
   | 'implementation_partner'
   | 'end_client'
   | 'status'
-  | 'technology'
   | 'project_start_date'
   | 'project_end_date'
   | 'interview_date'
@@ -58,7 +57,7 @@ const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDat
   { key: 'name', labels: ['Name', 'Candidate Name'] },
   { key: 'date', labels: ['Date'], isDate: true },
   { key: 'status', labels: ['Status'] },
-  { key: 'technology', labels: ['Technology'] },
+
   { key: 'recruiter_name', labels: ['Recruiter', 'Recruiter Name'] },
   { key: 'recruiter_email', labels: ['Recruiter Email'] },
   { key: 'organization_name', labels: ['Organization', 'Organization Name'] },
@@ -101,7 +100,7 @@ const DATE_COLUMNS: Record<string, string> = {
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'name',
   'Employee': 'employee_name',
-  'Technology': 'technology',
+
   'Status': 'status',
   'Recruiter Organization': 'recruiter_name',
   'Recruiter Email': 'recruiter_email',
@@ -135,7 +134,6 @@ const TableRow = memo(function TableRow({
         </td>
       )}
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.name}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.technology || '—'}</td>
       {showEmployeeColumn && (
         <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
       )}
@@ -181,7 +179,7 @@ export default function MarketingPage({
   initialRecords?: MarketingRecord[]
   initialOwnerNames?: Record<string, string>
   employeeOptions?: Array<{ id: string; full_name: string }>
-  candidateOptions?: Array<{ id: string; name: string; technology?: string | null; owner_id: string; owner_name?: string | null; status: string | null; backup_employee_id?: string | null; backup_employee_name?: string | null }>
+  candidateOptions?: Array<{ id: string; name: string; owner_id: string; owner_name?: string | null; status: string | null; backup_employee_id?: string | null; backup_employee_name?: string | null }>
 }) {
   const showEmployeeColumn = isAdmin || readOnly
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -217,7 +215,7 @@ export default function MarketingPage({
   const serverOwnerNamesRef = useRef(serverOwnerNames)
   const [form, setForm] = useState({
     name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '',
-    implementation_partner: '', end_client: '', technology: '', status: 'Telephone Call',
+    implementation_partner: '', end_client: '', status: 'Telephone Call',
     project_start_date: '', project_end_date: '', interview_date: '',
     implementation_poc_email: '', interviewer_email: '', notes: '',
     employee_name: '', backup_employee_name: '',
@@ -225,7 +223,7 @@ export default function MarketingPage({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
-  const [bulkForm, setBulkForm] = useState({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', technology: '', interviewer_email: '' })
+  const [bulkForm, setBulkForm] = useState({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', interviewer_email: '' })
   const [bulkSaving, setBulkSaving] = useState(false)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(50)
@@ -295,7 +293,6 @@ export default function MarketingPage({
           setClientCandidates(json.records.map((r: any) => ({
             id: r.id,
             name: r.Candidate_name || r.name,
-            technology: r.technology || null,
             owner_id: r.owner_id,
             owner_name: r.employee_name || null,
             status: r.status,
@@ -362,7 +359,6 @@ export default function MarketingPage({
         name: rec.name, date: rec.date || '', recruiter_name: rec.recruiter_name || '',
         recruiter_email: rec.recruiter_email || '', organization_name: rec.organization_name || '',
         implementation_partner: rec.implementation_partner || '', end_client: rec.end_client || '',
-        technology: rec.technology || '',
         status: rec.status || 'Telephone Call', project_start_date: rec.project_start_date || '',
         project_end_date: rec.project_end_date || '', interview_date: rec.interview_date || '',
         implementation_poc_email: rec.implementation_poc_email || '',
@@ -373,7 +369,7 @@ export default function MarketingPage({
       setSelectedEmployeeId(isAdmin ? (rec.owner_id || '') : '')
     } else {
       setEditing(null)
-      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', technology: '', status: 'Telephone Call', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '', backup_employee_name: '' })
+      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'Telephone Call', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '', backup_employee_name: '' })
       setSelectedEmployeeId('')
     }
     setError('')
@@ -422,7 +418,7 @@ export default function MarketingPage({
       toast.success(`Updated ${selectedIds.size} records`)
       setShowBulkModal(false)
       setSelectedIds(new Set())
-      setBulkForm({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', technology: '', interviewer_email: '' })
+      setBulkForm({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', interviewer_email: '' })
       fetchRecords()
     } catch {
       toast.error('Failed to bulk update')
@@ -679,17 +675,9 @@ export default function MarketingPage({
     return available
   }, [allCandidateOptions, isAdmin, editing])
 
-  const uniqueTechnologies = useMemo(() => {
-    const techs = new Set<string>()
-    for (const c of allCandidateOptions) {
-      if (c.technology) techs.add(c.technology)
-    }
-    return Array.from(techs).sort()
-  }, [allCandidateOptions])
-
   const handleCandidateSelect = (candidateName: string) => {
     const candidate = candidateOptions.find(c => c.name === candidateName)
-    let empName = '', backupName = '', empId = '', tech = ''
+    let empName = '', backupName = '', empId = ''
     if (candidate) {
       if (candidate.owner_name) {
         empName = candidate.owner_name
@@ -699,9 +687,8 @@ export default function MarketingPage({
       }
       backupName = candidate.backup_employee_name || ''
       empId = candidate.owner_id || ''
-      tech = candidate.technology || ''
     }
-    setForm(prev => ({ ...prev, name: candidateName, employee_name: empName, backup_employee_name: backupName, technology: tech }))
+    setForm(prev => ({ ...prev, name: candidateName, employee_name: empName, backup_employee_name: backupName }))
     if (isAdmin) setSelectedEmployeeId(empId)
   }
 
@@ -751,7 +738,6 @@ export default function MarketingPage({
       const fields = [
         r.name, r.date, r.status, r.recruiter_name, r.recruiter_email,
         r.organization_name, r.implementation_partner, r.end_client,
-        r.technology,
         r.interview_type, r.client_name, r.client_email,
         r.implementation_poc_email, r.interviewer_email, r.notes,
         r.employee_name, r.project_start_date, r.project_end_date, r.interview_date,
@@ -771,8 +757,8 @@ export default function MarketingPage({
   }, [page, totalPages])
 
   const exportCSV = useCallback(() => {
-    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, r.technology, ...(showEmployeeColumn ? [r.employee_name] : []), r.backup_employee_name, formatDate(r.date), r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.backup_employee_name, formatDate(r.date), r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -785,8 +771,8 @@ export default function MarketingPage({
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const data = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.backup_employee_name || '', formatDate(r.date), r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.backup_employee_name || '', formatDate(r.date), r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
 
     autoTable(doc, {
       head: [headers],
@@ -875,7 +861,7 @@ export default function MarketingPage({
               const rec = records.find(r => r.id === id) || filtered.find(r => r.id === id)
               if (rec) { openModal(rec); setSelectedIds(new Set()); return }
             }
-            setBulkForm({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', technology: '', interviewer_email: '' }); setShowBulkModal(true)
+            setBulkForm({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', interviewer_email: '' }); setShowBulkModal(true)
           }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
           {isAdmin && <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>}
           <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
@@ -1119,7 +1105,6 @@ export default function MarketingPage({
                 { label: '2nd Up Recruiter', name: 'organization_name', type: 'text', span: 1 },
                 { label: 'Implementation Partner', name: 'implementation_partner', type: 'text', span: 1 },
                 { label: 'End Client', name: 'end_client', type: 'text', span: 1 },
-                { label: 'Technology', name: 'technology', type: 'text', span: 1 },
                 { label: 'Interview Date', name: 'interview_date', type: 'date', span: 1 },
                 { label: 'Project Start Date', name: 'project_start_date', type: 'date', span: 1 },
                 { label: 'Project End Date', name: 'project_end_date', type: 'date', span: 1 },
@@ -1129,19 +1114,11 @@ export default function MarketingPage({
               ].map(field => {
                 const locked = field.name === 'date'
                   ? !editing
-                  : field.name === 'technology'
-                    ? false
-                    : (!!editing && (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]))
+                  : (!!editing && (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]))
                 return (
                 <div key={field.name} className={field.span === 2 ? 'col-span-2' : ''}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
-                  {field.name === 'technology' ? (
-                    <select value={form.technology || ''} onChange={e => setForm({ ...form, technology: e.target.value })} disabled={locked}
-                      className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                      <option value="">Select Technology</option>
-                      {uniqueTechnologies.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  ) : field.type === 'select' ? (
+                  {field.type === 'select' ? (
                     <select value={form[field.name as keyof typeof form]} onChange={e => setForm({ ...form, [field.name]: e.target.value })} disabled={locked}
                       className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>
                       {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
@@ -1184,7 +1161,6 @@ export default function MarketingPage({
                 { label: 'Implementation Partner', name: 'implementation_partner', type: 'text' },
                 { label: 'Implementation POC Email', name: 'implementation_poc_email', type: 'email' },
                 { label: 'End Client', name: 'end_client', type: 'text' },
-                { label: 'Technology', name: 'technology', type: 'text' },
                 { label: 'Interviewer Email', name: 'interviewer_email', type: 'email' },
               ].map(f => (
                 <div key={f.name}>

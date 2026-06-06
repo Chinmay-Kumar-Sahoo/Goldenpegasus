@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
         })()
       : Promise.resolve({} as Record<string, string>),
     candidateNames.length > 0
-      ? lookupClient.from('Candidate_records').select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name, status').in('Candidate_name', candidateNames)
+      ? lookupClient.from('Candidate_records').select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status').in('Candidate_name', candidateNames)
       : Promise.resolve({ data: [] }),
     supabase.from('marketing_reminder_logs').select('marketing_record_id, sent_at').is('error', null).in('marketing_record_id', data.map(r => r.id)).order('sent_at', { ascending: false }),
   ])
@@ -157,26 +157,14 @@ export async function POST(req: NextRequest) {
   let effectiveOwnerId = user.id
   let employeeName = recordData.employee_name || null
 
-  // When creating a new record with candidate name + technology, auto-fill from Candidate_records
+  // When creating a new record with candidate name, auto-fill from Candidate_records
   if (!body.id && recordData.name) {
     const { data: candidates } = await supabase
       .from('Candidate_records')
-      .select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name')
+      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name')
       .eq('Candidate_name', recordData.name)
 
-    let matchedCandidate: any = null
-    if (candidates && candidates.length > 0) {
-      // Try to match by technology first
-      if (recordData.technology) {
-        matchedCandidate = candidates.find((c: any) =>
-          c.technology && c.technology.toLowerCase() === recordData.technology.toLowerCase()
-        )
-      }
-      // Fall back to first match
-      if (!matchedCandidate) {
-        matchedCandidate = candidates[0]
-      }
-    }
+    const matchedCandidate = candidates && candidates.length > 0 ? candidates[0] : null
 
     if (matchedCandidate) {
       if (selectedEmployeeId) {
@@ -270,7 +258,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { date, technology, employee_name: _, backup_employee_name: __, ...updatableFields } = recordData
+    const { date, employee_name: _, backup_employee_name: __, ...updatableFields } = recordData
     const updatePayload: any = { ...updatableFields, updated_at: new Date().toISOString() }
 
     // Admin can edit date
@@ -284,11 +272,6 @@ export async function POST(req: NextRequest) {
       if (effectiveOwnerId) {
         updatePayload.owner_id = effectiveOwnerId
       }
-    }
-
-    // Preserve existing technology if not being changed
-    if (technology !== undefined) {
-      updatePayload.technology = technology || null
     }
 
     const { error } = await client
