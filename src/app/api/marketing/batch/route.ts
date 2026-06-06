@@ -94,8 +94,8 @@ export async function PUT(req: NextRequest) {
     const unmatched = primaryNames.filter(n => !foundNames.has(normalize(n)))
     for (const name of unmatched) {
       const [{ data: mp }, { data: me }] = await Promise.all([
-        supabase.from('profiles').select('id, full_name').ilike('full_name', name),
-        supabase.from('employees').select('user_id, full_name').ilike('full_name', name),
+        supabase.from('profiles').select('id, full_name').ilike('full_name', `%${name}%`),
+        supabase.from('employees').select('user_id, full_name').ilike('full_name', `%${name}%`),
       ])
       for (const p of (mp || [])) {
         if (p.full_name && !primaryEmployeeMap.has(normalize(p.full_name))) {
@@ -189,12 +189,23 @@ export async function PUT(req: NextRequest) {
     if (empName) {
       primaryUserId = primaryEmployeeMap.get(normalize(empName)) || null
       if (!primaryUserId) {
+        // Try partial match: find any employee whose full name contains the provided name
+        const norm = normalize(empName)
+        for (const [key, id] of primaryEmployeeMap) {
+          if (key.includes(norm)) {
+            primaryUserId = id
+            primaryUserName = employeeIdToName.get(id) || empName
+            break
+          }
+        }
+      }
+      if (!primaryUserId) {
         issues.push(`Employee "${empName}" not found in system`)
         hasCriticalError = true
         errors.push({ name: r.name || '', issues })
         continue
       }
-      primaryUserName = empName
+      if (!primaryUserName) primaryUserName = empName
     }
 
     // --- Step 4: Check if employee matches candidate record's primary employee ---
