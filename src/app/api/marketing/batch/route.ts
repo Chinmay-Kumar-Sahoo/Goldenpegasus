@@ -132,6 +132,7 @@ export async function PUT(req: NextRequest) {
       organization_name: r.organization_name || null,
       implementation_partner: r.implementation_partner || null,
       end_client: r.end_client || null,
+      technology: r.technology || null,
       project_start_date: isValidISODate(r.project_start_date) ? r.project_start_date : null,
       project_end_date: isValidISODate(r.project_end_date) ? r.project_end_date : null,
       interview_date: isValidISODate(r.interview_date) ? r.interview_date : null,
