@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest) {
   // Gather unique candidate names, technologies, and employee names from the import
   const candidateNames = [...new Set(records.map((r: any) => r.name).filter(Boolean))] as string[]
   const technologies = [...new Set(records.map((r: any) => r.technology).filter(Boolean))] as string[]
-  const primaryNames = [...new Set(records.map((r: any) => r.employee_name).filter(Boolean))] as string[]
+  const primaryNames = [...new Set(records.map((r: any) => (r.employee_name || '').trim()).filter(Boolean))] as string[]
 
   // Fetch Candidate_records with both name and technology
   let candidatesData: any[] = []
@@ -42,20 +42,50 @@ export async function PUT(req: NextRequest) {
     candidatesData = data || []
   }
 
-  // Fetch profiles and employees to resolve names
+  // Fetch profiles and employees to resolve names (exact match first)
   const [profilesResult, employeesResult] = await Promise.all([
     supabase.from('profiles').select('id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
     supabase.from('employees').select('user_id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
   ])
 
-  // Build employee name-to-ID map
+  // Build employee name-to-ID map from exact matches
   const primaryEmployeeMap = new Map<string, string>()
   const employeeIdToName = new Map<string, string>()
-  for (const p of (profilesResult.data || [])) {
+  const profilesData = profilesResult.data || []
+  const employeesData = employeesResult.data || []
+
+  for (const p of profilesData) {
     if (p.full_name) { primaryEmployeeMap.set(normalize(p.full_name), p.id); employeeIdToName.set(p.id, p.full_name) }
   }
-  for (const e of (employeesResult.data || [])) {
+  for (const e of employeesData) {
     if (e.full_name) { primaryEmployeeMap.set(normalize(e.full_name), e.user_id); if (e.user_id && !employeeIdToName.has(e.user_id)) employeeIdToName.set(e.user_id, e.full_name) }
+  }
+
+  // Fallback: case-insensitive matching for names not found by exact match
+  if (primaryNames.length > 0) {
+    const foundNames = new Set([
+      ...profilesData.map(p => normalize(p.full_name || '')),
+      ...employeesData.map(e => normalize(e.full_name || '')),
+    ].filter(Boolean))
+    const unmatched = primaryNames.filter(n => !foundNames.has(normalize(n)))
+    for (const name of unmatched) {
+      const [{ data: mp }, { data: me }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name').ilike('full_name', name),
+        supabase.from('employees').select('user_id, full_name').ilike('full_name', name),
+      ])
+      for (const p of (mp || [])) {
+        if (p.full_name && !primaryEmployeeMap.has(normalize(p.full_name))) {
+          primaryEmployeeMap.set(normalize(p.full_name), p.id)
+          if (!employeeIdToName.has(p.id)) employeeIdToName.set(p.id, p.full_name)
+        }
+      }
+      for (const e of (me || [])) {
+        if (e.full_name && !primaryEmployeeMap.has(normalize(e.full_name))) {
+          primaryEmployeeMap.set(normalize(e.full_name), e.user_id)
+          if (e.user_id && !employeeIdToName.has(e.user_id)) employeeIdToName.set(e.user_id, e.full_name)
+        }
+      }
+    }
   }
 
   // Resolve names for IDs found in Candidate_records
