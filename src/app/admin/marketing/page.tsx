@@ -1,3 +1,4 @@
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import MarketingTable from '@/components/MarketingTable'
 
@@ -7,11 +8,17 @@ export default async function AdminMarketingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  const lookupClient = serviceRoleKey
+    ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : supabase
+
   const [recordsResult, employeeProfiles, employeesFromTable, candidatesResult] = await Promise.all([
     supabase.from('marketing_records').select('*').order('created_at', { ascending: false }),
-    supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
-    supabase.from('employees').select('user_id, full_name, email'),
-    supabase.from('Candidate_records').select('id, Candidate_name, technology, owner_id, status, backup_employee_id, backup_employee_name'),
+    lookupClient.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
+    lookupClient.from('employees').select('user_id, full_name, email'),
+    lookupClient.from('Candidate_records').select('id, Candidate_name, technology, owner_id, status, backup_employee_id, backup_employee_name'),
   ])
 
   const records = (recordsResult.data || []).map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
@@ -24,8 +31,8 @@ export default async function AdminMarketingPage() {
   let ownerNames: Record<string, string> = {}
   if (ownerIds.length > 0) {
     const [{ data: profiles }, { data: employees }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email').in('id', ownerIds),
-      supabase.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
+      lookupClient.from('profiles').select('id, full_name, email').in('id', ownerIds),
+      lookupClient.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
     ])
     ownerNames = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name || p.email || 'Unknown employee']))
     for (const e of (employees || [])) {
