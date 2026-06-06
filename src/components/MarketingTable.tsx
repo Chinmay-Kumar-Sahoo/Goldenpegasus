@@ -609,7 +609,12 @@ export default function MarketingPage({
         body: JSON.stringify({ records: batchRecords }),
       })
       const result = await res.json()
-      if (!res.ok) throw new Error(result.error || 'Failed to import records')
+      if (!res.ok) {
+        const validationErrors = (result.errors || []).slice(0, 5).map((e: any) => `${e.name}: ${e.issues.join(', ')}`)
+        const more = result.errors?.length > 5 ? `\n...and ${result.errors.length - 5} more` : ''
+        const detail = validationErrors.length > 0 ? `\n${validationErrors.join('\n')}${more}` : ''
+        throw new Error(`${result.error || 'Failed to import records'}${detail}`)
+      }
 
       const errors = result.errors || []
       if (errors.length > 0) {

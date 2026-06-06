@@ -162,23 +162,24 @@ export async function PUT(req: NextRequest) {
       continue
     }
 
-    // --- Step 2: Check Technology match (no name-only fallback) ---
+    // --- Step 2: Check Technology match ---
     let candidateInfo: any = null
     if (tech) {
+      // Excel specified a technology — must match candidate's technology
       candidateInfo = candidatesWithName.find((c: any) => c.technology && normalize(c.technology) === normalize(tech)) || null
+      if (!candidateInfo) {
+        const existingTechs = [...new Set(candidatesWithName.map((c: any) => c.technology).filter(Boolean))]
+        const errorMsg = existingTechs.length > 0
+          ? `Technology mismatch for "${name}" — Candidate has ${existingTechs.map(t => `"${t}"`).join(', ')} but Excel specifies "${tech}"`
+          : `Technology mismatch for "${name}" — Candidate has no technology but Excel specifies "${tech}"`
+        issues.push(errorMsg)
+        hasCriticalError = true
+        errors.push({ name, issues })
+        continue
+      }
     } else {
-      candidateInfo = candidatesWithName.find((c: any) => !c.technology) || null
-    }
-
-    if (!candidateInfo) {
-      const existingTechs = [...new Set(candidatesWithName.map((c: any) => c.technology).filter(Boolean))]
-      const errorMsg = existingTechs.length > 0
-        ? `Technology mismatch for "${name}" — Candidate has ${existingTechs.map(t => `"${t}"`).join(', ')} but Excel specifies "${tech || 'N/A'}"`
-        : `Technology mismatch for "${name}" — Candidate has no technology but Excel specifies "${tech}"`
-      issues.push(errorMsg)
-      hasCriticalError = true
-      errors.push({ name, issues })
-      continue
+      // Excel didn't specify technology — accept any match by name
+      candidateInfo = candidatesWithName[0]
     }
 
     // --- Step 3: Resolve primary employee ---
