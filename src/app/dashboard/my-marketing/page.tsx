@@ -102,7 +102,11 @@ export default async function MyMarketingPage() {
     }
   }
 
-  const enrichedRecords = mergedRecords.map(r => ({
+  // Filter out records whose candidate status is Closed
+  const closedCandidateNames = new Set((candidates || []).filter((c: any) => c.status === 'Closed').map((c: any) => c.Candidate_name))
+  const activeMergedRecords = mergedRecords.filter(r => !closedCandidateNames.has(r.name))
+
+  const enrichedRecords = activeMergedRecords.map(r => ({
     ...r,
     status: (r as any).status || 'Telephone Call',
     employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',

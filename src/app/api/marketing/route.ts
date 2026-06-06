@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
         })()
       : Promise.resolve({} as Record<string, string>),
     candidateNames.length > 0
-      ? supabase.from('Candidate_records').select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name').in('Candidate_name', candidateNames)
+      ? supabase.from('Candidate_records').select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name, status').in('Candidate_name', candidateNames)
       : Promise.resolve({ data: [] }),
     supabase.from('marketing_reminder_logs').select('marketing_record_id, sent_at').is('error', null).in('marketing_record_id', data.map(r => r.id)).order('sent_at', { ascending: false }),
   ])
@@ -77,6 +77,19 @@ export async function GET(req: NextRequest) {
   const ownerNames = ownerNamesResult
   const candidatesData = candidatesResult.data || []
   const reminderLogs = reminderResult.data || []
+
+  // Filter out records whose candidate status is Closed
+  const candidateStatusMap = new Map<string, string>()
+  for (const c of candidatesData as any[]) {
+    if (c.Candidate_name && c.status) candidateStatusMap.set(c.Candidate_name, c.status)
+  }
+  data = data.filter(r => {
+    const status = candidateStatusMap.get(r.name)
+    return !status || status !== 'Closed'
+  })
+  if (data.length === 0) {
+    return NextResponse.json({ records: [], timing: Date.now() - startTime })
+  }
 
   const candidateBackupIds = Array.from(new Set(candidatesData.map((c: any) => c.backup_employee_id).filter(Boolean))) as string[]
   const candidateOwnerIds = Array.from(new Set(candidatesData.map((c: any) => c.owner_id).filter(Boolean))) as string[]

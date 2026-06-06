@@ -143,14 +143,6 @@ export async function PUT(req: NextRequest) {
       continue
     }
 
-    // Check if candidate status is Closed - reject
-    if (candidateInfo.status === 'Closed') {
-      issues.push(`Candidate "${name}" is Closed`)
-      hasCriticalError = true
-      errors.push({ name, issues })
-      continue
-    }
-
     // --- Step 2: Resolve primary employee ---
     let primaryUserId: string | null = null
     let primaryUserName: string | null = null

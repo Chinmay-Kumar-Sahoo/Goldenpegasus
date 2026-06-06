@@ -11,7 +11,7 @@ export default async function AdminMarketingPage() {
     supabase.from('marketing_records').select('*').order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
     supabase.from('employees').select('user_id, full_name, email'),
-    supabase.from('Candidate_records').select('id, Candidate_name, technology, owner_id, status, backup_employee_id'),
+    supabase.from('Candidate_records').select('id, Candidate_name, technology, owner_id, status, backup_employee_id, backup_employee_name'),
   ])
 
   const records = (recordsResult.data || []).map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
@@ -72,7 +72,11 @@ export default async function AdminMarketingPage() {
     }
   }
 
-  const enrichedRecords = records.map(r => ({
+  // Filter out records whose candidate status is Closed
+  const closedCandidateNames = new Set((candidatesResult.data || []).filter((c: any) => c.status === 'Closed').map((c: any) => c.Candidate_name))
+  const activeRecords = records.filter(r => !closedCandidateNames.has(r.name))
+
+  const enrichedRecords = activeRecords.map(r => ({
     ...r,
     employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
     backup_employee_name: backupNamesByCandidate[r.name] || null,

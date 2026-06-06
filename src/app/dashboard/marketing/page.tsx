@@ -39,16 +39,19 @@ export default async function AllMarketingPage() {
   const candidateNames = records.map(r => r.name).filter(Boolean) as string[]
   let backupNamesByCandidate: Record<string, string> = {}
   let primaryOwnerByCandidate: Record<string, string> = {}
+  let candidates: any[] = []
 
   if (candidateNames.length > 0) {
-    const { data: candidates } = await supabase
+    const { data: candidatesData } = await supabase
       .from('Candidate_records')
-      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name')
+      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status')
       .in('Candidate_name', candidateNames)
 
+    candidates = candidatesData || []
+
     const allCandidateIds = Array.from(new Set([
-      ...(candidates || []).map((c: any) => c.backup_employee_id).filter(Boolean),
-      ...(candidates || []).map((c: any) => c.owner_id).filter(Boolean),
+      ...candidates.map((c: any) => c.backup_employee_id).filter(Boolean),
+      ...candidates.map((c: any) => c.owner_id).filter(Boolean),
     ])) as string[]
 
     const missingIds = allCandidateIds.filter(id => !ownerNames[id])
@@ -65,7 +68,7 @@ export default async function AllMarketingPage() {
       }
     }
 
-    for (const c of (candidates || []) as any[]) {
+    for (const c of candidates as any[]) {
       const name = c.backup_employee_name || (c.backup_employee_id ? ownerNames[c.backup_employee_id] : null)
       if (name) backupNamesByCandidate[c.Candidate_name] = name
       if (c.owner_id && ownerNames[c.owner_id]) {
@@ -74,7 +77,11 @@ export default async function AllMarketingPage() {
     }
   }
 
-  const enriched = records.map(r => ({
+  // Filter out records whose candidate status is Closed
+  const closedCandidateNames = new Set((candidates || []).filter((c: any) => c.status === 'Closed').map((c: any) => c.Candidate_name))
+  const activeRecords = records.filter(r => !closedCandidateNames.has(r.name))
+
+  const enriched = activeRecords.map(r => ({
     ...r,
     employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
     backup_employee_name: backupNamesByCandidate[r.name] || null,
