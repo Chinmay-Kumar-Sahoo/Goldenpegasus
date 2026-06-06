@@ -27,19 +27,33 @@ export async function PUT(req: NextRequest) {
   }
 
   // Gather unique candidate names, technologies, and employee names from the import
-  const candidateNames = [...new Set(records.map((r: any) => r.name).filter(Boolean))] as string[]
+  const rawCandidateNames = [...new Set(records.map((r: any) => (r.name || '').trim()).filter(Boolean))] as string[]
   const technologies = [...new Set(records.map((r: any) => r.technology).filter(Boolean))] as string[]
   const primaryNames = [...new Set(records.map((r: any) => (r.employee_name || '').trim()).filter(Boolean))] as string[]
 
-  // Fetch Candidate_records with both name and technology
+  // Fetch Candidate_records with both name and technology (exact match first)
   let candidatesData: any[] = []
-  if (candidateNames.length > 0) {
+  if (rawCandidateNames.length > 0) {
     const client = supabaseAdmin || supabase
     const { data } = await client
       .from('Candidate_records')
       .select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name, status')
-      .in('Candidate_name', candidateNames)
+      .in('Candidate_name', rawCandidateNames)
     candidatesData = data || []
+
+    // Fallback: case-insensitive matching for candidate names not found by exact match
+    const foundCandidateNames = new Set(candidatesData.map(c => normalize(c.Candidate_name)))
+    const unmatchedCandidates = rawCandidateNames.filter(n => !foundCandidateNames.has(normalize(n)))
+    for (const cName of unmatchedCandidates) {
+      const client = supabaseAdmin || supabase
+      const { data: fallback } = await client
+        .from('Candidate_records')
+        .select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name, status')
+        .ilike('Candidate_name', cName)
+      if (fallback) {
+        candidatesData = [...candidatesData, ...fallback]
+      }
+    }
   }
 
   // Fetch profiles and employees to resolve names (exact match first)
