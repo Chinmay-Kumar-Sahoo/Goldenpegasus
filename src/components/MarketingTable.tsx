@@ -101,6 +101,7 @@ const DATE_COLUMNS: Record<string, string> = {
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'name',
   'Employee': 'employee_name',
+  'Technology': 'technology',
   'Status': 'status',
   'Recruiter Organization': 'recruiter_name',
   'Recruiter Email': 'recruiter_email',
@@ -111,7 +112,7 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Interviewer Email': 'interviewer_email',
 }
 
-const LOCKABLE_FIELDS = new Set(['name', 'date', 'employee_name', 'backup_employee_name'])
+const LOCKABLE_FIELDS = new Set(['name', 'employee_name', 'backup_employee_name'])
 
 const PAGE_SIZES = [25, 50, 100] as const
 
@@ -180,7 +181,7 @@ export default function MarketingPage({
   initialRecords?: MarketingRecord[]
   initialOwnerNames?: Record<string, string>
   employeeOptions?: Array<{ id: string; full_name: string }>
-  candidateOptions?: Array<{ id: string; name: string; owner_id: string; owner_name?: string | null; status: string | null; backup_employee_id?: string | null; backup_employee_name?: string | null }>
+  candidateOptions?: Array<{ id: string; name: string; technology?: string | null; owner_id: string; owner_name?: string | null; status: string | null; backup_employee_id?: string | null; backup_employee_name?: string | null }>
 }) {
   const showEmployeeColumn = isAdmin || readOnly
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -495,6 +496,25 @@ export default function MarketingPage({
       if (month !== undefined) return toISODate(+hyphenMon[3], month, +hyphenMon[2])
     }
 
+    // --- Format: "YYYY Mon DD" or "YYYY Month DD" (e.g. "2025 Jun 17", "2025 June 17") ---
+    const ymdText = text.match(/^(\d{4})\s+([A-Za-z]+)\s+(\d{1,2})$/)
+    if (ymdText) {
+      const month = MONTH_NAMES[ymdText[2].toLowerCase()]
+      if (month !== undefined) return toISODate(+ymdText[1], month, +ymdText[3])
+    }
+
+    // --- Format: "DD Mon YYYY" with single-letter separators like dots or slashes (e.g. "17.Jun.2025") ---
+    const dMonY = text.match(/^(\d{1,2})[\.\/\s]([A-Za-z]+)[\.\/\s](\d{4})$/)
+    if (dMonY) {
+      const month = MONTH_NAMES[dMonY[2].toLowerCase()]
+      if (month !== undefined) return toISODate(+dMonY[3], month, +dMonY[1])
+    }
+    const mDoty = text.match(/^([A-Za-z]+)[\.\/\s](\d{1,2})[\.\/\s](\d{4})$/)
+    if (mDoty) {
+      const month = MONTH_NAMES[mDoty[1].toLowerCase()]
+      if (month !== undefined) return toISODate(+mDoty[3], month, +mDoty[2])
+    }
+
     // --- Numeric formats with separators: DD/MM/YYYY, DD.MM.YYYY, DD-MM-YYYY, DD MM YYYY ---
     const numericParts = text.match(/^(\d{1,2})[\/\.\-\s](\d{1,2})[\/\.\-\s](\d{4})$/)
     if (numericParts) {
@@ -507,8 +527,21 @@ export default function MarketingPage({
     }
 
     // --- YYYY/MM/DD, YYYY.MM.DD, YYYY-MM-DD (non-standard separators) ---
-    const ymdText = text.match(/^(\d{4})[\/\.\-\s](\d{1,2})[\/\.\-\s](\d{1,2})$/)
-    if (ymdText) return toISODate(+ymdText[1], +ymdText[2] - 1, +ymdText[3])
+    const ymdNum = text.match(/^(\d{4})[\/\.\-\s](\d{1,2})[\/\.\-\s](\d{1,2})$/)
+    if (ymdNum) return toISODate(+ymdNum[1], +ymdNum[2] - 1, +ymdNum[3])
+
+    // --- Handle "YYYYMMDD" (compact format, no separators) ---
+    const compact = text.match(/^(\d{4})(\d{2})(\d{2})$/)
+    if (compact) return toISODate(+compact[1], +compact[2] - 1, +compact[3])
+
+    // --- Handle "DDMMYYYY" and "MMDDYYYY" (compact, no separators) ---
+    const dmyCompact = text.match(/^(\d{2})(\d{2})(\d{4})$/)
+    if (dmyCompact) {
+      const a = +dmyCompact[1], b = +dmyCompact[2], y = +dmyCompact[3]
+      if (a > 12 && b <= 12) return toISODate(y, b - 1, a)  // DD MM YYYY
+      if (a <= 12 && b > 12) return toISODate(y, a - 1, b)  // MM DD YYYY
+      return toISODate(y, b - 1, a)  // default: DD MM YYYY (Indian)
+    }
 
     // Could not parse — store as null
     return null
@@ -604,6 +637,24 @@ export default function MarketingPage({
       : candidateOptions.filter(c => c.owner_id === currentUserIdRef.current || c.backup_employee_id === currentUserIdRef.current)
     return available.filter(c => c.status !== 'Closed')
   }, [candidateOptions, isAdmin, editing])
+
+  const handleCandidateSelect = (candidateName: string) => {
+    const candidate = candidateOptions.find(c => c.name === candidateName)
+    let empName = '', backupName = '', empId = '', tech = ''
+    if (candidate) {
+      if (candidate.owner_name) {
+        empName = candidate.owner_name
+      } else if (candidate.owner_id) {
+        const emp = employeeOptions.find(e => e.id === candidate.owner_id)
+        if (emp) empName = emp.full_name
+      }
+      backupName = candidate.backup_employee_name || ''
+      empId = candidate.owner_id || ''
+      tech = candidate.technology || ''
+    }
+    setForm(prev => ({ ...prev, name: candidateName, employee_name: empName, backup_employee_name: backupName, technology: tech }))
+    if (isAdmin) setSelectedEmployeeId(empId)
+  }
 
   const inRange = (val: string | null, range: { start: string; end: string }) => {
     if (!range.start && !range.end) return true
@@ -982,8 +1033,9 @@ export default function MarketingPage({
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
                   <input type="text" value={form.backup_employee_name || ''} onChange={e => setForm({ ...form, backup_employee_name: e.target.value })}
-                    disabled={!!form.name && !!form.backup_employee_name}
+                    disabled={!editing && !!form.name}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 disabled:opacity-50 disabled:cursor-not-allowed" />
+                  {!editing && !!form.name && <p className="text-[10px] text-[#71717a] mt-1">Auto-filled from Candidate Records. Edit after saving.</p>}
                 </div>
               ) : (
                 <div className="col-span-2">
@@ -995,27 +1047,11 @@ export default function MarketingPage({
               {!editing ? (
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Candidate Name *</label>
-                  <select value={form.name} onChange={e => {
-                    const name = e.target.value
-                    const candidate = candidateOptions.find(c => c.name === name)
-                    let empName = '', backupName = '', empId = ''
-                    if (candidate) {
-                      if (candidate.owner_name) {
-                        empName = candidate.owner_name
-                      } else if (candidate.owner_id) {
-                        const emp = employeeOptions.find(e => e.id === candidate.owner_id)
-                        if (emp) empName = emp.full_name
-                      }
-                      backupName = candidate.backup_employee_name || ''
-                      empId = candidate.owner_id || ''
-                    }
-                    setForm({ ...form, name, employee_name: empName, backup_employee_name: backupName })
-                    if (isAdmin) setSelectedEmployeeId(empId)
-                  }} required
+                  <select value={form.name} onChange={e => handleCandidateSelect(e.target.value)} required
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">Select Candidate</option>
                     {filteredCandidates.map(c => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
+                      <option key={c.id} value={c.name}>{c.name}{c.technology ? ` (${c.technology})` : ''}</option>
                     ))}
                   </select>
                 </div>
@@ -1042,7 +1078,11 @@ export default function MarketingPage({
                 { label: 'Interviewer Email', name: 'interviewer_email', type: 'email', span: 1 },
                 { label: 'Comments', name: 'notes', type: 'textarea', span: 2 },
               ].map(field => {
-                const locked = field.name === 'date' || (!!editing && (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]))
+                const locked = field.name === 'date'
+                  ? !isAdmin && !!editing
+                  : field.name === 'technology'
+                    ? !editing && !!form.name
+                    : (!!editing && (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]))
                 return (
                 <div key={field.name} className={field.span === 2 ? 'col-span-2' : ''}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>

@@ -26,30 +26,42 @@ export async function PUT(req: NextRequest) {
     return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime())
   }
 
-  // Gather unique candidate names and employee names from the import
+  // Gather unique candidate names, technologies, and employee names from the import
   const candidateNames = [...new Set(records.map((r: any) => r.name).filter(Boolean))] as string[]
+  const technologies = [...new Set(records.map((r: any) => r.technology).filter(Boolean))] as string[]
   const primaryNames = [...new Set(records.map((r: any) => r.employee_name).filter(Boolean))] as string[]
 
-  // Fetch existing data: Candidate_records (full), profiles, employees
-  const [candidatesResult, profilesResult, employeesResult] = await Promise.all([
-    (supabaseAdmin || supabase)
+  // Fetch Candidate_records with both name and technology
+  let candidatesData: any[] = []
+  if (candidateNames.length > 0) {
+    const client = supabaseAdmin || supabase
+    const { data } = await client
       .from('Candidate_records')
-      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name')
-      .in('Candidate_name', candidateNames.length > 0 ? candidateNames : ['']),
+      .select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name, status')
+      .in('Candidate_name', candidateNames)
+    candidatesData = data || []
+  }
+
+  // Fetch profiles and employees to resolve names
+  const [profilesResult, employeesResult] = await Promise.all([
     supabase.from('profiles').select('id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
     supabase.from('employees').select('user_id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
   ])
 
-  // Build candidate info map (from Candidate_records)
-  const candidateInfoMap = new Map<string, { owner_id?: string; backup_employee_id?: string; backup_employee_name?: string; Candidate_name: string }>()
-  for (const c of (candidatesResult.data || [])) {
-    if (c.Candidate_name) candidateInfoMap.set(normalize(c.Candidate_name), c)
+  // Build employee name-to-ID map
+  const primaryEmployeeMap = new Map<string, string>()
+  const employeeIdToName = new Map<string, string>()
+  for (const p of (profilesResult.data || [])) {
+    if (p.full_name) { primaryEmployeeMap.set(normalize(p.full_name), p.id); employeeIdToName.set(p.id, p.full_name) }
+  }
+  for (const e of (employeesResult.data || [])) {
+    if (e.full_name) { primaryEmployeeMap.set(normalize(e.full_name), e.user_id); if (e.user_id && !employeeIdToName.has(e.user_id)) employeeIdToName.set(e.user_id, e.full_name) }
   }
 
   // Resolve names for IDs found in Candidate_records
   const allCandIds = [...new Set([
-    ...(candidatesResult.data || []).map((c: any) => c.owner_id).filter(Boolean),
-    ...(candidatesResult.data || []).map((c: any) => c.backup_employee_id).filter(Boolean),
+    ...candidatesData.map((c: any) => c.owner_id).filter(Boolean),
+    ...candidatesData.map((c: any) => c.backup_employee_id).filter(Boolean),
   ])] as string[]
   const idToName = new Map<string, string>()
   if (allCandIds.length > 0) {
@@ -61,64 +73,106 @@ export async function PUT(req: NextRequest) {
     for (const e of (be || [])) if (e.full_name) idToName.set(e.user_id, e.full_name)
   }
 
-  // Build employee name-to-ID map (from the import's employee_name column)
-  const primaryEmployeeMap = new Map<string, string>()
-  const employeeIdToName = new Map<string, string>()
-  for (const p of (profilesResult.data || [])) {
-    if (p.full_name) { primaryEmployeeMap.set(normalize(p.full_name), p.id); employeeIdToName.set(p.id, p.full_name) }
-  }
-  for (const e of (employeesResult.data || [])) {
-    if (e.full_name) { primaryEmployeeMap.set(normalize(e.full_name), e.user_id); if (e.user_id && !employeeIdToName.has(e.user_id)) employeeIdToName.set(e.user_id, e.full_name) }
+  // Build candidate lookup keys: "name|tech" -> candidate record
+  const candidateLookup = new Map<string, any>()
+  for (const c of candidatesData) {
+    const key = normalize(c.Candidate_name) + '|' + (c.technology ? normalize(c.technology) : '')
+    if (!candidateLookup.has(key)) {
+      candidateLookup.set(key, c)
+    }
+    // Also store under name-only key for fallback
+    const nameKey = normalize(c.Candidate_name) + '|'
+    if (!candidateLookup.has(nameKey)) {
+      candidateLookup.set(nameKey, c)
+    }
   }
 
   const now = new Date().toISOString()
   const validRecords: any[] = []
   const errors: { name: string; issues: string[] }[] = []
+  let hasCriticalError = false
 
   for (const r of records) {
     const issues: string[] = []
-    const candidateInfo = r.name ? candidateInfoMap.get(normalize(r.name)) : null
+    const name = r.name || ''
+    const tech = r.technology || ''
+    const lookupKey = normalize(name) + '|' + (tech ? normalize(tech) : '')
+    const nameOnlyKey = normalize(name) + '|'
 
-    // --- Resolve primary employee ---
+    // --- Step 1: Find candidate by Name + Technology ---
+    let candidateInfo = candidateLookup.get(lookupKey)
+    // If not found with tech, try name-only match (for candidates with null technology)
+    if (!candidateInfo) {
+      candidateInfo = candidateLookup.get(nameOnlyKey)
+    }
+
+    if (!candidateInfo) {
+      issues.push(`Candidate "${name}" not found in All Candidates Records`)
+      hasCriticalError = true
+      errors.push({ name, issues })
+      continue
+    }
+
+    // Check if candidate status is Closed - reject
+    if (candidateInfo.status === 'Closed') {
+      issues.push(`Candidate "${name}" is Closed`)
+      hasCriticalError = true
+      errors.push({ name, issues })
+      continue
+    }
+
+    // --- Step 2: Resolve primary employee ---
     let primaryUserId: string | null = null
+    let primaryUserName: string | null = null
     const empName = r.employee_name
 
     if (empName) {
-      // 1) Try direct name lookup
       primaryUserId = primaryEmployeeMap.get(normalize(empName)) || null
       if (!primaryUserId) {
-        // 2) Employee name from Excel not found — fall back to Candidate_records owner
-        primaryUserId = candidateInfo?.owner_id || null
-        if (!primaryUserId) {
-          // 3) Last resort — assign to the importing admin
-          primaryUserId = user.id
-          issues.push('Primary Employee Not Found — assigned to Admin')
-        } else {
-          issues.push('Employee name mismatch — using Candidate_records owner')
-        }
+        issues.push(`Employee "${empName}" not found in system`)
+        hasCriticalError = true
+        errors.push({ name: r.name || '', issues })
+        continue
       }
-    } else {
-      // No employee_name in Excel — use Candidate_records owner or admin
-      primaryUserId = candidateInfo?.owner_id || user.id
-      if (!candidateInfo?.owner_id) issues.push('No employee specified — assigned to Admin')
+      primaryUserName = empName
     }
 
-    // --- Resolve backup employee name (if not in Excel, pull from Candidate_records) ---
-    if (!r.backup_employee_name && candidateInfo?.backup_employee_name) {
-      r.backup_employee_name = candidateInfo.backup_employee_name
-    }
-    if (!r.backup_employee_name && candidateInfo?.backup_employee_id && idToName.has(candidateInfo.backup_employee_id)) {
-      r.backup_employee_name = idToName.get(candidateInfo.backup_employee_id)
+    // --- Step 3: Check if employee matches candidate record's primary employee ---
+    if (candidateInfo.owner_id && primaryUserId) {
+      const expectedOwnerName = idToName.get(candidateInfo.owner_id) || ''
+      if (primaryUserId !== candidateInfo.owner_id) {
+        // Check if this is just a name variant issue
+        const actualOwnerName = idToName.get(candidateInfo.owner_id) || ''
+        issues.push(`Record Mismatch — Candidate "${name}" with Technology "${tech || 'N/A'}" already assigned to "${actualOwnerName}" but Excel specifies "${empName}"`)
+        hasCriticalError = true
+        errors.push({ name: r.name || '', issues })
+        continue
+      }
     }
 
-    // Track reconciliation: does the assigned owner differ from what Candidate_records expects?
-    const needsReconcile = candidateInfo?.owner_id && candidateInfo.owner_id !== primaryUserId
+    // --- Step 4: Fetch Backup Employee from Candidate_records ---
+    let backupEmployeeName = r.backup_employee_name || ''
+    if (!backupEmployeeName && candidateInfo.backup_employee_name) {
+      backupEmployeeName = candidateInfo.backup_employee_name
+    }
+    if (!backupEmployeeName && candidateInfo.backup_employee_id && idToName.has(candidateInfo.backup_employee_id)) {
+      backupEmployeeName = idToName.get(candidateInfo.backup_employee_id) || ''
+    }
 
-    r._owner_id = primaryUserId
-    r._candidateExists = !!candidateInfo
-    r._needsReconcile = !!needsReconcile
-    r._candidateActualName = candidateInfo?.Candidate_name || r.name
+    r._owner_id = primaryUserId || candidateInfo.owner_id || user.id
+    r._employee_name = primaryUserName || idToName.get(r._owner_id) || r.employee_name || null
+    r._backup_employee_name = backupEmployeeName || null
     validRecords.push(r)
+  }
+
+  // If any critical errors, reject entire batch
+  if (hasCriticalError) {
+    return NextResponse.json({
+      error: 'Import validation failed. No records were imported.',
+      errors,
+      imported: 0,
+      total: records.length,
+    }, { status: 400 })
   }
 
   const insertedList: Array<{ id: string; name: string; owner_id: string }> = []
@@ -142,7 +196,8 @@ export async function PUT(req: NextRequest) {
       implementation_poc_email: r.implementation_poc_email || null,
       interviewer_email: r.interviewer_email || null,
       notes: r.notes || null,
-      employee_name: r._needsReconcile ? 'Admin' : (employeeIdToName.get(r._owner_id) || r.employee_name || null),
+      employee_name: r._employee_name || null,
+      backup_employee_name: r._backup_employee_name || null,
       owner_id: r._owner_id || user.id,
       created_at: now,
       updated_at: now,
@@ -157,16 +212,14 @@ export async function PUT(req: NextRequest) {
 
     for (const item of (inserted || [])) insertedList.push(item)
 
-    // --- Update Candidate_records with owner / backup info ---
+    // --- Update Candidate_records with backup owner info ---
     if (supabaseAdmin) {
-      const candidateUpdates = new Map<string, { primaryUserId?: string; backupName?: string }>()
+      const candidateUpdates = new Map<string, { backupName?: string }>()
       for (const r of validRecords) {
-        if (r._candidateExists && r.name) {
-          const existing = candidateUpdates.get(r._candidateActualName) || {}
-          if (r._owner_id) existing.primaryUserId = r._owner_id
-          const backupName = r.backup_employee_name
-          if (backupName) existing.backupName = backupName
-          candidateUpdates.set(r._candidateActualName, existing)
+        if (r._backup_employee_name && r.name) {
+          const existing = candidateUpdates.get(normalize(r.name)) || {}
+          if (r._backup_employee_name) existing.backupName = r._backup_employee_name
+          candidateUpdates.set(normalize(r.name), existing)
         }
       }
       if (candidateUpdates.size > 0) {
@@ -182,7 +235,6 @@ export async function PUT(req: NextRequest) {
         }
         for (const [actualCandidateName, update] of candidateUpdates) {
           const candidatePayload: any = {}
-          if (update.primaryUserId) candidatePayload.owner_id = update.primaryUserId
           if (update.backupName) {
             const userId = backupNameToId.get(normalize(update.backupName))
             if (userId) {
@@ -194,33 +246,6 @@ export async function PUT(req: NextRequest) {
             await supabaseAdmin.from('Candidate_records').update(candidatePayload).eq('Candidate_name', actualCandidateName)
           }
         }
-      }
-    }
-
-    // --- Post-import reconciliation: fix records where owner mismatches Candidate_records ---
-    const reconcileRecords = validRecords.filter((r: any) => r._needsReconcile)
-    if (reconcileRecords.length > 0) {
-      const reconcileNames = reconcileRecords.map((r: any) => r.name).filter(Boolean) as string[]
-      // Find the inserted IDs for these names
-      const insertedByName = new Map<string, string[]>()
-      for (const item of insertedList) {
-        if (item.name) {
-          const existing = insertedByName.get(normalize(item.name)) || []
-          existing.push(item.id)
-          insertedByName.set(normalize(item.name), existing)
-        }
-      }
-      const idsToReconcile: string[] = []
-      for (const r of reconcileRecords) {
-        const ids = r.name ? insertedByName.get(normalize(r.name)) : undefined
-        if (ids) idsToReconcile.push(...ids)
-      }
-      if (idsToReconcile.length > 0) {
-        // Set employee_name to 'Admin' and clear any backup references
-        await supabase
-          .from('marketing_records')
-          .update({ employee_name: 'Admin', updated_at: now })
-          .in('id', idsToReconcile)
       }
     }
 

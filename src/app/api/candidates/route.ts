@@ -71,6 +71,9 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const isAdminUser = profile?.role === 'admin'
+
   const body = await req.json()
   const { selectedEmployeeId, backupEmployeeId, employee_name, ...recordData } = body
 
@@ -101,23 +104,44 @@ export async function POST(req: NextRequest) {
       .eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    if (selectedEmployeeId) {
-      const { data: candidate } = await supabase
-        .from('Candidate_records')
-        .select('Candidate_name')
-        .eq('id', body.id)
-        .single()
+    // Get candidate name for syncing marketing records
+    const { data: candidate } = await supabase
+      .from('Candidate_records')
+      .select('Candidate_name, owner_id')
+      .eq('id', body.id)
+      .single()
 
-      if (candidate?.Candidate_name) {
-        const [profileResult, employeeResult] = await Promise.all([
+    if (candidate?.Candidate_name) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+      const supabaseAdmin = serviceRoleKey
+        ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+        : null
+
+      // Sync owner_id change to all related marketing records
+      if (selectedEmployeeId) {
+        const [pResult, eResult] = await Promise.all([
           supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId).maybeSingle(),
           supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId).maybeSingle(),
         ])
-        let empName = profileResult.data?.full_name || employeeResult.data?.full_name || ''
+        const empName = pResult.data?.full_name || eResult.data?.full_name || ''
 
-        await supabase
+        const client = supabaseAdmin || supabase
+        await client
           .from('marketing_records')
           .update({ owner_id: selectedEmployeeId, employee_name: empName || null, updated_at: new Date().toISOString() })
+          .eq('name', candidate.Candidate_name)
+      }
+
+      // Sync backup_employee change to related marketing records
+      if (backupEmployeeId !== undefined) {
+        const client = supabaseAdmin || supabase
+        await client
+          .from('marketing_records')
+          .update({
+            backup_employee_name: backupName,
+            updated_at: new Date().toISOString(),
+          })
           .eq('name', candidate.Candidate_name)
       }
     }

@@ -15,9 +15,27 @@ export default async function MyMarketingPage() {
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : null
 
+  // Fetch employee options for the component
+  const [empProfilesResult, empFromTableResult] = await Promise.all([
+    supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
+    supabase.from('employees').select('user_id, full_name, email'),
+  ])
+
+  const empMap = new Map(((empFromTableResult?.data || []) as any[]).map((e: any) => [e.user_id, e]))
+  const profileIds = new Set((empProfilesResult.data || []).map((p: any) => p.id))
+  const employeeOptions = (empProfilesResult.data || []).map((p: any) => {
+    const emp = empMap.get(p.id)
+    return { id: p.id, full_name: emp?.full_name || p.full_name || p.email || 'Unknown' }
+  })
+  for (const e of ((empFromTableResult?.data || []) as any[])) {
+    if (e.user_id && !profileIds.has(e.user_id)) {
+      employeeOptions.push({ id: e.user_id, full_name: e.full_name || e.email || 'Unknown' })
+    }
+  }
+
   const candidateQuery = supabaseAdmin
-    ? supabaseAdmin.from('Candidate_records').select('id, Candidate_name, owner_id, status, backup_employee_id').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
-    : supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status, backup_employee_id').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+    ? supabaseAdmin.from('Candidate_records').select('id, Candidate_name, technology, owner_id, status, backup_employee_id').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+    : supabase.from('Candidate_records').select('id, Candidate_name, technology, owner_id, status, backup_employee_id').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
   const { data: candidates } = await candidateQuery
 
   const ownedCandidateNames = (candidates || []).filter(c => c.owner_id === uid).map(c => c.Candidate_name)
@@ -51,8 +69,12 @@ export default async function MyMarketingPage() {
     }
   }
 
+  // Also ensure employeeOptions entries are in ownerNames
+  for (const opt of employeeOptions) {
+    if (!ownerNames[opt.id]) ownerNames[opt.id] = opt.full_name
+  }
+
   // Resolve backup employee names from candidates
-  // Include backup employee IDs not already in ownerNames
   const candidateBackupIds = Array.from(new Set((candidates || []).map((c: any) => c.backup_employee_id).filter(Boolean))) as string[]
   const candidateOwnerIds = Array.from(new Set((candidates || []).map((c: any) => c.owner_id).filter(Boolean))) as string[]
   const allCandidateIds = Array.from(new Set([...candidateBackupIds, ...candidateOwnerIds]))
@@ -90,6 +112,7 @@ export default async function MyMarketingPage() {
   const candidateOptions = (candidates || []).map((c: any) => ({
     id: c.id,
     name: c.Candidate_name,
+    technology: (c as any).technology || null,
     owner_id: c.owner_id,
     status: c.status,
     backup_employee_id: c.backup_employee_id,
@@ -103,6 +126,7 @@ export default async function MyMarketingPage() {
       currentUserId={uid}
       initialRecords={enrichedRecords}
       initialOwnerNames={ownerNames}
+      employeeOptions={employeeOptions}
       candidateOptions={candidateOptions}
     />
   )

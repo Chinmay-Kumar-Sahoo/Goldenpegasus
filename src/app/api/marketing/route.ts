@@ -1,8 +1,9 @@
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -68,17 +69,17 @@ export async function GET(req: NextRequest) {
         })()
       : Promise.resolve({} as Record<string, string>),
     candidateNames.length > 0
-      ? supabase.from('Candidate_records').select('Candidate_name, owner_id, backup_employee_id, backup_employee_name').in('Candidate_name', candidateNames)
+      ? supabase.from('Candidate_records').select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name').in('Candidate_name', candidateNames)
       : Promise.resolve({ data: [] }),
     supabase.from('marketing_reminder_logs').select('marketing_record_id, sent_at').is('error', null).in('marketing_record_id', data.map(r => r.id)).order('sent_at', { ascending: false }),
   ])
 
   const ownerNames = ownerNamesResult
-  const candidates = candidatesResult.data || []
+  const candidatesData = candidatesResult.data || []
   const reminderLogs = reminderResult.data || []
 
-  const candidateBackupIds = Array.from(new Set(candidates.map((c: any) => c.backup_employee_id).filter(Boolean))) as string[]
-  const candidateOwnerIds = Array.from(new Set(candidates.map((c: any) => c.owner_id).filter(Boolean))) as string[]
+  const candidateBackupIds = Array.from(new Set(candidatesData.map((c: any) => c.backup_employee_id).filter(Boolean))) as string[]
+  const candidateOwnerIds = Array.from(new Set(candidatesData.map((c: any) => c.owner_id).filter(Boolean))) as string[]
   const missingIds = Array.from(new Set([...candidateBackupIds, ...candidateOwnerIds])).filter(id => !ownerNames[id])
 
   if (missingIds.length > 0) {
@@ -94,9 +95,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Build lookup by candidate name
   const backupNamesByCandidate: Record<string, string> = {}
   const primaryOwnerByCandidate: Record<string, string> = {}
-  for (const c of candidates as any[]) {
+  for (const c of candidatesData as any[]) {
     const name = c.backup_employee_name || (c.backup_employee_id ? ownerNames[c.backup_employee_id] : null)
     if (name) backupNamesByCandidate[c.Candidate_name] = name
     if (c.owner_id && ownerNames[c.owner_id]) {
@@ -123,47 +125,100 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { selectedEmployeeId, backup_employee_name: importBackupName, ...recordData } = body
+  const { selectedEmployeeId, ...recordData } = body
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const isAdminUser = profile?.role === 'admin'
 
   let effectiveOwnerId = user.id
+  let employeeName = recordData.employee_name || null
 
-  if (selectedEmployeeId) {
+  // When creating a new record with candidate name + technology, auto-fill from Candidate_records
+  if (!body.id && recordData.name) {
+    const { data: candidates } = await supabase
+      .from('Candidate_records')
+      .select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name')
+      .eq('Candidate_name', recordData.name)
+
+    let matchedCandidate: any = null
+    if (candidates && candidates.length > 0) {
+      // Try to match by technology first
+      if (recordData.technology) {
+        matchedCandidate = candidates.find((c: any) =>
+          c.technology && c.technology.toLowerCase() === recordData.technology.toLowerCase()
+        )
+      }
+      // Fall back to first match
+      if (!matchedCandidate) {
+        matchedCandidate = candidates[0]
+      }
+    }
+
+    if (matchedCandidate) {
+      if (selectedEmployeeId) {
+        effectiveOwnerId = selectedEmployeeId
+        const [pResult, eResult] = await Promise.all([
+          supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId).single(),
+          supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId).single(),
+        ])
+        employeeName = pResult.data?.full_name || eResult.data?.full_name || null
+      } else {
+        effectiveOwnerId = matchedCandidate.owner_id || user.id
+        // Resolve employee name
+        const ownerId = matchedCandidate.owner_id
+        if (ownerId) {
+          const [pResult, eResult] = await Promise.all([
+            supabase.from('profiles').select('full_name').eq('id', ownerId).single(),
+            supabase.from('employees').select('full_name').eq('user_id', ownerId).single(),
+          ])
+          employeeName = pResult.data?.full_name || eResult.data?.full_name || null
+        }
+      }
+
+      // Auto-fill backup employee name if not provided
+      if (!recordData.backup_employee_name && matchedCandidate.backup_employee_name) {
+        recordData.backup_employee_name = matchedCandidate.backup_employee_name
+      }
+      if (!recordData.backup_employee_name && matchedCandidate.backup_employee_id) {
+        const [pResult, eResult] = await Promise.all([
+          supabase.from('profiles').select('full_name').eq('id', matchedCandidate.backup_employee_id).single(),
+          supabase.from('employees').select('full_name').eq('user_id', matchedCandidate.backup_employee_id).single(),
+        ])
+        recordData.backup_employee_name = pResult.data?.full_name || eResult.data?.full_name || null
+      }
+    } else if (selectedEmployeeId) {
+      effectiveOwnerId = selectedEmployeeId
+      const [pResult, eResult] = await Promise.all([
+        supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId).single(),
+        supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId).single(),
+      ])
+      employeeName = pResult.data?.full_name || eResult.data?.full_name || null
+    }
+  } else if (selectedEmployeeId) {
     effectiveOwnerId = selectedEmployeeId
-    const [profileResult, employeeResult] = await Promise.all([
+    const [pResult, eResult] = await Promise.all([
       supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId).single(),
       supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId).single(),
     ])
-    if (profileResult.data?.full_name) recordData.employee_name = profileResult.data.full_name
-    if (employeeResult.data?.full_name) recordData.employee_name = employeeResult.data.full_name
-  } else if (!recordData.employee_name) {
-    const [profileResult, employeeResult] = await Promise.all([
-      supabase.from('profiles').select('full_name').eq('id', user.id).single(),
-      supabase.from('employees').select('full_name').eq('user_id', user.id).single(),
-    ])
-    if (profileResult.data?.full_name) recordData.employee_name = profileResult.data.full_name
-    if (employeeResult.data?.full_name) recordData.employee_name = employeeResult.data.full_name
+    employeeName = pResult.data?.full_name || eResult.data?.full_name || null
   }
 
-  if (importBackupName && body.name) {
-    const [backupProfileResult, backupEmployeeResult] = await Promise.all([
-      supabase.from('profiles').select('id').eq('full_name', importBackupName).maybeSingle(),
-      supabase.from('employees').select('user_id').eq('full_name', importBackupName).maybeSingle(),
+  // Update employee_name from effective owner if not set
+  if (!employeeName && effectiveOwnerId) {
+    const [pResult, eResult] = await Promise.all([
+      supabase.from('profiles').select('full_name').eq('id', effectiveOwnerId).single(),
+      supabase.from('employees').select('full_name').eq('user_id', effectiveOwnerId).single(),
     ])
-    const backupUserId = backupProfileResult.data?.id || backupEmployeeResult.data?.user_id
-    if (backupUserId) {
-      await supabase
-        .from('Candidate_records')
-        .update({ backup_employee_id: backupUserId, backup_employee_name: importBackupName })
-        .eq('Candidate_name', body.name)
-    }
+    employeeName = pResult.data?.full_name || eResult.data?.full_name || null
   }
 
   if (body.id) {
+    // --- EDITING EXISTING RECORD ---
     const { data: existingRecord } = await supabase
       .from('marketing_records')
       .select('owner_id, name')
@@ -173,9 +228,6 @@ export async function POST(req: NextRequest) {
     if (!existingRecord) {
       return NextResponse.json({ error: 'Record not found' }, { status: 404 })
     }
-
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    const isAdminUser = profile?.role === 'admin'
 
     if (!isAdminUser && existingRecord.owner_id !== user.id) {
       const { data: candidate } = await supabase
@@ -199,11 +251,52 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const { date, technology, employee_name: _, backup_employee_name: __, ...updatableFields } = recordData
+    const updatePayload: any = { ...updatableFields, updated_at: new Date().toISOString() }
+
+    // Admin can edit date
+    if (isAdminUser && date !== undefined) {
+      updatePayload.date = date || null
+    }
+
+    // Admin can edit employee_name on existing records
+    if (isAdminUser && employeeName) {
+      updatePayload.employee_name = employeeName
+      if (effectiveOwnerId) {
+        updatePayload.owner_id = effectiveOwnerId
+      }
+    }
+
+    // Preserve existing technology if not being changed
+    if (technology !== undefined) {
+      updatePayload.technology = technology || null
+    }
+
     const { error } = await client
       .from('marketing_records')
-      .update({ ...recordData, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // If admin changed owner, sync to Candidate_records and related marketing records
+    if (isAdminUser && effectiveOwnerId && effectiveOwnerId !== existingRecord.owner_id) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+      if (serviceRoleKey) {
+        const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+        // Update Candidate_records owner
+        await adminClient
+          .from('Candidate_records')
+          .update({ owner_id: effectiveOwnerId, updated_at: new Date().toISOString() })
+          .eq('Candidate_name', existingRecord.name)
+
+        // Update all marketing records for this candidate to sync owner
+        await adminClient
+          .from('marketing_records')
+          .update({ owner_id: effectiveOwnerId, employee_name: employeeName, updated_at: new Date().toISOString() })
+          .eq('name', existingRecord.name)
+      }
+    }
 
     await supabase.from('audit_logs').insert({
       action: 'updated', entity_type: 'marketing_record', entity_id: body.id,
@@ -212,12 +305,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   }
 
+  // --- CREATING NEW RECORD ---
+  const insertData: any = {
+    ...recordData,
+    owner_id: effectiveOwnerId,
+    employee_name: employeeName || null,
+  }
+  delete insertData.selectedEmployeeId
+  delete insertData.id
+
   const { data: inserted, error } = await supabase
     .from('marketing_records')
-    .insert({ ...recordData, owner_id: effectiveOwnerId })
+    .insert(insertData)
     .select('id')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // If admin assigned a different employee, sync to Candidate_records
+  if (isAdminUser && selectedEmployeeId && recordData.name) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+    if (serviceRoleKey) {
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      await adminClient
+        .from('Candidate_records')
+        .update({ owner_id: selectedEmployeeId, updated_at: new Date().toISOString() })
+        .eq('Candidate_name', recordData.name)
+    }
+  }
 
   await supabase.from('audit_logs').insert({
     action: 'created', entity_type: 'marketing_record', entity_id: inserted?.id || '',
@@ -227,7 +342,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
