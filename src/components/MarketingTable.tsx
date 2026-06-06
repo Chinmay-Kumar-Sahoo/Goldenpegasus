@@ -433,16 +433,26 @@ export default function MarketingPage({
 
   const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
 
-  const formatExcelDate = (value: unknown, XLSX: any) => {
+  const MONTH_NAMES: Record<string, number> = {
+    jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+    apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+    aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
+    nov: 10, november: 10, dec: 11, december: 11,
+  }
+
+  const toISODate = (y: number, m: number, d: number): string | null => {
+    const dt = new Date(y, m, d)
+    return !Number.isNaN(dt.getTime()) ? dt.toISOString().slice(0, 10) : null
+  }
+
+  const formatExcelDate = (value: unknown, XLSX: any): string | null => {
     if (!value) return null
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
       return value.toISOString().slice(0, 10)
     }
     if (typeof value === 'number') {
       const parsed = XLSX.SSF.parse_date_code(value)
-      if (parsed) {
-        return `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`
-      }
+      if (parsed) return toISODate(parsed.y, parsed.m - 1, parsed.d)
     }
     let text = String(value).trim()
     if (!text) return null
@@ -450,43 +460,52 @@ export default function MarketingPage({
     // Strip ordinal suffixes: "17th" → "17", "1st" → "1", "2nd" → "2", "3rd" → "3"
     text = text.replace(/(\d+)(st|nd|rd|th)\b/gi, '$1')
 
-    // Try standard Date parsing
+    // Try standard Date parsing (handles ISO, MM/DD/YYYY, etc.)
     const parsed = new Date(text)
     if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
 
-    // Try "DD Month YYYY" (e.g. "17 June 2025")
-    const dmyMatch = text.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
-    if (dmyMatch) {
-      const MONTHS: Record<string, number> = {
-        jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
-        apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
-        aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
-        nov: 10, november: 10, dec: 11, december: 11,
-      }
-      const month = MONTHS[dmyMatch[2].toLowerCase()]
-      if (month !== undefined) {
-        const d = new Date(+dmyMatch[3], month, +dmyMatch[1])
-        if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10)
-      }
+    // --- Format: "DD Month YYYY" (e.g. "17 June 2025") ---
+    const dmyText = text.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
+    if (dmyText) {
+      const month = MONTH_NAMES[dmyText[2].toLowerCase()]
+      if (month !== undefined) return toISODate(+dmyText[3], month, +dmyText[1])
     }
 
-    // Try "Month DD, YYYY" or "Month DD YYYY" (e.g. "June 17, 2025")
-    const mdyMatch = text.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/)
-    if (mdyMatch) {
-      const MONTHS: Record<string, number> = {
-        jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
-        apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
-        aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
-        nov: 10, november: 10, dec: 11, december: 11,
-      }
-      const month = MONTHS[mdyMatch[1].toLowerCase()]
-      if (month !== undefined) {
-        const d = new Date(+mdyMatch[3], month, +mdyMatch[2])
-        if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10)
-      }
+    // --- Format: "Month DD, YYYY" or "Month DD YYYY" (e.g. "June 17, 2025") ---
+    const mdyText = text.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/)
+    if (mdyText) {
+      const month = MONTH_NAMES[mdyText[1].toLowerCase()]
+      if (month !== undefined) return toISODate(+mdyText[3], month, +mdyText[2])
     }
 
-    // Could not parse — store as null rather than passing invalid text to PostgreSQL
+    // --- Format: "DD-Mon-YYYY" or "Mon-DD-YYYY" with hyphens (e.g. "17-Jun-2025", "Jun-17-2025") ---
+    const hyphenText = text.match(/^(\d{1,2})-([A-Za-z]+)-(\d{4})$/)
+    if (hyphenText) {
+      const month = MONTH_NAMES[hyphenText[2].toLowerCase()]
+      if (month !== undefined) return toISODate(+hyphenText[3], month, +hyphenText[1])
+    }
+    const hyphenMon = text.match(/^([A-Za-z]+)-(\d{1,2})-(\d{4})$/)
+    if (hyphenMon) {
+      const month = MONTH_NAMES[hyphenMon[1].toLowerCase()]
+      if (month !== undefined) return toISODate(+hyphenMon[3], month, +hyphenMon[2])
+    }
+
+    // --- Numeric formats with separators: DD/MM/YYYY, DD.MM.YYYY, DD-MM-YYYY, DD MM YYYY ---
+    const numericParts = text.match(/^(\d{1,2})[\/\.\-\s](\d{1,2})[\/\.\-\s](\d{4})$/)
+    if (numericParts) {
+      const a = +numericParts[1], b = +numericParts[2], y = +numericParts[3]
+      // Indian context: prefer DD/MM/YYYY. If first is >12, must be day; if first ≤12, try DD/MM first
+      if (a > 12) return toISODate(y, b - 1, a)   // a=day, b=month
+      if (b > 12) return toISODate(y, a - 1, b)   // b=day, a=month
+      // Both ≤12: use DD/MM (Indian convention)
+      return toISODate(y, b - 1, a)
+    }
+
+    // --- YYYY/MM/DD, YYYY.MM.DD, YYYY-MM-DD (non-standard separators) ---
+    const ymdText = text.match(/^(\d{4})[\/\.\-\s](\d{1,2})[\/\.\-\s](\d{1,2})$/)
+    if (ymdText) return toISODate(+ymdText[1], +ymdText[2] - 1, +ymdText[3])
+
+    // Could not parse — store as null
     return null
   }
 

@@ -18,15 +18,6 @@ export async function PUT(req: NextRequest) {
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : null
 
-  const candidateNames = [...new Set(records.map((r: any) => r.name).filter(Boolean))] as string[]
-  const primaryNames = [...new Set(records.map((r: any) => r.employee_name).filter(Boolean))] as string[]
-
-  const [candidatesResult, profilesResult, employeesResult] = await Promise.all([
-    supabase.from('Candidate_records').select('Candidate_name').in('Candidate_name', candidateNames.length > 0 ? candidateNames : ['']),
-    supabase.from('profiles').select('id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
-    supabase.from('employees').select('user_id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
-  ])
-
   const normalize = (s: string) => s.toLowerCase().trim()
   const denormalize = (s: string) => s.trim()
 
@@ -35,24 +26,49 @@ export async function PUT(req: NextRequest) {
     return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime())
   }
 
-  const existingCandidates = new Set((candidatesResult.data || []).map((c: any) => normalize(c.Candidate_name)))
-  const candidateNameMap = new Map<string, string>()
+  // Gather unique candidate names and employee names from the import
+  const candidateNames = [...new Set(records.map((r: any) => r.name).filter(Boolean))] as string[]
+  const primaryNames = [...new Set(records.map((r: any) => r.employee_name).filter(Boolean))] as string[]
+
+  // Fetch existing data: Candidate_records (full), profiles, employees
+  const [candidatesResult, profilesResult, employeesResult] = await Promise.all([
+    (supabaseAdmin || supabase)
+      .from('Candidate_records')
+      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name')
+      .in('Candidate_name', candidateNames.length > 0 ? candidateNames : ['']),
+    supabase.from('profiles').select('id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
+    supabase.from('employees').select('user_id, full_name').in('full_name', primaryNames.length > 0 ? primaryNames : ['']),
+  ])
+
+  // Build candidate info map (from Candidate_records)
+  const candidateInfoMap = new Map<string, { owner_id?: string; backup_employee_id?: string; backup_employee_name?: string; Candidate_name: string }>()
   for (const c of (candidatesResult.data || [])) {
-    if (c.Candidate_name) candidateNameMap.set(normalize(c.Candidate_name), c.Candidate_name)
+    if (c.Candidate_name) candidateInfoMap.set(normalize(c.Candidate_name), c)
   }
+
+  // Resolve names for IDs found in Candidate_records
+  const allCandIds = [...new Set([
+    ...(candidatesResult.data || []).map((c: any) => c.owner_id).filter(Boolean),
+    ...(candidatesResult.data || []).map((c: any) => c.backup_employee_id).filter(Boolean),
+  ])] as string[]
+  const idToName = new Map<string, string>()
+  if (allCandIds.length > 0) {
+    const [{ data: bp }, { data: be }] = await Promise.all([
+      (supabaseAdmin || supabase).from('profiles').select('id, full_name').in('id', allCandIds),
+      (supabaseAdmin || supabase).from('employees').select('user_id, full_name').in('user_id', allCandIds),
+    ])
+    for (const p of (bp || [])) if (p.full_name) idToName.set(p.id, p.full_name)
+    for (const e of (be || [])) if (e.full_name) idToName.set(e.user_id, e.full_name)
+  }
+
+  // Build employee name-to-ID map (from the import's employee_name column)
   const primaryEmployeeMap = new Map<string, string>()
   const employeeIdToName = new Map<string, string>()
   for (const p of (profilesResult.data || [])) {
-    if (p.full_name) {
-      primaryEmployeeMap.set(normalize(p.full_name), p.id)
-      employeeIdToName.set(p.id, p.full_name)
-    }
+    if (p.full_name) { primaryEmployeeMap.set(normalize(p.full_name), p.id); employeeIdToName.set(p.id, p.full_name) }
   }
   for (const e of (employeesResult.data || [])) {
-    if (e.full_name) {
-      primaryEmployeeMap.set(normalize(e.full_name), e.user_id)
-      if (e.user_id && !employeeIdToName.has(e.user_id)) employeeIdToName.set(e.user_id, e.full_name)
-    }
+    if (e.full_name) { primaryEmployeeMap.set(normalize(e.full_name), e.user_id); if (e.user_id && !employeeIdToName.has(e.user_id)) employeeIdToName.set(e.user_id, e.full_name) }
   }
 
   const now = new Date().toISOString()
@@ -61,28 +77,51 @@ export async function PUT(req: NextRequest) {
 
   for (const r of records) {
     const issues: string[] = []
+    const candidateInfo = r.name ? candidateInfoMap.get(normalize(r.name)) : null
 
-    const candidateExists = r.name && existingCandidates.has(normalize(r.name))
-    if (!candidateExists && r.employee_name && !primaryEmployeeMap.has(normalize(r.employee_name))) {
-      issues.push('Candidate not in records and Primary Employee unresolved')
+    // --- Resolve primary employee ---
+    let primaryUserId: string | null = null
+    const empName = r.employee_name
+
+    if (empName) {
+      // 1) Try direct name lookup
+      primaryUserId = primaryEmployeeMap.get(normalize(empName)) || null
+      if (!primaryUserId) {
+        // 2) Employee name from Excel not found — fall back to Candidate_records owner
+        primaryUserId = candidateInfo?.owner_id || null
+        if (!primaryUserId) {
+          // 3) Last resort — assign to the importing admin
+          primaryUserId = user.id
+          issues.push('Primary Employee Not Found — assigned to Admin')
+        } else {
+          issues.push('Employee name mismatch — using Candidate_records owner')
+        }
+      }
+    } else {
+      // No employee_name in Excel — use Candidate_records owner or admin
+      primaryUserId = candidateInfo?.owner_id || user.id
+      if (!candidateInfo?.owner_id) issues.push('No employee specified — assigned to Admin')
     }
 
-    const primaryUserId = r.employee_name
-      ? (primaryEmployeeMap.get(normalize(r.employee_name)) || null)
-      : user.id
-
-    if (r.employee_name && !primaryUserId) {
-      issues.push('Primary Employee Not Found — record skipped')
-      errors.push({ name: r.name || '(empty)', issues })
-      continue
+    // --- Resolve backup employee name (if not in Excel, pull from Candidate_records) ---
+    if (!r.backup_employee_name && candidateInfo?.backup_employee_name) {
+      r.backup_employee_name = candidateInfo.backup_employee_name
     }
+    if (!r.backup_employee_name && candidateInfo?.backup_employee_id && idToName.has(candidateInfo.backup_employee_id)) {
+      r.backup_employee_name = idToName.get(candidateInfo.backup_employee_id)
+    }
+
+    // Track reconciliation: does the assigned owner differ from what Candidate_records expects?
+    const needsReconcile = candidateInfo?.owner_id && candidateInfo.owner_id !== primaryUserId
 
     r._owner_id = primaryUserId
-    r._candidateExists = candidateExists
+    r._candidateExists = !!candidateInfo
+    r._needsReconcile = !!needsReconcile
+    r._candidateActualName = candidateInfo?.Candidate_name || r.name
     validRecords.push(r)
   }
 
-  const insertedList: any[] = []
+  const insertedList: Array<{ id: string; name: string; owner_id: string }> = []
   if (validRecords.length > 0) {
     const insertRecords = validRecords.map((r: any) => ({
       name: r.name,
@@ -102,7 +141,7 @@ export async function PUT(req: NextRequest) {
       implementation_poc_email: r.implementation_poc_email || null,
       interviewer_email: r.interviewer_email || null,
       notes: r.notes || null,
-      employee_name: employeeIdToName.get(r._owner_id) || r.employee_name || null,
+      employee_name: r._needsReconcile ? 'Admin' : (employeeIdToName.get(r._owner_id) || r.employee_name || null),
       owner_id: r._owner_id || user.id,
       created_at: now,
       updated_at: now,
@@ -111,23 +150,22 @@ export async function PUT(req: NextRequest) {
     const { data: inserted, error } = await supabase
       .from('marketing_records')
       .insert(insertRecords)
-      .select('id, name')
+      .select('id, name, owner_id')
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     for (const item of (inserted || [])) insertedList.push(item)
 
+    // --- Update Candidate_records with owner / backup info ---
     if (supabaseAdmin) {
       const candidateUpdates = new Map<string, { primaryUserId?: string; backupName?: string }>()
       for (const r of validRecords) {
         if (r._candidateExists && r.name) {
-          const actualName = candidateNameMap.get(normalize(r.name))
-          if (actualName) {
-            const existing = candidateUpdates.get(actualName) || {}
-            if (r._owner_id) existing.primaryUserId = r._owner_id
-            if (r.backup_employee_name) existing.backupName = r.backup_employee_name
-            candidateUpdates.set(actualName, existing)
-          }
+          const existing = candidateUpdates.get(r._candidateActualName) || {}
+          if (r._owner_id) existing.primaryUserId = r._owner_id
+          const backupName = r.backup_employee_name
+          if (backupName) existing.backupName = backupName
+          candidateUpdates.set(r._candidateActualName, existing)
         }
       }
       if (candidateUpdates.size > 0) {
@@ -158,6 +196,34 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    // --- Post-import reconciliation: fix records where owner mismatches Candidate_records ---
+    const reconcileRecords = validRecords.filter((r: any) => r._needsReconcile)
+    if (reconcileRecords.length > 0) {
+      const reconcileNames = reconcileRecords.map((r: any) => r.name).filter(Boolean) as string[]
+      // Find the inserted IDs for these names
+      const insertedByName = new Map<string, string[]>()
+      for (const item of insertedList) {
+        if (item.name) {
+          const existing = insertedByName.get(normalize(item.name)) || []
+          existing.push(item.id)
+          insertedByName.set(normalize(item.name), existing)
+        }
+      }
+      const idsToReconcile: string[] = []
+      for (const r of reconcileRecords) {
+        const ids = r.name ? insertedByName.get(normalize(r.name)) : undefined
+        if (ids) idsToReconcile.push(...ids)
+      }
+      if (idsToReconcile.length > 0) {
+        // Set employee_name to 'Admin' and clear any backup references
+        await supabase
+          .from('marketing_records')
+          .update({ employee_name: 'Admin', updated_at: now })
+          .in('id', idsToReconcile)
+      }
+    }
+
+    // --- Audit log ---
     if (insertedList.length > 0) {
       await supabase.from('audit_logs').insert(
         insertedList.map((r: any) => ({ action: 'created', entity_type: 'marketing_record', entity_id: r.id, user_id: user.id, created_at: now }))
