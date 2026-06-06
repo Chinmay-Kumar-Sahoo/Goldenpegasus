@@ -187,6 +187,7 @@ export default function MarketingPage({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [clientCandidates, setClientCandidates] = useState<typeof candidateOptions>([])
   const todayIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
   const [records, setRecords] = useState<MarketingRecord[]>(() =>
     serverRecords.map(r => ({ ...r, employee_name: (r.employee_name || serverOwnerNames[r.owner_id] || 'Unknown employee').trim() }))
@@ -282,6 +283,30 @@ export default function MarketingPage({
       fetchRecords()
     }
   }, [fetchRecords])
+
+  // Fetch candidates from API if server-side options are empty
+  useEffect(() => {
+    if (candidateOptions.length > 0) return
+    const controller = new AbortController()
+    fetch('/api/candidates', { signal: controller.signal })
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (json?.records) {
+          setClientCandidates(json.records.map((r: any) => ({
+            id: r.id,
+            name: r.Candidate_name || r.name,
+            technology: r.technology || null,
+            owner_id: r.owner_id,
+            owner_name: r.employee_name || null,
+            status: r.status,
+            backup_employee_id: r.backup_employee_id,
+            backup_employee_name: r.backup_employee_name || null,
+          })))
+        }
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [candidateOptions.length])
 
   const handleSearchChange = useCallback((value: string) => {
     setSearchInput(value)
@@ -635,13 +660,24 @@ export default function MarketingPage({
     }
   }
 
+  const allCandidateOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const merged = [...candidateOptions, ...clientCandidates]
+    return merged.filter(c => {
+      const key = c.name + '|' + c.owner_id
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [candidateOptions, clientCandidates])
+
   const filteredCandidates = useMemo(() => {
     if (editing) return []
     const available = isAdmin
-      ? candidateOptions
-      : candidateOptions.filter(c => c.owner_id === currentUserIdRef.current || c.backup_employee_id === currentUserIdRef.current)
+      ? allCandidateOptions
+      : allCandidateOptions.filter(c => c.owner_id === currentUserIdRef.current || c.backup_employee_id === currentUserIdRef.current)
     return available.filter(c => c.status !== 'Closed')
-  }, [candidateOptions, isAdmin, editing])
+  }, [allCandidateOptions, isAdmin, editing])
 
   const handleCandidateSelect = (candidateName: string) => {
     const candidate = candidateOptions.find(c => c.name === candidateName)

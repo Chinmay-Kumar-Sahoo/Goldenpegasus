@@ -10,13 +10,14 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const ownerFilter = searchParams.get('owner_id')
 
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  const supabaseAdmin = serviceRoleKey
+    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : null
+  const lookupClient = supabaseAdmin || supabase
+
   let records: any[] = []
   if (ownerFilter) {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-    const supabaseAdmin = serviceRoleKey
-      ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-      : null
-
     const ownedQuery = supabase.from('Candidate_records').select('*').eq('owner_id', ownerFilter).order('created_at', { ascending: false })
     const backupQuery = supabaseAdmin
       ? supabaseAdmin.from('Candidate_records').select('*').eq('backup_employee_id', ownerFilter).order('created_at', { ascending: false })
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
     }
     records = Array.from(recordMap.values())
   } else {
-    const { data, error } = await supabase
+    const { data, error } = await lookupClient
       .from('Candidate_records')
       .select('*')
       .order('created_at', { ascending: false })
@@ -49,8 +50,8 @@ export async function GET(req: NextRequest) {
   const allIds = Array.from(new Set([...ownerIds, ...backupIds]))
 
   const [{ data: profiles }, { data: employees }] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, email').in('id', allIds.length > 0 ? allIds : ['']),
-    supabase.from('employees').select('user_id, full_name, email').in('user_id', allIds.length > 0 ? allIds : ['']),
+    lookupClient.from('profiles').select('id, full_name, email').in('id', allIds.length > 0 ? allIds : ['']),
+    lookupClient.from('employees').select('user_id, full_name, email').in('user_id', allIds.length > 0 ? allIds : ['']),
   ])
 
   const ownerNames: Record<string, string> = {}

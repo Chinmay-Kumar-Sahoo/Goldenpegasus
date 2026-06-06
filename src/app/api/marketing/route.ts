@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
@@ -6,6 +6,12 @@ export async function GET(req: NextRequest) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  const lookupClient = serviceRoleKey
+    ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : supabase
 
   const { searchParams } = new URL(req.url)
   const ownerFilter = searchParams.get('owner_id')
@@ -59,8 +65,8 @@ export async function GET(req: NextRequest) {
     ownerIds.length > 0
       ? (async () => {
           const [{ data: profiles }, { data: employees }] = await Promise.all([
-            supabase.from('profiles').select('id, full_name, email').in('id', ownerIds),
-            supabase.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
+            lookupClient.from('profiles').select('id, full_name, email').in('id', ownerIds),
+            lookupClient.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
           ])
           const names: Record<string, string> = {}
           for (const p of (profiles || [])) if (p.id) names[p.id] = p.full_name || p.email || 'Unknown employee'
@@ -69,7 +75,7 @@ export async function GET(req: NextRequest) {
         })()
       : Promise.resolve({} as Record<string, string>),
     candidateNames.length > 0
-      ? supabase.from('Candidate_records').select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name, status').in('Candidate_name', candidateNames)
+      ? lookupClient.from('Candidate_records').select('Candidate_name, technology, owner_id, backup_employee_id, backup_employee_name, status').in('Candidate_name', candidateNames)
       : Promise.resolve({ data: [] }),
     supabase.from('marketing_reminder_logs').select('marketing_record_id, sent_at').is('error', null).in('marketing_record_id', data.map(r => r.id)).order('sent_at', { ascending: false }),
   ])
@@ -97,8 +103,8 @@ export async function GET(req: NextRequest) {
 
   if (missingIds.length > 0) {
     const [{ data: bp }, { data: be }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email').in('id', missingIds),
-      supabase.from('employees').select('user_id, full_name, email').in('user_id', missingIds),
+      lookupClient.from('profiles').select('id, full_name, email').in('id', missingIds),
+      lookupClient.from('employees').select('user_id, full_name, email').in('user_id', missingIds),
     ])
     for (const p of (bp || []) as any[]) {
       if (p.id) ownerNames[p.id] = p.full_name || p.email || 'Unknown employee'
