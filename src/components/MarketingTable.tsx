@@ -1092,7 +1092,7 @@ export default function MarketingPage({
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">Select Candidate</option>
                     {filteredCandidates.map(c => (
-                      <option key={c.id} value={c.name}>{c.name}{c.technology ? ` (${c.technology})` : ''}</option>
+                      <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
                   </select>
                 </div>
