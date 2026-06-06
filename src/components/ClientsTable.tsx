@@ -357,6 +357,10 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
         if (val == null || val === '') val = fieldKey === 'status' ? 'Active' : null
         if (val != null) values.add(String(val).trim())
       }
+      // Always show core status options in the filter popover
+      if (fieldKey === 'status') {
+        for (const s of ['Active', 'In-active', 'Closed']) values.add(s)
+      }
       result[header] = Array.from(values).sort((a, b) => a.localeCompare(b))
     }
     return result
