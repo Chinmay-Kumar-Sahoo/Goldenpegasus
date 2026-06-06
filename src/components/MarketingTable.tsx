@@ -676,8 +676,16 @@ export default function MarketingPage({
     const available = isAdmin
       ? allCandidateOptions
       : allCandidateOptions.filter(c => c.owner_id === currentUserIdRef.current || c.backup_employee_id === currentUserIdRef.current)
-    return available.filter(c => c.status !== 'Closed')
+    return available
   }, [allCandidateOptions, isAdmin, editing])
+
+  const uniqueTechnologies = useMemo(() => {
+    const techs = new Set<string>()
+    for (const c of allCandidateOptions) {
+      if (c.technology) techs.add(c.technology)
+    }
+    return Array.from(techs).sort()
+  }, [allCandidateOptions])
 
   const handleCandidateSelect = (candidateName: string) => {
     const candidate = candidateOptions.find(c => c.name === candidateName)
@@ -1042,13 +1050,13 @@ export default function MarketingPage({
               {isAdmin && !editing && (
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee *</label>
-                  <select value={selectedEmployeeId} onChange={e => {
+                   <select value={selectedEmployeeId} onChange={e => {
                     const empId = e.target.value
                     setSelectedEmployeeId(empId)
                     const emp = employeeOptions.find(e => e.id === empId)
                     setForm({ ...form, employee_name: emp?.full_name || '' })
-                  }} required disabled={!!form.name && !!selectedEmployeeId}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 disabled:opacity-50 disabled:cursor-not-allowed">
+                  }} required
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">Select Primary Employee</option>
                     {employeeOptions.map(emp => (
                       <option key={emp.id} value={emp.id}>{emp.full_name}</option>
@@ -1122,12 +1130,18 @@ export default function MarketingPage({
                 const locked = field.name === 'date'
                   ? !editing
                   : field.name === 'technology'
-                    ? !editing && !!form.name
+                    ? false
                     : (!!editing && (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]))
                 return (
                 <div key={field.name} className={field.span === 2 ? 'col-span-2' : ''}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
-                  {field.type === 'select' ? (
+                  {field.name === 'technology' ? (
+                    <select value={form.technology || ''} onChange={e => setForm({ ...form, technology: e.target.value })} disabled={locked}
+                      className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      <option value="">Select Technology</option>
+                      {uniqueTechnologies.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  ) : field.type === 'select' ? (
                     <select value={form[field.name as keyof typeof form]} onChange={e => setForm({ ...form, [field.name]: e.target.value })} disabled={locked}
                       className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>
                       {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
