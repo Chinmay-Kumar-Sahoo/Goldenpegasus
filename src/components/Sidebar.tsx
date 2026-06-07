@@ -22,7 +22,7 @@ const adminNav: NavItem[] = [
   { label: 'Admin', href: '/admin/admins', icon: '🔑' },
   { label: 'Employees', href: '/admin/employees', icon: '👥' },
   { label: 'All Marketing', href: '/admin/marketing', icon: '📈' },
-  { label: 'Candidate Records', href: '/admin/clients', icon: '🤝' },
+  { label: 'All Candidate Records', href: '/admin/clients', icon: '🤝' },
   { label: 'Dynamic Tables', href: '/admin/tables', icon: '🏗️' },
   { label: 'Audit Logs', href: '/admin/audit', icon: '📋' },
   { label: 'Register Admin', href: '/admin/register', icon: '➕' },
