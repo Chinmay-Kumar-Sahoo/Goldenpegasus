@@ -22,6 +22,7 @@ interface CandidateRecord {
   employee_name?: string | null
   backup_employee_id?: string | null
   backup_employee_name?: string | null
+  technology?: string | null
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -40,6 +41,7 @@ const DATE_COLUMNS: Record<string, string> = {
 
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'Candidate_name',
+  'Technology': 'technology',
   'Email': 'Candidate_email',
   'Company': 'company_name',
   'Primary Employee': 'employee_name',
@@ -81,6 +83,7 @@ const TableRow = memo(function TableRow({
     <tr className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
       <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.Candidate_name}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.technology || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.client_phone || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.company_name || '—'}</td>
@@ -117,7 +120,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   const [editing, setEditing] = useState<CandidateRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '' })
+  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
@@ -215,11 +218,11 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   const openModal = (rec?: CandidateRecord) => {
     if (rec) {
       setEditing(rec)
-      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', contract_start: rec.contract_start || '', contract_end: rec.contract_end || '', project_type: rec.project_type || '', notes: rec.notes || '', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '' })
+      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', contract_start: rec.contract_start || '', contract_end: rec.contract_end || '', project_type: rec.project_type || '', notes: rec.notes || '', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '', technology: rec.technology || '' })
       setSelectedEmployeeId(rec.owner_id || '')
     } else {
       setEditing(null)
-      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '' })
+      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
       setSelectedEmployeeId('')
     }
     setError('')
@@ -315,8 +318,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
-    const rows = filtered.map(r => [r.Candidate_name, r.Candidate_email, r.client_phone, r.company_name, r.employee_name, r.backup_employee_name, r.status, r.project_type, formatDate(r.contract_start), formatDate(r.contract_end), r.notes])
+    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
+    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email, r.client_phone, r.company_name, r.employee_name, r.backup_employee_name, r.status, r.project_type, formatDate(r.contract_start), formatDate(r.contract_end), r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -329,8 +332,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
-    const data = filtered.map(r => [r.Candidate_name, r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.backup_employee_name || '', r.status || '', r.project_type || '', formatDate(r.contract_start), formatDate(r.contract_end), r.notes || ''])
+    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
+    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.backup_employee_name || '', r.status || '', r.project_type || '', formatDate(r.contract_start), formatDate(r.contract_end), r.notes || ''])
 
     autoTable(doc, {
       head: [headers],
@@ -492,7 +495,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {['SELECT', 'Candidate Name', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End'].map(h => {
+                {['SELECT', 'Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End'].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -597,13 +600,13 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 11 }).map((_, j) => (
+                    {Array.from({ length: 12 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={11} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                <tr><td colSpan={12} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 paginated.map(rec => (
                   <TableRow key={rec.id} rec={rec} selectedIds={selectedIds} toggleSelect={toggleSelect} />
@@ -705,6 +708,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
                 { label: 'Phone', name: 'client_phone', type: 'text' },
                 { label: 'Company Name', name: 'company_name', type: 'text' },
                 { label: 'Address', name: 'address', type: 'text' },
+                { label: 'Technology', name: 'technology', type: 'text' },
                 { label: 'Project Type', name: 'project_type', type: 'text' },
                 { label: 'Contract Start', name: 'contract_start', type: 'date' },
                 { label: 'Contract End', name: 'contract_end', type: 'date' },

@@ -1120,8 +1120,18 @@ export default function MarketingPage({
               )}
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Technology</label>
-                <input type="text" value={form.technology} onChange={e => setForm({ ...form, technology: e.target.value })}
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                {!editing ? (
+                  <select value={form.technology} onChange={e => setForm({ ...form, technology: e.target.value })} required={!!form.name}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                    <option value="">{form.name ? 'Select Technology' : 'Select a candidate first'}</option>
+                    {form.name && allCandidateOptions.find(c => c.name === form.name)?.technology?.split(',').map(t => t.trim()).filter(Boolean).map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input type="text" value={form.technology} onChange={e => setForm({ ...form, technology: e.target.value })}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                )}
               </div>
               {[
                 { label: 'Created Date', name: 'date', type: 'date', span: 1 },
