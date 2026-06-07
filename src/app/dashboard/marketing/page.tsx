@@ -1,3 +1,4 @@
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import MarketingTable from '@/components/MarketingTable'
 
@@ -6,6 +7,12 @@ export const metadata = { title: 'All Marketing | GoldenPegasus' }
 export default async function AllMarketingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  const lookupClient = serviceRoleKey
+    ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : supabase
 
   const { data: rawRecords } = await supabase
     .from('marketing_records')
@@ -26,8 +33,8 @@ export default async function AllMarketingPage() {
   let ownerNames: Record<string, string> = {}
   if (ownerIds.length > 0) {
     const [{ data: profiles }, { data: employees }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email').in('id', ownerIds),
-      supabase.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
+      lookupClient.from('profiles').select('id, full_name, email').in('id', ownerIds),
+      lookupClient.from('employees').select('user_id, full_name, email').in('user_id', ownerIds),
     ])
     ownerNames = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name || p.email || 'Unknown employee']))
     for (const e of (employees || [])) {
@@ -42,7 +49,7 @@ export default async function AllMarketingPage() {
   let candidates: any[] = []
 
   if (candidateNames.length > 0) {
-    const { data: candidatesData } = await supabase
+    const { data: candidatesData } = await lookupClient
       .from('Candidate_records')
       .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status')
       .in('Candidate_name', candidateNames)
@@ -57,8 +64,8 @@ export default async function AllMarketingPage() {
     const missingIds = allCandidateIds.filter(id => !ownerNames[id])
     if (missingIds.length > 0) {
       const [{ data: bp }, { data: be }] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, email').in('id', missingIds),
-        supabase.from('employees').select('user_id, full_name, email').in('user_id', missingIds),
+        lookupClient.from('profiles').select('id, full_name, email').in('id', missingIds),
+        lookupClient.from('employees').select('user_id, full_name, email').in('user_id', missingIds),
       ])
       for (const p of (bp || []) as any[]) {
         if (p.id) ownerNames[p.id] = p.full_name || p.email || 'Unknown employee'
