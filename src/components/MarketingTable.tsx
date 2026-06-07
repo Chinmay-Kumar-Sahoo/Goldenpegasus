@@ -661,14 +661,18 @@ export default function MarketingPage({
         throw new Error(`${result.error || 'Failed to import records'}${detail}`)
       }
 
+      const parts: string[] = [`Imported ${result.imported} record${result.imported === 1 ? '' : 's'}`]
+      if (result.closed > 0) parts.push(`${result.closed} for Closed candidates (hidden)`)
+      const summary = parts.join(', ')
       const errors = result.errors || []
       if (errors.length > 0) {
         const firstFew = errors.slice(0, 5).map((e: any) => `${e.name}: ${e.issues.join(', ')}`)
         const more = errors.length > 5 ? `...and ${errors.length - 5} more` : ''
-        setError(`Imported ${result.imported}/${result.total}. Errors:\n${firstFew.join('\n')}${more ? '\n' + more : ''}`)
-        toast.error(`Imported ${result.imported}/${result.total} — ${errors.length} row${errors.length === 1 ? '' : 's'} failed`)
+        setError(`${summary}. Errors:\n${firstFew.join('\n')}${more ? '\n' + more : ''}`)
+        toast.error(`${summary} — ${errors.length} row${errors.length === 1 ? '' : 's'} had issues`)
       } else {
-        toast.success(`Imported ${result.imported} marketing records`)
+        setError('')
+        toast.success(summary)
       }
       fetchRecords()
     } catch (err: any) {
