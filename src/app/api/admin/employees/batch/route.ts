@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   const { error } = await supabase.from('employees').update(updates).in('user_id', ids)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_updated', entity_type: 'employee', entity_id: id, user_id: user.id })))
+  await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_updated', entity_type: 'employee', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))
 
   return NextResponse.json({ success: true })
 }
@@ -52,7 +52,7 @@ export async function DELETE(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'employee', entity_id: id, user_id: user.id })))
+  await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'employee', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))
 
   return NextResponse.json({ success: true })
 }

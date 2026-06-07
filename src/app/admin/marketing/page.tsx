@@ -58,7 +58,9 @@ export default async function AdminMarketingPage() {
     if (!ownerNames[opt.id]) ownerNames[opt.id] = opt.full_name
   }
 
-  const candidateOptions = (candidatesResult.data || []).map((c: any) => ({
+  const candidateOptions = (candidatesResult.data || [])
+    .filter((c: any) => c.status !== 'Closed')
+    .map((c: any) => ({
     id: c.id,
     name: c.Candidate_name,
     owner_id: c.owner_id,

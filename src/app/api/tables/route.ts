@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       is_global: body.is_global || false,
     }).select('id').single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    await supabase.from('audit_logs').insert({ action: 'created', entity_type: 'dynamic_table', entity_id: inserted.id, user_id: user.id })
+    await supabase.from('audit_logs').insert({ action: 'created', entity_type: 'dynamic_table', entity_id: inserted.id, user_id: user.id, created_at: new Date().toISOString() })
     return NextResponse.json({ success: true })
   }
 
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         .update({ data: body.data, updated_at: new Date().toISOString() })
         .eq('id', body.id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      await supabase.from('audit_logs').insert({ action: 'updated', entity_type: 'dynamic_table_record', entity_id: body.id, user_id: user.id })
+      await supabase.from('audit_logs').insert({ action: 'updated', entity_type: 'dynamic_table_record', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })
       return NextResponse.json({ success: true })
     }
     const { data: inserted, error } = await supabase.from('dynamic_table_records').insert({
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       data: body.data,
     }).select('id').single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    await supabase.from('audit_logs').insert({ action: 'created', entity_type: 'dynamic_table_record', entity_id: inserted.id, user_id: user.id })
+    await supabase.from('audit_logs').insert({ action: 'created', entity_type: 'dynamic_table_record', entity_id: inserted.id, user_id: user.id, created_at: new Date().toISOString() })
     return NextResponse.json({ success: true })
   }
 
@@ -101,14 +101,14 @@ export async function POST(req: NextRequest) {
     if (existing) {
       if (!body.permission) {
         await supabase.from('table_permissions').delete().eq('id', existing.id)
-        await supabase.from('audit_logs').insert({ action: 'deleted', entity_type: 'table_permission', entity_id: existing.id, user_id: user.id })
+        await supabase.from('audit_logs').insert({ action: 'deleted', entity_type: 'table_permission', entity_id: existing.id, user_id: user.id, created_at: new Date().toISOString() })
       } else {
         const { error } = await supabase
           .from('table_permissions')
           .update({ permission: body.permission, granted_by: user.id })
           .eq('id', existing.id)
         if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-        await supabase.from('audit_logs').insert({ action: 'updated', entity_type: 'table_permission', entity_id: existing.id, user_id: user.id })
+        await supabase.from('audit_logs').insert({ action: 'updated', entity_type: 'table_permission', entity_id: existing.id, user_id: user.id, created_at: new Date().toISOString() })
       }
     } else if (body.permission) {
       const { data: inserted, error } = await supabase.from('table_permissions').insert({
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
         granted_by: user.id,
       }).select('id').single()
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      await supabase.from('audit_logs').insert({ action: 'created', entity_type: 'table_permission', entity_id: inserted.id, user_id: user.id })
+      await supabase.from('audit_logs').insert({ action: 'created', entity_type: 'table_permission', entity_id: inserted.id, user_id: user.id, created_at: new Date().toISOString() })
     }
     return NextResponse.json({ success: true })
   }
@@ -137,21 +137,21 @@ export async function DELETE(req: NextRequest) {
   if (action === 'table') {
     const { error } = await supabase.from('dynamic_tables').delete().eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    await supabase.from('audit_logs').insert({ action: 'deleted', entity_type: 'dynamic_table', entity_id: body.id, user_id: user.id })
+    await supabase.from('audit_logs').insert({ action: 'deleted', entity_type: 'dynamic_table', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })
     return NextResponse.json({ success: true })
   }
 
   if (action === 'record') {
     const { error } = await supabase.from('dynamic_table_records').delete().eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    await supabase.from('audit_logs').insert({ action: 'deleted', entity_type: 'dynamic_table_record', entity_id: body.id, user_id: user.id })
+    await supabase.from('audit_logs').insert({ action: 'deleted', entity_type: 'dynamic_table_record', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })
     return NextResponse.json({ success: true })
   }
 
   if (action === 'permission') {
     const { error } = await supabase.from('table_permissions').delete().eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    await supabase.from('audit_logs').insert({ action: 'deleted', entity_type: 'table_permission', entity_id: body.id, user_id: user.id })
+    await supabase.from('audit_logs').insert({ action: 'deleted', entity_type: 'table_permission', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })
     return NextResponse.json({ success: true })
   }
 

@@ -113,7 +113,9 @@ export default async function MyMarketingPage() {
     backup_employee_name: backupNamesByCandidate[r.name] || null,
   }))
 
-  const candidateOptions = (candidates || []).map((c: any) => ({
+  const candidateOptions = (candidates || [])
+    .filter((c: any) => c.status !== 'Closed')
+    .map((c: any) => ({
     id: c.id,
     name: c.Candidate_name,
     owner_id: c.owner_id,

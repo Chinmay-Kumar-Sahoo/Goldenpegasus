@@ -689,7 +689,7 @@ export default function MarketingPage({
     const available = isAdmin
       ? allCandidateOptions
       : allCandidateOptions.filter(c => c.owner_id === currentUserIdRef.current || c.backup_employee_id === currentUserIdRef.current)
-    return available
+    return available.filter(c => c.status !== 'Closed')
   }, [allCandidateOptions, isAdmin, editing])
 
   const handleCandidateSelect = (candidateName: string) => {
