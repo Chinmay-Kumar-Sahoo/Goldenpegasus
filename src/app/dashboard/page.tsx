@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import Link from 'next/link'
 
@@ -8,6 +9,7 @@ export const metadata = { title: 'Dashboard | GoldenPegasus' }
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const [
     { count: mktCount },
@@ -15,10 +17,10 @@ export default async function DashboardPage() {
     { count: tableCount },
     { data: _profileData },
   ] = await Promise.all([
-    supabase.from('marketing_records').select('*', { count: 'exact', head: true }).eq('owner_id', user!.id),
-    supabase.from('Candidate_records').select('*', { count: 'exact', head: true }).eq('owner_id', user!.id),
-    supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }).eq('owner_id', user!.id),
-    supabase.from('profiles').select('full_name, email').eq('id', user!.id).single(),
+    supabase.from('marketing_records').select('*', { count: 'exact', head: true }).eq('owner_id', user.id),
+    supabase.from('Candidate_records').select('*', { count: 'exact', head: true }).eq('owner_id', user.id),
+    supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }).eq('owner_id', user.id),
+    supabase.from('profiles').select('full_name, email').eq('id', user.id).single(),
   ])
 
   const stats = [
