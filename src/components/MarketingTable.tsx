@@ -16,6 +16,7 @@ interface MarketingRecord {
   implementation_partner: string | null
   end_client: string | null
   status: string | null
+  technology: string | null
 
   project_start_date: string | null
   project_end_date: string | null
@@ -52,9 +53,11 @@ type MarketingImportField =
   | 'notes'
   | 'employee_name'
   | 'backup_employee_name'
+  | 'technology'
 
 const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDate?: boolean }> = [
   { key: 'name', labels: ['Name', 'Candidate Name'] },
+  { key: 'technology', labels: ['Technology'] },
   { key: 'date', labels: ['Date'], isDate: true },
   { key: 'status', labels: ['Status'] },
 
@@ -99,6 +102,7 @@ const DATE_COLUMNS: Record<string, string> = {
 
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'name',
+  'Technology': 'technology',
   'Employee': 'employee_name',
   'Primary Employee': 'employee_name',
 
@@ -139,6 +143,7 @@ const TableRow = memo(function TableRow({
         </td>
       )}
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.name}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.technology || '—'}</td>
       {showEmployeeColumn && (
         <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{currentUserName || 'Unknown'}</td>
       )}
@@ -189,7 +194,7 @@ export default function MarketingPage({
   initialRecords?: MarketingRecord[]
   initialOwnerNames?: Record<string, string>
   employeeOptions?: Array<{ id: string; full_name: string }>
-  candidateOptions?: Array<{ id: string; name: string; owner_id: string; owner_name?: string | null; status: string | null; backup_employee_id?: string | null; backup_employee_name?: string | null }>
+  candidateOptions?: Array<{ id: string; name: string; owner_id: string; owner_name?: string | null; status: string | null; backup_employee_id?: string | null; backup_employee_name?: string | null; technology?: string | null }>
 }) {
   const showPrimaryEmployeeColumn = true
   const showBackupEmployeeColumn = true
@@ -235,7 +240,7 @@ export default function MarketingPage({
     implementation_partner: '', end_client: '', status: 'Telephone Call',
     project_start_date: '', project_end_date: '', interview_date: '',
     implementation_poc_email: '', interviewer_email: '', notes: '',
-    employee_name: '', backup_employee_name: '',
+    employee_name: '', backup_employee_name: '', technology: '',
   })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
@@ -313,6 +318,7 @@ export default function MarketingPage({
             owner_id: r.owner_id,
             owner_name: r.employee_name || null,
             status: r.status,
+            technology: r.technology || null,
             backup_employee_id: r.backup_employee_id,
             backup_employee_name: r.backup_employee_name || null,
           })))
@@ -382,12 +388,13 @@ export default function MarketingPage({
         interviewer_email: rec.interviewer_email || '', notes: rec.notes || '',
         employee_name: rec.employee_name || '',
         backup_employee_name: rec.backup_employee_name || '',
+        technology: rec.technology || '',
       })
       const empMatch = isAdmin && rec.employee_name ? employeeOptions.find(e => e.full_name === rec.employee_name) : null
       setSelectedEmployeeId(empMatch?.id || (isAdmin ? (rec.owner_id || '') : ''))
     } else {
       setEditing(null)
-      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'Telephone Call', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '', backup_employee_name: '' })
+      setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'Telephone Call', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '', backup_employee_name: '', technology: '' })
       setSelectedEmployeeId('')
     }
     setError('')
@@ -705,7 +712,7 @@ export default function MarketingPage({
       backupName = candidate.backup_employee_name || ''
       empId = candidate.owner_id || ''
     }
-    setForm(prev => ({ ...prev, name: candidateName, employee_name: empName, backup_employee_name: backupName }))
+    setForm(prev => ({ ...prev, name: candidateName, employee_name: empName, backup_employee_name: backupName, technology: candidate?.technology || '' }))
     if (isAdmin) setSelectedEmployeeId(empId)
   }
 
@@ -753,7 +760,7 @@ export default function MarketingPage({
       }
       if (!q) return true
       const fields = [
-        r.name, r.date, r.status, r.recruiter_name, r.recruiter_email,
+        r.name, r.technology, r.date, r.status, r.recruiter_name, r.recruiter_email,
         r.organization_name, r.implementation_partner, r.end_client,
         r.interview_type, r.client_name, r.client_email,
         r.implementation_poc_email, r.interviewer_email, r.notes,
@@ -774,8 +781,8 @@ export default function MarketingPage({
   }, [page, totalPages])
 
   const exportCSV = useCallback(() => {
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const rows = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -788,8 +795,8 @@ export default function MarketingPage({
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const data = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
 
     autoTable(doc, {
       head: [headers],
@@ -892,7 +899,7 @@ export default function MarketingPage({
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
+                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -998,18 +1005,18 @@ export default function MarketingPage({
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 14 + (showPrimaryEmployeeColumn ? 1 : 0) + (showBackupEmployeeColumn ? 1 : 0) + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0) }).map((_, j) => (
+                    {Array.from({ length: 15 + (showPrimaryEmployeeColumn ? 1 : 0) + (showBackupEmployeeColumn ? 1 : 0) + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0) }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : error ? (
-                <tr><td colSpan={15 + (showPrimaryEmployeeColumn ? 1 : 0) + (showBackupEmployeeColumn ? 1 : 0) + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center">
+                <tr><td colSpan={16 + (showPrimaryEmployeeColumn ? 1 : 0) + (showBackupEmployeeColumn ? 1 : 0) + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center">
                   <div className="text-red-400 text-sm mb-1">Failed to load records</div>
                   <div className="text-[#71717a] text-xs">{error.includes('timed') ? 'The request timed out. Try refreshing the page.' : 'Please check your connection and try again.'}</div>
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={16 + (showPrimaryEmployeeColumn ? 1 : 0) + (showBackupEmployeeColumn ? 1 : 0) + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
+                <tr><td colSpan={17 + (showPrimaryEmployeeColumn ? 1 : 0) + (showBackupEmployeeColumn ? 1 : 0) + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
                 paginated.map(rec => (
                   <TableRow key={rec.id} rec={rec} showPrimaryEmployeeColumn={showPrimaryEmployeeColumn} showBackupEmployeeColumn={showBackupEmployeeColumn} showEmployeeColumn={showEmployeeColumn} isAdmin={isAdmin} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} currentUserName={currentUserName} />
@@ -1107,6 +1114,11 @@ export default function MarketingPage({
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
                 </div>
               )}
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Technology</label>
+                <input type="text" value={form.technology} onChange={e => setForm({ ...form, technology: e.target.value })}
+                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+              </div>
               {[
                 { label: 'Created Date', name: 'date', type: 'date', span: 1 },
                 { label: 'Status', name: 'status', type: 'select', options: ['Initial Screening', 'Introductory call', 'Project Received', 'RTR Confirmed', 'Screening Call', 'Technical Interview', 'Telephone Call'], span: 1 },

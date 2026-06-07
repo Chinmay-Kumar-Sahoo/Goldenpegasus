@@ -34,8 +34,8 @@ export default async function MyMarketingPage() {
   }
 
   const candidateQuery = supabaseAdmin
-    ? supabaseAdmin.from('Candidate_records').select('id, Candidate_name, owner_id, status, backup_employee_id, backup_employee_name').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
-    : supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status, backup_employee_id, backup_employee_name').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+    ? supabaseAdmin.from('Candidate_records').select('id, Candidate_name, owner_id, status, technology, backup_employee_id, backup_employee_name').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+    : supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status, technology, backup_employee_id, backup_employee_name').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
   const { data: candidates } = await candidateQuery
 
   const ownedCandidateNames = (candidates || []).filter(c => c.owner_id === uid).map(c => c.Candidate_name)
@@ -111,6 +111,7 @@ export default async function MyMarketingPage() {
     status: (r as any).status || 'Telephone Call',
     employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
     backup_employee_name: backupNamesByCandidate[r.name] || null,
+    technology: (r as any).technology || null,
   }))
 
   const candidateOptions = (candidates || [])

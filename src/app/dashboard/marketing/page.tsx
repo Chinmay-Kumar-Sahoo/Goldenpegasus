@@ -51,7 +51,7 @@ export default async function AllMarketingPage() {
   if (candidateNames.length > 0) {
     const { data: candidatesData } = await lookupClient
       .from('Candidate_records')
-      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status')
+      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology')
       .in('Candidate_name', candidateNames)
 
     candidates = candidatesData || []
@@ -92,6 +92,7 @@ export default async function AllMarketingPage() {
     ...r,
     employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
     backup_employee_name: backupNamesByCandidate[r.name] || null,
+    technology: (r as any).technology || null,
   }))
 
   return (

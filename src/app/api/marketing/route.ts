@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
         })()
       : Promise.resolve({} as Record<string, string>),
     candidateNames.length > 0
-      ? lookupClient.from('Candidate_records').select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status').in('Candidate_name', candidateNames)
+      ? lookupClient.from('Candidate_records').select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology').in('Candidate_name', candidateNames)
       : Promise.resolve({ data: [] }),
     supabase.from('marketing_reminder_logs').select('marketing_record_id, sent_at').is('error', null).in('marketing_record_id', data.map(r => r.id)).order('sent_at', { ascending: false }),
   ])
@@ -137,6 +137,7 @@ export async function GET(req: NextRequest) {
     status: (r as any).status || 'Telephone Call',
     employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
     backup_employee_name: backupNamesByCandidate[r.name] || null,
+    technology: (r as any).technology || null,
     last_reminder_sent_at: lastReminderByRecord[r.id] || null,
   }))
 
@@ -161,7 +162,7 @@ export async function POST(req: NextRequest) {
   if (!body.id && recordData.name) {
     const { data: candidates } = await supabase
       .from('Candidate_records')
-      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name')
+      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, technology')
       .eq('Candidate_name', recordData.name)
 
     const matchedCandidate = candidates && candidates.length > 0 ? candidates[0] : null
@@ -197,6 +198,11 @@ export async function POST(req: NextRequest) {
           supabase.from('employees').select('full_name').eq('user_id', matchedCandidate.backup_employee_id).single(),
         ])
         recordData.backup_employee_name = pResult.data?.full_name || eResult.data?.full_name || null
+      }
+
+      // Auto-fill technology from candidate
+      if (!recordData.technology && matchedCandidate.technology) {
+        recordData.technology = matchedCandidate.technology
       }
     } else if (selectedEmployeeId) {
       effectiveOwnerId = selectedEmployeeId

@@ -39,7 +39,7 @@ export async function PUT(req: NextRequest) {
     const client = supabaseAdmin || supabase
     const { data } = await client
       .from('Candidate_records')
-      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status')
+      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology')
       .in('Candidate_name', rawCandidateNames)
     candidatesData = data || []
 
@@ -50,7 +50,7 @@ export async function PUT(req: NextRequest) {
       const client = supabaseAdmin || supabase
       const { data: fallback } = await client
         .from('Candidate_records')
-        .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status')
+        .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology')
         .ilike('Candidate_name', cName)
       if (fallback) {
         candidatesData = [...candidatesData, ...fallback]
@@ -241,6 +241,7 @@ export async function PUT(req: NextRequest) {
       implementation_poc_email: r.implementation_poc_email || null,
       interviewer_email: r.interviewer_email || null,
       notes: r.notes || null,
+      technology: r.technology || null,
       employee_name: r._employee_name || null,
       backup_employee_name: r._backup_employee_name || null,
       owner_id: r._owner_id || user.id,
