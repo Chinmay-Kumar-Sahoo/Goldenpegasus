@@ -238,6 +238,7 @@ export type Database = {
       }
       marketing_records: {
         Row: {
+          backup_employee_name: string | null
           client_email: string | null
           client_name: string | null
           client_phone: string | null
@@ -264,6 +265,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          backup_employee_name?: string | null
           client_email?: string | null
           client_name?: string | null
           client_phone?: string | null
@@ -290,6 +292,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          backup_employee_name?: string | null
           client_email?: string | null
           client_name?: string | null
           client_phone?: string | null

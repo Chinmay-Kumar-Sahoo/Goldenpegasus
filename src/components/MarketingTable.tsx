@@ -100,6 +100,7 @@ const DATE_COLUMNS: Record<string, string> = {
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'name',
   'Employee': 'employee_name',
+  'Primary Employee': 'employee_name',
 
   'Status': 'status',
   'Recruiter Organization': 'recruiter_name',
@@ -109,6 +110,7 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Implementation Partner Email': 'implementation_poc_email',
   'End Client': 'end_client',
   'Interviewer Email': 'interviewer_email',
+  'Backup Employee': 'backup_employee_name',
 }
 
 const LOCKABLE_FIELDS = new Set(['name', 'employee_name', 'backup_employee_name'])
@@ -116,14 +118,17 @@ const LOCKABLE_FIELDS = new Set(['name', 'employee_name', 'backup_employee_name'
 const PAGE_SIZES = [25, 50, 100] as const
 
 const TableRow = memo(function TableRow({
-  rec, showEmployeeColumn, isAdmin, readOnly, selectedIds, toggleSelect
+  rec, showPrimaryEmployeeColumn, showBackupEmployeeColumn, showEmployeeColumn, isAdmin, readOnly, selectedIds, toggleSelect, currentUserName
 }: {
   rec: MarketingRecord
+  showPrimaryEmployeeColumn: boolean
+  showBackupEmployeeColumn: boolean
   showEmployeeColumn: boolean
   isAdmin: boolean
   readOnly: boolean
   selectedIds: Set<string>
   toggleSelect: (id: string) => void
+  currentUserName: string
 }) {
   return (
     <tr className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
@@ -135,9 +140,14 @@ const TableRow = memo(function TableRow({
       )}
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.name}</td>
       {showEmployeeColumn && (
+        <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{currentUserName || 'Unknown'}</td>
+      )}
+      {showPrimaryEmployeeColumn && (
         <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{rec.employee_name || 'Unknown employee'}</td>
       )}
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.backup_employee_name || '—'}</td>
+      {showBackupEmployeeColumn && (
+        <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.backup_employee_name || '—'}</td>
+      )}
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{formatDate(rec.date)}</td>
       <td className="px-4 py-3">
         <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${STATUS_COLORS[rec.status || 'Telephone Call'] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
@@ -181,7 +191,14 @@ export default function MarketingPage({
   employeeOptions?: Array<{ id: string; full_name: string }>
   candidateOptions?: Array<{ id: string; name: string; owner_id: string; owner_name?: string | null; status: string | null; backup_employee_id?: string | null; backup_employee_name?: string | null }>
 }) {
-  const showEmployeeColumn = isAdmin || readOnly
+  const showPrimaryEmployeeColumn = true
+  const showBackupEmployeeColumn = !(readOnly && !isAdmin)
+  const showEmployeeColumn = !isAdmin && !readOnly
+  const currentUserName = useMemo(() => {
+    if (!showEmployeeColumn || !currentUserIdRef.current) return ''
+    const emp = employeeOptions.find(e => e.id === currentUserIdRef.current)
+    return emp?.full_name || ''
+  }, [employeeOptions])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -676,7 +693,7 @@ export default function MarketingPage({
   }, [allCandidateOptions, isAdmin, editing])
 
   const handleCandidateSelect = (candidateName: string) => {
-    const candidate = candidateOptions.find(c => c.name === candidateName)
+    const candidate = allCandidateOptions.find(c => c.name === candidateName)
     let empName = '', backupName = '', empId = ''
     if (candidate) {
       if (candidate.owner_name) {
@@ -757,22 +774,22 @@ export default function MarketingPage({
   }, [page, totalPages])
 
   const exportCSV = useCallback(() => {
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name] : []), r.backup_employee_name, formatDate(r.date), r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const rows = filtered.map(r => [r.name, ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = 'marketing_records.csv'; a.click()
     setShowExportMenu(false)
-  }, [filtered, showEmployeeColumn, isAdmin])
+  }, [filtered, showPrimaryEmployeeColumn, showBackupEmployeeColumn, showEmployeeColumn, isAdmin, currentUserName])
 
   const exportPDF = useCallback(async () => {
     const { default: jsPDF } = await import('jspdf')
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [r.employee_name || ''] : []), r.backup_employee_name || '', formatDate(r.date), r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const data = filtered.map(r => [r.name, ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
 
     autoTable(doc, {
       head: [headers],
@@ -783,7 +800,7 @@ export default function MarketingPage({
 
     doc.save('marketing_records.pdf')
     setShowExportMenu(false)
-  }, [filtered, showEmployeeColumn, isAdmin])
+  }, [filtered, showPrimaryEmployeeColumn, showBackupEmployeeColumn, showEmployeeColumn, isAdmin, currentUserName])
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -875,7 +892,7 @@ export default function MarketingPage({
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), 'Backup Employee', 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
+                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -981,21 +998,21 @@ export default function MarketingPage({
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 14 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0) }).map((_, j) => (
+                    {Array.from({ length: 14 + (showPrimaryEmployeeColumn ? 1 : 0) + (showBackupEmployeeColumn ? 1 : 0) + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 1 : 0) }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : error ? (
-                <tr><td colSpan={15 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center">
+                <tr><td colSpan={15 + (showPrimaryEmployeeColumn ? 1 : 0) + (showBackupEmployeeColumn ? 1 : 0) + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center">
                   <div className="text-red-400 text-sm mb-1">Failed to load records</div>
                   <div className="text-[#71717a] text-xs">{error.includes('timed') ? 'The request timed out. Try refreshing the page.' : 'Please check your connection and try again.'}</div>
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={16 + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
+                <tr><td colSpan={16 + (showPrimaryEmployeeColumn ? 1 : 0) + (showBackupEmployeeColumn ? 1 : 0) + (showEmployeeColumn ? 1 : 0) + (isAdmin ? 1 : 0) + (!readOnly ? 2 : 0)} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
                 paginated.map(rec => (
-                  <TableRow key={rec.id} rec={rec} showEmployeeColumn={showEmployeeColumn} isAdmin={isAdmin} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} />
+                  <TableRow key={rec.id} rec={rec} showPrimaryEmployeeColumn={showPrimaryEmployeeColumn} showBackupEmployeeColumn={showBackupEmployeeColumn} showEmployeeColumn={showEmployeeColumn} isAdmin={isAdmin} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} currentUserName={currentUserName} />
                 ))
               )}
             </tbody>
@@ -1062,6 +1079,7 @@ export default function MarketingPage({
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee</label>
                   <input type="text" value={form.employee_name || ''} disabled
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
+                  {!editing && <p className="text-[10px] text-[#71717a] mt-1">Auto-filled from Candidate Records</p>}
                 </div>
               )}
               {isAdmin ? (
@@ -1077,6 +1095,7 @@ export default function MarketingPage({
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
                   <input type="text" value={form.backup_employee_name || ''} disabled
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
+                  {!editing && <p className="text-[10px] text-[#71717a] mt-1">Auto-filled from Candidate Records</p>}
                 </div>
               )}
               {!editing ? (
