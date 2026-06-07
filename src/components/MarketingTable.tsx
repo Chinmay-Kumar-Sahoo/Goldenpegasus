@@ -194,6 +194,8 @@ export default function MarketingPage({
   const showPrimaryEmployeeColumn = true
   const showBackupEmployeeColumn = !(readOnly && !isAdmin)
   const showEmployeeColumn = !isAdmin && !readOnly
+  const currentUserIdRef = useRef(propUserId)
+  const serverOwnerNamesRef = useRef(serverOwnerNames)
   const currentUserName = useMemo(() => {
     if (!showEmployeeColumn || !currentUserIdRef.current) return ''
     const emp = employeeOptions.find(e => e.id === currentUserIdRef.current)
@@ -228,8 +230,6 @@ export default function MarketingPage({
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
-  const currentUserIdRef = useRef(propUserId)
-  const serverOwnerNamesRef = useRef(serverOwnerNames)
   const [form, setForm] = useState({
     name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '',
     implementation_partner: '', end_client: '', status: 'Telephone Call',
