@@ -383,7 +383,8 @@ export default function MarketingPage({
         employee_name: rec.employee_name || '',
         backup_employee_name: rec.backup_employee_name || '',
       })
-      setSelectedEmployeeId(isAdmin ? (rec.owner_id || '') : '')
+      const empMatch = isAdmin && rec.employee_name ? employeeOptions.find(e => e.full_name === rec.employee_name) : null
+      setSelectedEmployeeId(empMatch?.id || (isAdmin ? (rec.owner_id || '') : ''))
     } else {
       setEditing(null)
       setForm({ name: '', date: todayIST(), recruiter_name: '', recruiter_email: '', organization_name: '', implementation_partner: '', end_client: '', status: 'Telephone Call', project_start_date: '', project_end_date: '', interview_date: '', implementation_poc_email: '', interviewer_email: '', notes: '', employee_name: '', backup_employee_name: '' })
