@@ -192,8 +192,8 @@ export default function MarketingPage({
   candidateOptions?: Array<{ id: string; name: string; owner_id: string; owner_name?: string | null; status: string | null; backup_employee_id?: string | null; backup_employee_name?: string | null }>
 }) {
   const showPrimaryEmployeeColumn = true
-  const showBackupEmployeeColumn = !(readOnly && !isAdmin)
-  const showEmployeeColumn = !isAdmin && !readOnly
+  const showBackupEmployeeColumn = true
+  const showEmployeeColumn = false
   const currentUserIdRef = useRef(propUserId)
   const serverOwnerNamesRef = useRef(serverOwnerNames)
   const currentUserName = useMemo(() => {
@@ -397,8 +397,7 @@ export default function MarketingPage({
     e.preventDefault()
     setSaving(true)
     setError('')
-    const { backup_employee_name: _, ...payloadFields } = form
-    const cleanForm = Object.fromEntries(Object.entries(payloadFields).map(([k, v]) => [k, v || null]))
+    const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
     const payload = editing
       ? { ...cleanForm, id: editing.id, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}) }
       : { ...cleanForm, name: form.name, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}) }
@@ -1050,10 +1049,11 @@ export default function MarketingPage({
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-white mb-6">{editing ? 'Edit Record' : 'Add Marketing Record'}</h2>
             <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
-              {isAdmin && !editing && (
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee *</label>
-                   <select value={selectedEmployeeId} onChange={e => {
+              {/* Primary Employee - dropdown in admin edit, auto-filled otherwise */}
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee{isAdmin && editing ? ' *' : ''}</label>
+                {isAdmin && editing ? (
+                  <select value={selectedEmployeeId} onChange={e => {
                     const empId = e.target.value
                     setSelectedEmployeeId(empId)
                     const emp = employeeOptions.find(e => e.id === empId)
@@ -1065,39 +1065,29 @@ export default function MarketingPage({
                       <option key={emp.id} value={emp.id}>{emp.full_name}</option>
                     ))}
                   </select>
-                </div>
-              )}
-              {isAdmin && editing && (
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee</label>
+                ) : (
                   <input type="text" value={form.employee_name || ''} disabled
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
-                </div>
-              )}
-              {!isAdmin && (
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee</label>
-                  <input type="text" value={form.employee_name || ''} disabled
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
-                  {!editing && <p className="text-[10px] text-[#71717a] mt-1">Auto-filled from Candidate Records</p>}
-                </div>
-              )}
-              {isAdmin ? (
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
-                  <input type="text" value={form.backup_employee_name || ''} onChange={e => setForm({ ...form, backup_employee_name: e.target.value })}
-                    disabled={!editing && !!form.name}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 disabled:opacity-50 disabled:cursor-not-allowed" />
-                  {!editing && !!form.name && <p className="text-[10px] text-[#71717a] mt-1">Auto-filled from Candidate Records. Edit after saving.</p>}
-                </div>
-              ) : (
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
+                )}
+                {!editing && <p className="text-[10px] text-[#71717a] mt-1">Auto-filled from Candidate Records</p>}
+              </div>
+              {/* Backup Employee - dropdown in admin edit, auto-filled otherwise */}
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
+                {isAdmin && editing ? (
+                  <select value={form.backup_employee_name || ''} onChange={e => setForm({ ...form, backup_employee_name: e.target.value })}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                    <option value="">None</option>
+                    {employeeOptions.map(emp => (
+                      <option key={emp.id} value={emp.full_name}>{emp.full_name}</option>
+                    ))}
+                  </select>
+                ) : (
                   <input type="text" value={form.backup_employee_name || ''} disabled
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
-                  {!editing && <p className="text-[10px] text-[#71717a] mt-1">Auto-filled from Candidate Records</p>}
-                </div>
-              )}
+                )}
+                {!editing && <p className="text-[10px] text-[#71717a] mt-1">Auto-filled from Candidate Records</p>}
+              </div>
               {!editing ? (
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Candidate Name *</label>

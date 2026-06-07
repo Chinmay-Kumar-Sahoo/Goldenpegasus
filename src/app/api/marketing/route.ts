@@ -258,7 +258,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { date, employee_name: _, backup_employee_name: __, ...updatableFields } = recordData
+    const { date, employee_name: _, ...updatableFields } = recordData
+    // Non-admin should not update employee meta fields
+    if (!isAdminUser) {
+      delete updatableFields.backup_employee_name
+    }
     const updatePayload: any = { ...updatableFields, updated_at: new Date().toISOString() }
 
     // Admin can edit date
@@ -272,6 +276,11 @@ export async function POST(req: NextRequest) {
       if (effectiveOwnerId) {
         updatePayload.owner_id = effectiveOwnerId
       }
+    }
+
+    // Admin can edit backup_employee_name on existing records
+    if (isAdminUser && recordData.backup_employee_name !== undefined) {
+      updatePayload.backup_employee_name = recordData.backup_employee_name || null
     }
 
     const { error } = await client
