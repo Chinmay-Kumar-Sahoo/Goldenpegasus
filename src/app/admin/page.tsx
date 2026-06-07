@@ -75,7 +75,7 @@ export default async function AdminPage() {
               { label: 'Add Employee', href: '/admin/employees?action=new', icon: '➕' },
               { label: 'Create Dynamic Table', href: '/admin/tables?action=new', icon: '🏗️' },
               { label: 'View All Marketing', href: '/admin/marketing', icon: '📈' },
-              { label: 'View Audit Logs', href: '/admin/audit', icon: '📋' },
+              { label: 'View Audit Log History', href: '/admin/audit', icon: '📋' },
             ].map(action => (
               <Link key={action.label} href={action.href}
                 className="flex items-center gap-3 p-3 rounded-xl hover:bg-[#1a1a1a] transition-colors text-sm text-[#a1a1aa] hover:text-white group">
