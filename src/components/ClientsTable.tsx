@@ -55,15 +55,16 @@ function wordScore(val: string | null, q: string): number {
 }
 
 const TableRow = memo(function TableRow({
-  rec, selectedIds, toggleSelect
+  rec, readOnly, selectedIds, toggleSelect
 }: {
   rec: CandidateRecord
+  readOnly: boolean
   selectedIds: Set<string>
   toggleSelect: (id: string) => void
 }) {
   return (
     <tr className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-      <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>
+      {!readOnly && <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>}
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.Candidate_name}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.technology || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
@@ -81,7 +82,7 @@ const TableRow = memo(function TableRow({
   )
 })
 
-export default function CandidatesPage({ isAdmin = false, initialRecords = [], employeeOptions = [], initialOwnerNames = {}, currentUserId: propUserId = null }: { isAdmin?: boolean; initialRecords?: CandidateRecord[]; employeeOptions?: Array<{ id: string; full_name: string }>; initialOwnerNames?: Record<string, string>; currentUserId?: string | null }) {
+export default function CandidatesPage({ isAdmin = false, readOnly = false, initialRecords = [], employeeOptions = [], initialOwnerNames = {}, currentUserId: propUserId = null }: { isAdmin?: boolean; readOnly?: boolean; initialRecords?: CandidateRecord[]; employeeOptions?: Array<{ id: string; full_name: string }>; initialOwnerNames?: Record<string, string>; currentUserId?: string | null }) {
   const [records, setRecords] = useState<CandidateRecord[]>(() =>
     initialRecords.map(r => ({
       ...r,
@@ -394,7 +395,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <PageHeader title={isAdmin ? 'All Marketing Profiles' : 'My Marketing Profile'} subtitle="Manage Marketing Profiles">
-        <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">+ Add Candidate</button>
+        {!readOnly && <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">+ Add Candidate</button>}
         <div ref={exportMenuRef} className="relative">
           <button onClick={() => setShowExportMenu(v => !v)} className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all">
             Export ▾
@@ -435,7 +436,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
         )}
       </div>
 
-      {selectedIds.size > 0 && (
+      {!readOnly && selectedIds.size > 0 && (
         <div className="mb-4 flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5">
           <span className="text-sm text-[#a1a1aa]">{selectedIds.size} selected</span>
           <button onClick={() => {
@@ -457,7 +458,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {['SELECT', 'Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status'].map(h => {
+                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status'].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -528,16 +529,16 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 9 }).map((_, j) => (
+                    {Array.from({ length: readOnly ? 8 : 9 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                <tr><td colSpan={readOnly ? 8 : 9} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 paginated.map(rec => (
-                  <TableRow key={rec.id} rec={rec} selectedIds={selectedIds} toggleSelect={toggleSelect} />
+                  <TableRow key={rec.id} rec={rec} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} />
                 ))
               )}
             </tbody>

@@ -34,7 +34,8 @@ const employeeNav: NavItem[] = [
   { label: 'Personal Details', href: '/dashboard/profile', icon: '👤' },
   { label: 'All Marketing', href: '/dashboard/marketing', icon: '📊' },
   { label: 'My Marketing', href: '/dashboard/my-marketing', icon: '📈' },
-  { label: 'My Marketing Profile', href: '/dashboard/clients', icon: '🤝' },
+  { label: 'All Marketing Profiles', href: '/dashboard/all-marketing-profiles', icon: '🤝' },
+  { label: 'My Marketing Profile', href: '/dashboard/clients', icon: '👤' },
   { label: 'Custom Tables', href: '/dashboard/tables', icon: '🏗️' },
 ]
 
