@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import PageHeader from '@/components/PageHeader'
-import { formatDate } from '@/lib/format'
 import toast from 'react-hot-toast'
 
 interface CandidateRecord {
@@ -14,9 +13,7 @@ interface CandidateRecord {
   company_name: string | null
   address: string | null
   status: string | null
-  contract_start: string | null
-  contract_end: string | null
-  project_type: string | null
+
   notes: string | null
   created_at: string
   employee_name?: string | null
@@ -34,11 +31,6 @@ const STATUS_COLORS: Record<string, string> = {
   'Closed': 'bg-gray-500/10 text-gray-400 border-gray-500/20',
 }
 
-const DATE_COLUMNS: Record<string, string> = {
-  'Contract Start': 'contract_start',
-  'Contract End': 'contract_end',
-}
-
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'Candidate_name',
   'Technology': 'technology',
@@ -47,19 +39,9 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Primary Employee': 'employee_name',
   'Backup Employee': 'backup_employee_name',
   'Status': 'status',
-  'Project Type': 'project_type',
 }
 
 const PAGE_SIZES = [25, 50, 100] as const
-
-function inRange(val: string | null, range: { start: string; end: string }): boolean {
-  if (!range.start && !range.end) return true
-  const d = (val || '').split('T')[0]
-  if (!d) return false
-  if (range.start && d < range.start) return false
-  if (range.end && d > range.end) return false
-  return true
-}
 
 function wordScore(val: string | null, q: string): number {
   const v = (val ?? '').toLowerCase()
@@ -94,9 +76,7 @@ const TableRow = memo(function TableRow({
           {rec.status || 'Active'}
         </span>
       </td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.project_type || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{formatDate(rec.contract_start)}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{formatDate(rec.contract_end)}</td>
+
     </tr>
   )
 })
@@ -120,17 +100,12 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   const [editing, setEditing] = useState<CandidateRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
+  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
-  const [bulkForm, setBulkForm] = useState({ status: '', notes: '', project_type: '', company_name: '', address: '' })
+  const [bulkForm, setBulkForm] = useState({ status: '', notes: '', company_name: '', address: '' })
   const [bulkSaving, setBulkSaving] = useState(false)
-  const [activeDateFilter, setActiveDateFilter] = useState<string | null>(null)
-  const [dateFilters, setDateFilters] = useState({
-    contract_start: { start: '', end: '' },
-    contract_end: { start: '', end: '' },
-  })
   const [activeTextFilter, setActiveTextFilter] = useState<string | null>(null)
   const [textFilters, setTextFilters] = useState<Record<string, string[]>>({})
   const [textFilterSearch, setTextFilterSearch] = useState('')
@@ -139,7 +114,6 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
 
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
-  const dateFilterRef = useRef<HTMLTableSectionElement>(null)
 
   const fetchingRef = useRef(false)
   const fetchedRef = useRef(initialRecords.length > 0)
@@ -204,25 +178,22 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   }, [showExportMenu])
 
   useEffect(() => {
-    if (!activeDateFilter && !activeTextFilter) return
+    if (!activeTextFilter) return
     const handleClick = (e: MouseEvent) => {
-      if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
-        setActiveDateFilter(null)
-        setActiveTextFilter(null)
-      }
+      setActiveTextFilter(null)
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [activeDateFilter, activeTextFilter])
+  }, [activeTextFilter])
 
   const openModal = (rec?: CandidateRecord) => {
     if (rec) {
       setEditing(rec)
-      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', contract_start: rec.contract_start || '', contract_end: rec.contract_end || '', project_type: rec.project_type || '', notes: rec.notes || '', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '', technology: rec.technology || '' })
+      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', notes: rec.notes || '', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '', technology: rec.technology || '' })
       setSelectedEmployeeId(rec.owner_id || '')
     } else {
       setEditing(null)
-      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', contract_start: '', contract_end: '', project_type: '', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
+      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
       setSelectedEmployeeId('')
     }
     setError('')
@@ -292,7 +263,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
       toast.success(`Updated ${selectedIds.size} records`)
       setShowBulkModal(false)
       setSelectedIds(new Set())
-      setBulkForm({ status: '', notes: '', project_type: '', company_name: '', address: '' })
+      setBulkForm({ status: '', notes: '', company_name: '', address: '' })
       fetchRecords()
     } catch {
       toast.error('Failed to bulk update')
@@ -318,8 +289,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
-    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email, r.client_phone, r.company_name, r.employee_name, r.backup_employee_name, r.status, r.project_type, formatDate(r.contract_start), formatDate(r.contract_end), r.notes])
+    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Notes']
+    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email, r.client_phone, r.company_name, r.employee_name, r.backup_employee_name, r.status, r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -332,8 +303,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End', 'Notes']
-    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.backup_employee_name || '', r.status || '', r.project_type || '', formatDate(r.contract_start), formatDate(r.contract_end), r.notes || ''])
+    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Notes']
+    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.backup_employee_name || '', r.status || '', r.notes || ''])
 
     autoTable(doc, {
       head: [headers],
@@ -366,17 +337,14 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     return result
   }, [records])
 
-  const hasDateFilter = Object.values(dateFilters).some(r => r.start || r.end)
   const hasTextFilter = Object.values(textFilters).some(v => v.length > 0)
 
   const filtered = useMemo(() => {
     const hasSearch = !!query
     const hasStatus = statusFilter !== 'all'
-    if (!hasSearch && !hasStatus && !hasDateFilter && !hasTextFilter) return records
+    if (!hasSearch && !hasStatus && !hasTextFilter) return records
     return records.filter(r => {
       if (hasStatus && r.status !== statusFilter) return false
-      if (!inRange(r.contract_start, dateFilters.contract_start)) return false
-      if (!inRange(r.contract_end, dateFilters.contract_end)) return false
       for (const [header, selected] of Object.entries(textFilters)) {
         if (selected.length === 0) continue
         const fieldKey = TEXT_FILTER_COLUMNS[header]
@@ -389,13 +357,10 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
         wordScore(r.company_name, query) > 0 ||
         wordScore(r.Candidate_email, query) > 0 ||
         wordScore(r.client_phone, query) > 0 ||
-        wordScore(r.project_type, query) > 0 ||
         wordScore(r.address, query) > 0 ||
-        wordScore(r.notes, query) > 0 ||
-        wordScore(r.contract_start, query) > 0 ||
-        wordScore(r.contract_end, query) > 0
+        wordScore(r.notes, query) > 0
     })
-  }, [records, query, statusFilter, dateFilters, textFilters, hasDateFilter, hasTextFilter])
+  }, [records, query, statusFilter, textFilters, hasTextFilter])
 
   const sorted = useMemo(() => {
     if (!query) return filtered
@@ -405,11 +370,8 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
         wordScore(r.company_name, query),
         wordScore(r.Candidate_email, query),
         wordScore(r.client_phone, query),
-        wordScore(r.project_type, query),
         wordScore(r.address, query),
         wordScore(r.notes, query),
-        wordScore(r.contract_start, query),
-        wordScore(r.contract_end, query),
       )
       return { rec: r, score }
     })
@@ -427,11 +389,11 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
     if (page >= totalPages && totalPages > 0) setPage(0)
   }, [page, totalPages])
 
-  const anyFilterActive = hasDateFilter || hasTextFilter || statusFilter !== 'all' || !!searchInput
+  const anyFilterActive = hasTextFilter || statusFilter !== 'all' || !!searchInput
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <PageHeader title={isAdmin ? 'All Candidate Records' : 'My Candidates'} subtitle="Manage candidate information">
+      <PageHeader title={isAdmin ? 'All Marketing Profiles' : 'My Marketing Profile'} subtitle="Manage candidate information">
         <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">+ Add Candidate</button>
         <div ref={exportMenuRef} className="relative">
           <button onClick={() => setShowExportMenu(v => !v)} className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all">
@@ -466,7 +428,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
           <span className="text-xs text-[#71717a] whitespace-nowrap">{sorted.length} result{sorted.length !== 1 ? 's' : ''}</span>
         )}
         {anyFilterActive && (
-          <button onClick={() => { setDateFilters({ contract_start: { start: '', end: '' }, contract_end: { start: '', end: '' } }); setActiveDateFilter(null); setTextFilters({}); setActiveTextFilter(null); setStatusFilter('all'); setSearchInput(''); setSearch('') }}
+          <button onClick={() => { setTextFilters({}); setActiveTextFilter(null); setStatusFilter('all'); setSearchInput(''); setSearch('') }}
             className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2">
             Clear all filters
           </button>
@@ -482,7 +444,7 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
               const rec = records.find(r => r.id === id) || sorted.find(r => r.id === id)
               if (rec) { openModal(rec); setSelectedIds(new Set()); return }
             }
-            setBulkForm({ status: '', notes: '', project_type: '', company_name: '', address: '' }); setShowBulkModal(true)
+            setBulkForm({ status: '', notes: '', company_name: '', address: '' }); setShowBulkModal(true)
           }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
           {isAdmin && <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>}
           <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
@@ -490,12 +452,12 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
       )}
       </div>
 
-      <div className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${(activeDateFilter || activeTextFilter) ? 'overflow-visible' : 'overflow-hidden'}`}>
-        <div className={`flex-1 ${(activeDateFilter || activeTextFilter) ? 'overflow-hidden' : 'overflow-auto'}`}>
+      <div className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeTextFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
+        <div className={`flex-1 ${activeTextFilter ? 'overflow-hidden' : 'overflow-auto'}`}>
           <table className="w-full">
-            <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
+            <thead className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {['SELECT', 'Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Project Type', 'Contract Start', 'Contract End'].map(h => {
+                {['SELECT', 'Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status'].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -504,56 +466,22 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
                       </th>
                     )
                   }
-                  const dateKey = DATE_COLUMNS[h]
                   const textKey = TEXT_FILTER_COLUMNS[h]
-                  const isFilterable = dateKey || textKey
-                  const dateIsActive = dateKey && activeDateFilter === dateKey
                   const textIsActive = textKey && activeTextFilter === h
-                  const dateHasFilter = dateKey && !!(dateFilters[dateKey as keyof typeof dateFilters]?.start || dateFilters[dateKey as keyof typeof dateFilters]?.end)
                   const textHasFilter = textKey && (textFilters[h]?.length ?? 0) > 0
                   return (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap relative">
-                      {isFilterable ? (
+                      {textKey ? (
                         <div className="flex items-center gap-1.5">
                           <span>{h}</span>
-                          <button onClick={(e) => { e.stopPropagation(); if (dateKey) { setActiveDateFilter(dateIsActive ? null : dateKey); setActiveTextFilter(null) } else { setActiveTextFilter(textIsActive ? null : h); setActiveDateFilter(null) } }}
-                            className={`p-0.5 rounded transition-colors ${(dateHasFilter || textHasFilter) ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
+                          <button onClick={(e) => { e.stopPropagation(); setActiveTextFilter(textIsActive ? null : h) }}
+                            className={`p-0.5 rounded transition-colors ${textHasFilter ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                             </svg>
                           </button>
                         </div>
                       ) : h}
-                      {dateKey && dateIsActive && (
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3.5 z-[9999] shadow-2xl min-w-[260px]" onClick={e => e.stopPropagation()}>
-                          <div className="space-y-3">
-                            <div>
-                              <label className="block text-[10px] text-[#71717a] mb-1.5 font-medium">FROM</label>
-                              <input type="date" value={dateFilters[dateKey as keyof typeof dateFilters].start}
-                                onChange={e => setDateFilters(f => ({ ...f, [dateKey]: { ...f[dateKey as keyof typeof f], start: e.target.value } }))}
-                                className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 [color-scheme:dark]" />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] text-[#71717a] mb-1.5 font-medium">TO</label>
-                              <input type="date" value={dateFilters[dateKey as keyof typeof dateFilters].end}
-                                onChange={e => setDateFilters(f => ({ ...f, [dateKey]: { ...f[dateKey as keyof typeof f], end: e.target.value } }))}
-                                className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 [color-scheme:dark]" />
-                            </div>
-                            <div className="flex gap-2 pt-1">
-                              {dateHasFilter && (
-                                <button onClick={() => { setDateFilters(f => ({ ...f, [dateKey]: { start: '', end: '' } })); setActiveDateFilter(null) }}
-                                  className="flex-1 text-center text-xs text-[#71717a] hover:text-red-400 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-red-400/30 transition-colors">
-                                  Clear
-                                </button>
-                              )}
-                              <button onClick={() => setActiveDateFilter(null)}
-                                className="flex-1 text-center text-xs text-white bg-[#22c55e]/20 hover:bg-[#22c55e]/30 py-1.5 rounded-lg border border-[#22c55e]/40 transition-colors">
-                                Apply
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                       {textKey && textIsActive && (
                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl z-[9999] shadow-2xl min-w-[240px]" onClick={e => e.stopPropagation()}>
                           <div className="p-3.5 space-y-2">
@@ -600,13 +528,13 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 12 }).map((_, j) => (
+                    {Array.from({ length: 9 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={12} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 paginated.map(rec => (
                   <TableRow key={rec.id} rec={rec} selectedIds={selectedIds} toggleSelect={toggleSelect} />
@@ -709,9 +637,6 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
                 { label: 'Company Name', name: 'company_name', type: 'text' },
                 { label: 'Address', name: 'address', type: 'text' },
                 { label: 'Technology', name: 'technology', type: 'text' },
-                { label: 'Project Type', name: 'project_type', type: 'text' },
-                { label: 'Contract Start', name: 'contract_start', type: 'date' },
-                { label: 'Contract End', name: 'contract_end', type: 'date' },
               ].map(field => (
                 <div key={field.name}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
@@ -758,7 +683,6 @@ export default function CandidatesPage({ isAdmin = false, initialRecords = [], e
               {[
                 { label: 'Status', name: 'status', type: 'select', options: ['', 'Active', 'In-active', 'Closed'] },
                 { label: 'Notes', name: 'notes', type: 'textarea' },
-                { label: 'Project Type', name: 'project_type', type: 'text' },
                 { label: 'Company Name', name: 'company_name', type: 'text' },
                 { label: 'Address', name: 'address', type: 'text' },
               ].map(f => (
