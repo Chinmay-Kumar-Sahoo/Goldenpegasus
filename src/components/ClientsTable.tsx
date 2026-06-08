@@ -65,11 +65,7 @@ const TableRow = memo(function TableRow({
     <tr className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
       {!readOnly && <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>}
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.Candidate_name}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa]">
-        {rec.technology ? rec.technology.split(',').map(t => t.trim()).filter(Boolean).map(t => (
-          <span key={t} className="inline-block bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 px-2 py-0.5 rounded-md text-xs mr-1 mb-0.5">{t}</span>
-        )) : '—'}
-      </td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.technology || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.client_phone || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.company_name || '—'}</td>
@@ -112,7 +108,6 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const [activeTextFilter, setActiveTextFilter] = useState<string | null>(null)
   const [textFilters, setTextFilters] = useState<Record<string, string[]>>({})
   const [textFilterSearch, setTextFilterSearch] = useState('')
-  const [techInput, setTechInput] = useState('')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(50)
 
@@ -191,7 +186,6 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   }, [activeTextFilter])
 
   const openModal = (rec?: CandidateRecord) => {
-    setTechInput('')
     if (rec) {
       setEditing(rec)
       setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', notes: rec.notes || '', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '', technology: rec.technology || '' })
@@ -329,13 +323,9 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     for (const [header, fieldKey] of Object.entries(TEXT_FILTER_COLUMNS)) {
       const values = new Set<string>()
       for (const rec of records) {
-        let val = (rec as any)[fieldKey]
+        const val = (rec as any)[fieldKey]
         if (val == null || val === '') continue
-        if (fieldKey === 'technology') {
-          String(val).split(',').map(t => t.trim()).filter(Boolean).forEach(t => values.add(t))
-        } else {
-          values.add(String(val).trim())
-        }
+        values.add(String(val).trim())
       }
       result[header] = Array.from(values).sort((a, b) => a.localeCompare(b))
     }
@@ -351,13 +341,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
       for (const [header, selected] of Object.entries(textFilters)) {
         if (selected.length === 0) continue
         const fieldKey = TEXT_FILTER_COLUMNS[header]
-        let fieldVal = String((r as any)[fieldKey] ?? '').trim()
-        if (fieldKey === 'technology') {
-          const techs = fieldVal.split(',').map(t => t.trim()).filter(Boolean)
-          if (!techs.some(t => selected.includes(t))) return false
-        } else {
-          if (!selected.includes(fieldVal)) return false
-        }
+        const fieldVal = String((r as any)[fieldKey] ?? '').trim()
+        if (!selected.includes(fieldVal)) return false
       }
       if (!hasSearch) return true
       return         wordScore(r.Candidate_name, query) > 0 ||
@@ -365,8 +350,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
         wordScore(r.Candidate_email, query) > 0 ||
         wordScore(r.client_phone, query) > 0 ||
         wordScore(r.address, query) > 0 ||
-        wordScore(r.notes, query) > 0 ||
-        wordScore(r.technology ?? '', query) > 0
+        wordScore(r.notes, query) > 0
     })
   }, [records, query, textFilters, hasTextFilter])
 
@@ -380,7 +364,6 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
         wordScore(r.client_phone, query),
         wordScore(r.address, query),
         wordScore(r.notes, query),
-        wordScore(r.technology ?? '', query),
       )
       return { rec: r, score }
     })
@@ -634,10 +617,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
               </div>
               {[
                 { label: 'Candidate Name *', name: 'Candidate_name', type: 'text', required: true },
-                { label: 'Email', name: 'Candidate_email', type: 'email' },
-                { label: 'Phone', name: 'client_phone', type: 'text' },
-                { label: 'Company Name', name: 'company_name', type: 'text' },
-                { label: 'Address', name: 'address', type: 'text' },
+                { label: 'Technology', name: 'technology', type: 'text' },
                 { label: 'Email', name: 'Candidate_email', type: 'email' },
                 { label: 'Phone', name: 'client_phone', type: 'text' },
                 { label: 'Company Name', name: 'company_name', type: 'text' },
@@ -649,25 +629,6 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 </div>
               ))}
-              <div>
-                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Technology</label>
-                <div className="flex gap-2">
-                  <input type="text" value={techInput} placeholder="Add technology..." onChange={e => setTechInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const t = techInput.trim(); if (t) { setForm(f => ({ ...f, technology: f.technology ? `${f.technology}, ${t}` : t })); setTechInput('') } } }}
-                    className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 placeholder-[#3a3a3a]" />
-                  <button type="button" onClick={() => { const t = techInput.trim(); if (t) { setForm(f => ({ ...f, technology: f.technology ? `${f.technology}, ${t}` : t })); setTechInput('') } }}
-                    className="bg-[#22c55e]/20 hover:bg-[#22c55e]/30 text-[#22c55e] border border-[#22c55e]/40 px-3 py-2 rounded-xl text-xs font-medium transition-colors shrink-0">Add</button>
-                </div>
-                {(form.technology || '').split(',').map(t => t.trim()).filter(Boolean).length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {(form.technology || '').split(',').map(t => t.trim()).filter(Boolean).map(t => (
-                      <span key={t} className="inline-flex items-center gap-1 bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 px-2 py-0.5 rounded-md text-xs">
-                        {t}
-                        <button type="button" onClick={() => setForm(f => ({ ...f, technology: (f.technology || '').split(',').map(x => x.trim()).filter(x => x && x !== t).join(', ') }))} className="hover:text-red-400 transition-colors leading-none">&times;</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
               <div>
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Status *</label>
                 <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} required
