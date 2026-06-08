@@ -181,8 +181,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     const handleClick = (e: MouseEvent) => {
       setActiveTextFilter(null)
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
   }, [activeTextFilter])
 
   const openModal = (rec?: CandidateRecord) => {
