@@ -321,13 +321,18 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const uniqueValues = useMemo(() => {
     const result: Record<string, string[]> = {}
     for (const [header, fieldKey] of Object.entries(TEXT_FILTER_COLUMNS)) {
-      const values = new Set<string>()
+      const seen = new Set<string>()
+      const values: string[] = []
       for (const rec of records) {
         const val = (rec as any)[fieldKey]
         if (val == null || val === '') continue
-        values.add(String(val).trim())
+        const key = String(val).trim().toLowerCase()
+        if (!seen.has(key)) {
+          seen.add(key)
+          values.push(String(val).trim())
+        }
       }
-      result[header] = Array.from(values).sort((a, b) => a.localeCompare(b))
+      result[header] = values.sort((a, b) => a.localeCompare(b))
     }
     return result
   }, [records])
@@ -341,8 +346,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
       for (const [header, selected] of Object.entries(textFilters)) {
         if (selected.length === 0) continue
         const fieldKey = TEXT_FILTER_COLUMNS[header]
-        const fieldVal = String((r as any)[fieldKey] ?? '').trim()
-        if (!selected.includes(fieldVal)) return false
+        const fieldVal = String((r as any)[fieldKey] ?? '').trim().toLowerCase()
+        if (!selected.some(s => s.toLowerCase() === fieldVal)) return false
       }
       if (!hasSearch) return true
       return         wordScore(r.Candidate_name, query) > 0 ||
