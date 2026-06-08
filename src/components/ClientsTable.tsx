@@ -38,7 +38,6 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Company': 'company_name',
   'Primary Employee': 'employee_name',
   'Backup Employee': 'backup_employee_name',
-  'Status': 'status',
 }
 
 const PAGE_SIZES = [25, 50, 100] as const
@@ -96,7 +95,6 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>()
-  const [statusFilter, setStatusFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<CandidateRecord | null>(null)
   const [saving, setSaving] = useState(false)
@@ -290,8 +288,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Notes']
-    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email, r.client_phone, r.company_name, r.employee_name, r.backup_employee_name, r.status, r.notes])
+    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Notes']
+    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email, r.client_phone, r.company_name, r.employee_name, r.backup_employee_name, r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -304,8 +302,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status', 'Notes']
-    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.backup_employee_name || '', r.status || '', r.notes || ''])
+    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Notes']
+    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.backup_employee_name || '', r.notes || ''])
 
     autoTable(doc, {
       head: [headers],
@@ -342,15 +340,12 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
 
   const filtered = useMemo(() => {
     const hasSearch = !!query
-    const hasStatus = statusFilter !== 'all'
-    if (!hasSearch && !hasStatus && !hasTextFilter) return records
+    if (!hasSearch && !hasTextFilter) return records
     return records.filter(r => {
-      if (hasStatus && r.status !== statusFilter) return false
       for (const [header, selected] of Object.entries(textFilters)) {
         if (selected.length === 0) continue
         const fieldKey = TEXT_FILTER_COLUMNS[header]
         let fieldVal = String((r as any)[fieldKey] ?? '').trim()
-        if (!fieldVal && fieldKey === 'status') fieldVal = 'Active'
         if (!selected.includes(fieldVal)) return false
       }
       if (!hasSearch) return true
@@ -361,7 +356,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
         wordScore(r.address, query) > 0 ||
         wordScore(r.notes, query) > 0
     })
-  }, [records, query, statusFilter, textFilters, hasTextFilter])
+  }, [records, query, textFilters, hasTextFilter])
 
   const sorted = useMemo(() => {
     if (!query) return filtered
@@ -390,7 +385,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     if (page >= totalPages && totalPages > 0) setPage(0)
   }, [page, totalPages])
 
-  const anyFilterActive = hasTextFilter || statusFilter !== 'all' || !!searchInput
+  const anyFilterActive = hasTextFilter || !!searchInput
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -418,18 +413,11 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
             <button onClick={() => { setSearchInput(''); setSearch(''); setPage(0) }} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717a] hover:text-white transition-colors text-lg leading-none">&times;</button>
           )}
         </div>
-        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0) }}
-          className="bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-          <option value="all">All Status</option>
-          <option value="Active">Active</option>
-          <option value="In-active">In-active</option>
-          <option value="Closed">Closed</option>
-        </select>
         {searchInput && (
           <span className="text-xs text-[#71717a] whitespace-nowrap">{sorted.length} result{sorted.length !== 1 ? 's' : ''}</span>
         )}
         {anyFilterActive && (
-          <button onClick={() => { setTextFilters({}); setActiveTextFilter(null); setStatusFilter('all'); setSearchInput(''); setSearch('') }}
+          <button onClick={() => { setTextFilters({}); setActiveTextFilter(null); setSearchInput(''); setSearch('') }}
             className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2">
             Clear all filters
           </button>
@@ -458,7 +446,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status'].map(h => {
+                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee'].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -529,13 +517,13 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: readOnly ? 8 : 9 }).map((_, j) => (
+                    {Array.from({ length: readOnly ? 7 : 8 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={readOnly ? 8 : 9} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                <tr><td colSpan={readOnly ? 7 : 8} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 paginated.map(rec => (
                   <TableRow key={rec.id} rec={rec} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} />

@@ -106,7 +106,6 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Employee': 'employee_name',
   'Primary Employee': 'employee_name',
 
-  'Status': 'status',
   'Recruiter Organization': 'recruiter_name',
   'Recruiter Email': 'recruiter_email',
   '2nd Up Recruiter': 'organization_name',
@@ -218,8 +217,6 @@ export default function MarketingPage({
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>()
-  const statusFilterRef = useRef('all')
-  const [statusFilter, setStatusFilter] = useState('all')
   const [activeDateFilter, setActiveDateFilter] = useState<string | null>(null)
   const [dateFilters, setDateFilters] = useState({
     date: { start: '', end: '' },
@@ -339,12 +336,6 @@ export default function MarketingPage({
 
   useEffect(() => {
     return () => clearTimeout(searchDebounceRef.current)
-  }, [])
-
-  const handleStatusFilterChange = useCallback((value: string) => {
-    setStatusFilter(value)
-    statusFilterRef.current = value
-    setPage(0)
   }, [])
 
   const dateFilterRef = useRef<HTMLTableSectionElement>(null)
@@ -747,10 +738,8 @@ export default function MarketingPage({
     const q = search.toLowerCase().trim()
     const hasDateFilter = Object.values(dateFilters).some(r => r.start || r.end)
     const hasTextFilter = Object.values(textFilters).some(v => v.length > 0)
-    if (!q && statusFilter === 'all' && !hasDateFilter && !hasTextFilter) return records
+    if (!q && !hasDateFilter && !hasTextFilter) return records
     return records.filter(r => {
-      const displayStatus = r.status || 'Telephone Call'
-      if (statusFilter !== 'all' && displayStatus !== statusFilter) return false
       if (!inRange(r.date, dateFilters.date)) return false
       if (!inRange(r.interview_date, dateFilters.interview_date)) return false
       if (!inRange(r.project_start_date, dateFilters.project_start_date)) return false
@@ -772,7 +761,7 @@ export default function MarketingPage({
       ]
       return fields.some(f => f && f.toLowerCase().includes(q))
     })
-  }, [records, search, statusFilter, dateFilters, textFilters])
+  }, [records, search, dateFilters, textFilters])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const paginated = useMemo(() => {
@@ -785,8 +774,8 @@ export default function MarketingPage({
   }, [page, totalPages])
 
   const exportCSV = useCallback(() => {
-    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status, r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const rows = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -799,8 +788,8 @@ export default function MarketingPage({
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const data = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.status || '', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const data = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
 
     autoTable(doc, {
       head: [headers],
@@ -816,7 +805,7 @@ export default function MarketingPage({
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="shrink-0 space-y-4 mb-4">
-        <PageHeader title={isAdmin ? "All Marketing" : (readOnly ? "All Marketing" : "My Marketing")} subtitle={readOnly ? 'Read-only view of all marketing records' : 'Manage marketing records'}>
+        <PageHeader title={isAdmin ? "All Marketing Records" : (readOnly ? "All Marketing Records" : "My Marketing Records")} subtitle={readOnly ? 'Read-only view of all marketing records' : 'Manage marketing records'}>
         {!readOnly && (
           <>
             <input
@@ -859,18 +848,6 @@ export default function MarketingPage({
         <input type="text" placeholder="Search records..." value={searchInput} onChange={e => handleSearchChange(e.target.value)}
           suppressHydrationWarning
           className="flex-1 min-w-[200px] bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60" />
-        <select value={statusFilter} onChange={e => handleStatusFilterChange(e.target.value)}
-          suppressHydrationWarning
-          className="bg-[#111111] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-          <option value="all">All Status</option>
-          <option value="Initial Screening">Initial Screening</option>
-          <option value="Introductory call">Introductory call</option>
-          <option value="Project Received">Project Received</option>
-          <option value="RTR Confirmed">RTR Confirmed</option>
-          <option value="Screening Call">Screening Call</option>
-          <option value="Technical Interview">Technical Interview</option>
-          <option value="Telephone Call">Telephone Call</option>
-        </select>
         {Object.values(dateFilters).some(r => r.start || r.end) || Object.values(textFilters).some(v => v.length > 0) ? (
           <button onClick={() => { setDateFilters({ date: { start: '', end: '' }, interview_date: { start: '', end: '' }, project_start_date: { start: '', end: '' }, project_end_date: { start: '', end: '' } }); setActiveDateFilter(null); setTextFilters({}); setActiveTextFilter(null) }} suppressHydrationWarning
             className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2">
@@ -903,7 +880,7 @@ export default function MarketingPage({
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
+                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
