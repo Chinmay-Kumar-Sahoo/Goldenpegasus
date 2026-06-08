@@ -447,7 +447,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee'].map(h => {
+                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status'].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -518,13 +518,13 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: readOnly ? 7 : 8 }).map((_, j) => (
+                    {Array.from({ length: readOnly ? 8 : 9 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={readOnly ? 7 : 8} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                <tr><td colSpan={readOnly ? 8 : 9} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 paginated.map(rec => (
                   <TableRow key={rec.id} rec={rec} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} />
