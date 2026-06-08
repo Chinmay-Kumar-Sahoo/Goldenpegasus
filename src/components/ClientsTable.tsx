@@ -394,7 +394,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <PageHeader title={isAdmin ? 'All Marketing Profiles' : 'My Marketing Profile'} subtitle="Manage Marketing Profiles">
+      <PageHeader title={isAdmin || readOnly ? 'All Marketing Profiles' : 'My Marketing Profile'} subtitle={readOnly ? 'Read-only view of all marketing profiles' : 'Manage Marketing Profiles'}>
         {!readOnly && <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">+ Add Candidate</button>}
         <div ref={exportMenuRef} className="relative">
           <button onClick={() => setShowExportMenu(v => !v)} className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all">
