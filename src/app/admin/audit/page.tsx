@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/PageHeader'
 import { formatDate, formatDateTime } from '@/lib/format'
 
@@ -79,16 +78,9 @@ export default function AuditLogHistoryPage() {
     const fetchLogs = async () => {
       try {
         setLoading(true)
-        const supabase = createClient()
-        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-
-        const { data: logsData, error: err } = await supabase
-          .from('audit_logs')
-          .select('id, created_at, action, entity_type, entity_id, user_id, profiles(full_name)')
-          .gte('created_at', fourteenDaysAgo)
-          .order('created_at', { ascending: false })
-
-        if (err) throw err
+        const res = await fetch('/api/audit')
+        if (!res.ok) throw new Error((await res.json()).error || 'Failed to load audit logs')
+        const { data: logsData } = await res.json()
 
         const logs = (logsData || []) as AuditLog[]
         const groups: WeekGroup[] = []
