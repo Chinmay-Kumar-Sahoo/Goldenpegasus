@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
     // --- EDITING EXISTING RECORD ---
     const { data: existingRecord } = await supabase
       .from('marketing_records')
-      .select('owner_id, name')
+      .select('owner_id, name, technology')
       .eq('id', body.id)
       .single()
 
@@ -317,23 +317,27 @@ export async function POST(req: NextRequest) {
       .eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // If admin changed owner, sync to Candidate_records and related marketing records
+    // If admin changed owner, sync to Candidate_records and related marketing records (by name+technology)
     if (isAdminUser && effectiveOwnerId && effectiveOwnerId !== existingRecord.owner_id) {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
       if (serviceRoleKey) {
         const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-        // Update Candidate_records owner
-        await adminClient
-          .from('Candidate_records')
-          .update({ owner_id: effectiveOwnerId, updated_at: new Date().toISOString() })
-          .eq('Candidate_name', existingRecord.name)
+        // Update specific Candidate_records row (name + technology)
+        const candQ = adminClient.from('Candidate_records').update({ owner_id: effectiveOwnerId, updated_at: new Date().toISOString() }).eq('Candidate_name', existingRecord.name)
+        if (existingRecord.technology) {
+          await candQ.eq('technology', existingRecord.technology)
+        } else {
+          await candQ.is('technology', null)
+        }
 
-        // Update all marketing records for this candidate to sync owner
-        await adminClient
-          .from('marketing_records')
-          .update({ owner_id: effectiveOwnerId, employee_name: employeeName, updated_at: new Date().toISOString() })
-          .eq('name', existingRecord.name)
+        // Update marketing records with matching name + technology
+        const mktQ = adminClient.from('marketing_records').update({ owner_id: effectiveOwnerId, employee_name: employeeName, updated_at: new Date().toISOString() }).eq('name', existingRecord.name)
+        if (existingRecord.technology) {
+          await mktQ.eq('technology', existingRecord.technology)
+        } else {
+          await mktQ.is('technology', null)
+        }
       }
     }
 
@@ -360,16 +364,19 @@ export async function POST(req: NextRequest) {
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // If admin assigned a different employee, sync to Candidate_records
+  // If admin assigned a different employee, sync to Candidate_records (by name+technology)
   if (isAdminUser && selectedEmployeeId && recordData.name) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
     if (serviceRoleKey) {
       const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-      await adminClient
-        .from('Candidate_records')
-        .update({ owner_id: selectedEmployeeId, updated_at: new Date().toISOString() })
-        .eq('Candidate_name', recordData.name)
+      const q = adminClient.from('Candidate_records').update({ owner_id: selectedEmployeeId, updated_at: new Date().toISOString() }).eq('Candidate_name', recordData.name)
+      const tech = recordData.technology
+      if (tech) {
+        await q.eq('technology', tech)
+      } else {
+        await q.is('technology', null)
+      }
     }
   }
 

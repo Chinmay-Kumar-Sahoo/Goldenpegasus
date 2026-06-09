@@ -212,14 +212,15 @@ export async function PUT(req: NextRequest) {
 
     for (const item of (inserted || [])) insertedList.push(item)
 
-    // --- Update Candidate_records with backup owner info ---
+    // --- Update Candidate_records with backup owner info (keyed by name|technology) ---
     if (supabaseAdmin) {
       const candidateUpdates = new Map<string, { backupName?: string }>()
       for (const r of insertRecords) {
         if (r.backup_employee_name && r.name) {
-          const existing = candidateUpdates.get(normalize(r.name)) || {}
+          const key = normalize(r.name) + '|' + normalize(r.technology || '')
+          const existing = candidateUpdates.get(key) || {}
           if (r.backup_employee_name) existing.backupName = r.backup_employee_name
-          candidateUpdates.set(normalize(r.name), existing)
+          candidateUpdates.set(key, existing)
         }
       }
       if (candidateUpdates.size > 0) {
@@ -233,7 +234,8 @@ export async function PUT(req: NextRequest) {
           for (const p of (bpResult.data || [])) if (p.full_name) backupNameToId.set(normalize(p.full_name), p.id)
           for (const e of (beResult.data || [])) if (e.full_name) backupNameToId.set(normalize(e.full_name), e.user_id)
         }
-        for (const [actualCandidateName, update] of candidateUpdates) {
+        for (const [key, update] of candidateUpdates) {
+          const [namePart, techPart] = key.split('|')
           const candidatePayload: any = {}
           if (update.backupName) {
             const userId = backupNameToId.get(normalize(update.backupName))
@@ -243,7 +245,12 @@ export async function PUT(req: NextRequest) {
             }
           }
           if (Object.keys(candidatePayload).length > 0) {
-            await supabaseAdmin.from('Candidate_records').update(candidatePayload).eq('Candidate_name', actualCandidateName)
+            const q = supabaseAdmin.from('Candidate_records').update(candidatePayload).eq('Candidate_name', namePart)
+            if (techPart) {
+              await q.eq('technology', denormalize(techPart))
+            } else {
+              await q.is('technology', null)
+            }
           }
         }
       }
