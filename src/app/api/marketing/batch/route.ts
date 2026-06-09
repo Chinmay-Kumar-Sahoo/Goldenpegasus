@@ -98,6 +98,7 @@ export async function PUT(req: NextRequest) {
   const insertRecords: any[] = []
   const errors: { name: string; issues: string[] }[] = []
   let closedCount = 0
+  let debugInserts: any[] = []
 
   for (const r of records) {
     const issues: string[] = []
@@ -198,6 +199,15 @@ export async function PUT(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+    // Debug: log the first few inserted records to verify resolved employees
+    const debugInserts = insertRecords.slice(0, 5).map(r => ({
+      name: r.name,
+      technology: r.technology,
+      employee_name: r.employee_name,
+      backup_employee_name: r.backup_employee_name,
+      owner_id: r.owner_id,
+    }))
+
     for (const item of (inserted || [])) insertedList.push(item)
 
     // --- Update Candidate_records with backup owner info (keyed by name|technology) ---
@@ -259,6 +269,7 @@ export async function PUT(req: NextRequest) {
     closed: closedCount,
     errors,
     total: records.length,
+    _debug: debugInserts,
   })
 }
 
