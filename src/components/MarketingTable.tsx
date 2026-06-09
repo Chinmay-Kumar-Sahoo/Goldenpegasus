@@ -1082,10 +1082,10 @@ export default function MarketingPage({
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-white mb-6">{editing ? 'Edit Record' : 'Add Marketing Record'}</h2>
             <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
-              {/* Primary Employee - dropdown for admin (create + edit), auto-filled for non-admin */}
+              {/* Primary Employee - auto-filled when name+tech selected, dropdown for edit */}
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee{isAdmin ? ' *' : ''}</label>
-                {isAdmin ? (
+                {isAdmin && (editing || !form.employee_name) ? (
                   <select value={selectedEmployeeId} onChange={e => {
                     const empId = e.target.value
                     setSelectedEmployeeId(empId)
@@ -1104,10 +1104,10 @@ export default function MarketingPage({
                 )}
                 {!editing && <p className="text-[10px] text-[#71717a] mt-1">Auto-filled from Candidate Records</p>}
               </div>
-              {/* Backup Employee - dropdown for admin (create + edit), auto-filled for non-admin */}
+              {/* Backup Employee - auto-filled when name+tech selected, dropdown for edit */}
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
-                {isAdmin ? (
+                {isAdmin && (editing || !form.backup_employee_name) ? (
                   <select value={form.backup_employee_name || ''} onChange={e => setForm(prev => ({ ...prev, backup_employee_name: e.target.value }))}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">None</option>
