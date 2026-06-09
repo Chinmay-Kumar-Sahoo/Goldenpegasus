@@ -149,8 +149,8 @@ export async function GET(req: NextRequest) {
     return {
       ...r,
       status: (r as any).status || 'Telephone Call',
-      employee_name: (r as any).employee_name || primaryOwnerByCandidate[lookupKey] || ownerNames[r.owner_id] || 'Unknown employee',
-      backup_employee_name: (r as any).backup_employee_name || backupNamesByCandidate[lookupKey] || null,
+      employee_name: primaryOwnerByCandidate[lookupKey] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
+      backup_employee_name: backupNamesByCandidate[lookupKey] || (r as any).backup_employee_name || null,
       technology: (r as any).technology || null,
       last_reminder_sent_at: lastReminderByRecord[r.id] || null,
     }
@@ -173,14 +173,21 @@ export async function POST(req: NextRequest) {
   let effectiveOwnerId = user.id
   let employeeName = recordData.employee_name || null
 
-  // When creating a new record with candidate name, auto-fill from Candidate_records
+  // When creating a new record with candidate name + technology, auto-fill from Candidate_records
   if (!body.id && recordData.name) {
     const { data: candidates } = await supabase
       .from('Candidate_records')
       .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, technology')
       .eq('Candidate_name', recordData.name)
 
-    const matchedCandidate = candidates && candidates.length > 0 ? candidates[0] : null
+    // If technology is provided, find the matching Candidate_records row
+    const matchedCandidate = candidates && candidates.length > 0
+      ? (recordData.technology
+          ? candidates.find(
+              (c: any) => (c.technology || '').toLowerCase().trim() === (recordData.technology || '').toLowerCase().trim()
+            ) || candidates[0]
+          : candidates[0])
+      : null
 
     if (matchedCandidate) {
       if (selectedEmployeeId) {
