@@ -92,13 +92,15 @@ export default async function MyMarketingPage() {
     }
   }
 
+  const normalize = (s: string) => s.toLowerCase().trim()
   const backupNamesByCandidate: Record<string, string> = {}
   const primaryOwnerByCandidate: Record<string, string> = {}
   for (const c of (candidates || []) as any[]) {
-    const name = (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null)
-    if (name) backupNamesByCandidate[(c as any).Candidate_name] = name
+    const key = normalize((c as any).Candidate_name) + '|' + normalize((c as any).technology || '')
+    const backupName = (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null)
+    if (backupName) backupNamesByCandidate[key] = backupName
     if ((c as any).owner_id && ownerNames[(c as any).owner_id]) {
-      primaryOwnerByCandidate[(c as any).Candidate_name] = ownerNames[(c as any).owner_id]
+      primaryOwnerByCandidate[key] = ownerNames[(c as any).owner_id]
     }
   }
 
@@ -106,13 +108,16 @@ export default async function MyMarketingPage() {
   const closedCandidateNames = new Set((candidates || []).filter((c: any) => c.status === 'Closed').map((c: any) => c.Candidate_name))
   const activeMergedRecords = mergedRecords.filter(r => !closedCandidateNames.has(r.name))
 
-  const enrichedRecords = activeMergedRecords.map(r => ({
-    ...r,
-    status: (r as any).status || 'Telephone Call',
-    employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
-    backup_employee_name: backupNamesByCandidate[r.name] || null,
-    technology: (r as any).technology || null,
-  }))
+  const enrichedRecords = activeMergedRecords.map(r => {
+    const lookupKey = normalize((r as any).name || '') + '|' + normalize((r as any).technology || '')
+    return {
+      ...r,
+      status: (r as any).status || 'Telephone Call',
+      employee_name: primaryOwnerByCandidate[lookupKey] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
+      backup_employee_name: backupNamesByCandidate[lookupKey] || null,
+      technology: (r as any).technology || null,
+    }
+  })
 
   const candidateOptions = (candidates || [])
     .filter((c: any) => c.status !== 'Closed')

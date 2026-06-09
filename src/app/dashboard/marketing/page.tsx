@@ -49,10 +49,11 @@ export default async function AllMarketingPage() {
   let candidates: any[] = []
 
   if (candidateNames.length > 0) {
+    const nameFilters = candidateNames.map(n => `Candidate_name.ilike.${n}`).join(',')
     const { data: candidatesData } = await lookupClient
       .from('Candidate_records')
       .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology')
-      .in('Candidate_name', candidateNames)
+      .or(nameFilters)
 
     candidates = candidatesData || []
 
@@ -75,11 +76,13 @@ export default async function AllMarketingPage() {
       }
     }
 
+    const normalize = (s: string) => s.toLowerCase().trim()
     for (const c of candidates as any[]) {
-      const name = c.backup_employee_name || (c.backup_employee_id ? ownerNames[c.backup_employee_id] : null)
-      if (name) backupNamesByCandidate[c.Candidate_name] = name
+      const key = normalize(c.Candidate_name) + '|' + normalize(c.technology || '')
+      const backupName = c.backup_employee_name || (c.backup_employee_id ? ownerNames[c.backup_employee_id] : null)
+      if (backupName) backupNamesByCandidate[key] = backupName
       if (c.owner_id && ownerNames[c.owner_id]) {
-        primaryOwnerByCandidate[c.Candidate_name] = ownerNames[c.owner_id]
+        primaryOwnerByCandidate[key] = ownerNames[c.owner_id]
       }
     }
   }
@@ -88,12 +91,16 @@ export default async function AllMarketingPage() {
   const closedCandidateNames = new Set((candidates || []).filter((c: any) => c.status === 'Closed').map((c: any) => c.Candidate_name))
   const activeRecords = records.filter(r => !closedCandidateNames.has(r.name))
 
-  const enriched = activeRecords.map(r => ({
-    ...r,
-    employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
-    backup_employee_name: backupNamesByCandidate[r.name] || null,
-    technology: (r as any).technology || null,
-  }))
+  const normalize = (s: string) => s.toLowerCase().trim()
+  const enriched = activeRecords.map(r => {
+    const lookupKey = normalize((r as any).name || '') + '|' + normalize((r as any).technology || '')
+    return {
+      ...r,
+      employee_name: primaryOwnerByCandidate[lookupKey] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
+      backup_employee_name: backupNamesByCandidate[lookupKey] || null,
+      technology: (r as any).technology || null,
+    }
+  })
 
   return (
     <MarketingTable
