@@ -298,30 +298,49 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { ids } = await req.json()
-  if (!Array.isArray(ids) || ids.length === 0) {
-    return NextResponse.json({ error: 'No records specified' }, { status: 400 })
+    let ids: string[]
+    try {
+      const body = await req.json()
+      ids = body.ids
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: 'No records specified' }, { status: 400 })
+    }
+
+    // Validate that all ids are valid UUIDs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const invalidIds = ids.filter(id => typeof id !== 'string' || !uuidRegex.test(id))
+    if (invalidIds.length > 0) {
+      return NextResponse.json({ error: `Invalid record ID format: ${JSON.stringify(invalidIds.slice(0, 3))}${invalidIds.length > 3 ? `... (${invalidIds.length} total)` : ''}` }, { status: 400 })
+    }
+
+    // Use service role client to bypass RLS (preferred), fall back to auth client
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const deleteClient = (() => {
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+      if (serviceRoleKey) return createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      return supabase
+    })()
+
+    const { error: delError } = await deleteClient.from('marketing_records').delete().in('id', ids)
+    if (delError) return NextResponse.json({ error: `Delete failed: ${delError.message}` }, { status: 500 })
+
+    const { error: auditError } = await deleteClient.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'marketing_record', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))
+    if (auditError) return NextResponse.json({ error: `Audit log failed: ${auditError.message}` }, { status: 500 })
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: `Unexpected error: ${err.message}` }, { status: 500 })
   }
-
-  // Use service role client to bypass RLS (preferred), fall back to auth client
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const deleteClient = (() => {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-    if (serviceRoleKey) return createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-    return supabase
-  })()
-
-  const { error } = await deleteClient.from('marketing_records').delete().in('id', ids)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  await deleteClient.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'marketing_record', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))
-
-  return NextResponse.json({ success: true })
 }
