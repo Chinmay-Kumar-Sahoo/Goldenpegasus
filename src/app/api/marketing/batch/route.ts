@@ -310,10 +310,18 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'No records specified' }, { status: 400 })
   }
 
-  const { error } = await supabase.from('marketing_records').delete().in('id', ids)
+  // Use service role client to bypass RLS (no DELETE policies on marketing_records)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceRoleKey) {
+    return NextResponse.json({ error: 'Server configuration error: no service role key' }, { status: 500 })
+  }
+  const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+
+  const { error } = await adminClient.from('marketing_records').delete().in('id', ids)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'marketing_record', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))
+  await adminClient.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'marketing_record', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))
 
   return NextResponse.json({ success: true })
 }

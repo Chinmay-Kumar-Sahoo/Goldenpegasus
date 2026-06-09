@@ -406,12 +406,17 @@ export async function DELETE(req: NextRequest) {
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await req.json()
-  const { error } = await supabase.from('marketing_records').delete().eq('id', id)
+
+  // Use admin client to bypass RLS
+  const adminClient = getAdminClient()
+  if (!adminClient) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+
+  const { error } = await adminClient.from('marketing_records').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  await supabase.from('audit_logs').insert({
+  await adminClient.from('audit_logs').insert([{
     action: 'deleted', entity_type: 'marketing_record', entity_id: id,
     user_id: user.id, created_at: new Date().toISOString(),
-  })
+  }] as any)
   return NextResponse.json({ success: true })
 }
