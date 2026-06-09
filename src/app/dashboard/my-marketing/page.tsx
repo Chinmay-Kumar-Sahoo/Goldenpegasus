@@ -126,6 +126,7 @@ export default async function MyMarketingPage() {
     name: c.Candidate_name,
     owner_id: c.owner_id,
     status: c.status,
+    technology: (c as any).technology || null,
     backup_employee_id: c.backup_employee_id,
     backup_employee_name: (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null) || null,
   }))
