@@ -87,15 +87,9 @@ export async function GET(req: NextRequest) {
       : Promise.resolve({} as Record<string, string>),
     candidateNames.length > 0
       ? (async () => {
-          // Try exact match first, then case-insensitive fallback for unmatched names
-          const { data: exact } = await lookupClient.from('Candidate_records').select(CANDIDATE_FIELDS).in('Candidate_name', candidateNames)
-          const exactSet = new Set((exact || []).map((c: any) => c.Candidate_name.toLowerCase().trim()))
-          const unmatched = candidateNames.filter(n => !exactSet.has(n.toLowerCase().trim()))
-          if (unmatched.length === 0) return { data: exact || [] }
-          // Fetch unmatched candidates with case-insensitive matching
-          const ilikeFilters = unmatched.map(n => `Candidate_name.ilike.${n}`).join(',')
-          const { data: fallback } = await lookupClient.from('Candidate_records').select(CANDIDATE_FIELDS).or(ilikeFilters)
-          return { data: [...(exact || []), ...(fallback || [])] }
+          const ilikeFilters = candidateNames.map(n => `Candidate_name.ilike.${n}`).join(',')
+          const { data } = await lookupClient.from('Candidate_records').select(CANDIDATE_FIELDS).or(ilikeFilters)
+          return { data: data || [] }
         })()
       : Promise.resolve({ data: [] }),
     lookupClient.from('marketing_reminder_logs').select('marketing_record_id, sent_at').is('error', null).in('marketing_record_id', data.map(r => r.id)).order('sent_at', { ascending: false }),
@@ -188,7 +182,7 @@ export async function POST(req: NextRequest) {
     const { data: candidates } = await supabase
       .from('Candidate_records')
       .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, technology')
-      .eq('Candidate_name', recordData.name)
+      .ilike('Candidate_name', recordData.name)
 
     // If technology is provided, find the matching Candidate_records row
     const matchedCandidate = candidates && candidates.length > 0
@@ -278,7 +272,7 @@ export async function POST(req: NextRequest) {
       const { data: candidate } = await supabase
         .from('Candidate_records')
         .select('id')
-        .eq('Candidate_name', existingRecord.name)
+        .ilike('Candidate_name', existingRecord.name)
         .eq('backup_employee_id', user.id)
         .maybeSingle()
 
@@ -334,7 +328,7 @@ export async function POST(req: NextRequest) {
       if (serviceRoleKey) {
         const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
         // Update specific Candidate_records row (name + technology)
-        const candQ = adminClient.from('Candidate_records').update({ owner_id: effectiveOwnerId, updated_at: new Date().toISOString() }).eq('Candidate_name', existingRecord.name)
+        const candQ = adminClient.from('Candidate_records').update({ owner_id: effectiveOwnerId, updated_at: new Date().toISOString() }).ilike('Candidate_name', existingRecord.name)
         if (existingRecord.technology) {
           await candQ.eq('technology', existingRecord.technology)
         } else {
@@ -380,7 +374,7 @@ export async function POST(req: NextRequest) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
     if (serviceRoleKey) {
       const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-      const q = adminClient.from('Candidate_records').update({ owner_id: selectedEmployeeId, updated_at: new Date().toISOString() }).eq('Candidate_name', recordData.name)
+      const q = adminClient.from('Candidate_records').update({ owner_id: selectedEmployeeId, updated_at: new Date().toISOString() }).ilike('Candidate_name', recordData.name)
       const tech = recordData.technology
       if (tech) {
         await q.eq('technology', tech)

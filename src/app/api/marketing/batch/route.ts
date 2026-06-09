@@ -46,28 +46,16 @@ export async function PUT(req: NextRequest) {
   // Gather unique candidate names from the import
   const rawCandidateNames = [...new Set(records.map((r: any) => (r.name || '').trim()).filter(Boolean))] as string[]
 
-  // Fetch Candidate_records by name (using service role to bypass RLS)
+  // Fetch Candidate_records by name (case-insensitive ilike)
   const lookupClient = supabaseAdmin || supabase
   let candidatesData: any[] = []
   if (rawCandidateNames.length > 0) {
+    const nameFilters = rawCandidateNames.map(n => `Candidate_name.ilike.${n}`).join(',')
     const { data } = await lookupClient
       .from('Candidate_records')
       .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology')
-      .in('Candidate_name', rawCandidateNames)
+      .or(nameFilters)
     candidatesData = data || []
-
-    // Fallback: case-insensitive matching for names not found by exact match
-    const foundCandidateNames = new Set(candidatesData.map(c => normalize(c.Candidate_name)))
-    const unmatchedCandidates = rawCandidateNames.filter(n => !foundCandidateNames.has(normalize(n)))
-    for (const cName of unmatchedCandidates) {
-      const { data: fallback } = await lookupClient
-        .from('Candidate_records')
-        .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology')
-        .ilike('Candidate_name', cName)
-      if (fallback) {
-        candidatesData = [...candidatesData, ...fallback]
-      }
-    }
   }
 
   // If non-admin, restrict to only candidates they are assigned to
@@ -245,7 +233,7 @@ export async function PUT(req: NextRequest) {
             }
           }
           if (Object.keys(candidatePayload).length > 0) {
-            const q = supabaseAdmin.from('Candidate_records').update(candidatePayload).eq('Candidate_name', namePart)
+            const q = supabaseAdmin.from('Candidate_records').update(candidatePayload).ilike('Candidate_name', namePart)
             if (techPart) {
               await q.eq('technology', denormalize(techPart))
             } else {
