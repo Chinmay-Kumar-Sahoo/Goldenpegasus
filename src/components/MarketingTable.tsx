@@ -725,7 +725,21 @@ export default function MarketingPage({
       if (isAdmin) setSelectedEmployeeId('')
       return
     }
-    const candidate = allCandidateOptions.find(c => c.name === form.name && c.technology === tech)
+    let candidate = allCandidateOptions.find(c => c.name === form.name && c.technology === tech)
+    if (!candidate) {
+      const matchingRecord = records.find(r => r.name === form.name && r.technology === tech)
+      if (matchingRecord) {
+        candidate = {
+          id: matchingRecord.id,
+          name: matchingRecord.name,
+          owner_id: matchingRecord.owner_id,
+          owner_name: matchingRecord.employee_name || null,
+          status: null,
+          technology: tech,
+          backup_employee_name: matchingRecord.backup_employee_name || null,
+        }
+      }
+    }
     let empName = '', backupName = '', empId = ''
     if (candidate) {
       if (candidate.owner_name) {
@@ -1131,7 +1145,10 @@ export default function MarketingPage({
                   <select value={form.technology} onChange={e => handleTechnologySelect(e.target.value)} required={!!form.name}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">{form.name ? 'Select Technology' : 'Select a candidate first'}</option>
-                    {form.name && [...new Set(allCandidateOptions.filter(c => c.name === form.name).map(c => c.technology).filter((t): t is string => !!t))].map(t => (
+                    {form.name && [...new Set([
+                      ...records.filter(r => r.name === form.name).map(r => r.technology).filter((t): t is string => !!t),
+                      ...allCandidateOptions.filter(c => c.name === form.name).map(c => c.technology).filter((t): t is string => !!t),
+                    ])].map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
