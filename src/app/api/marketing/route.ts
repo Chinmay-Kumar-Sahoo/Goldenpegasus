@@ -86,7 +86,17 @@ export async function GET(req: NextRequest) {
         })()
       : Promise.resolve({} as Record<string, string>),
     candidateNames.length > 0
-      ? lookupClient.from('Candidate_records').select(CANDIDATE_FIELDS).in('Candidate_name', candidateNames)
+      ? (async () => {
+          // Try exact match first, then case-insensitive fallback for unmatched names
+          const { data: exact } = await lookupClient.from('Candidate_records').select(CANDIDATE_FIELDS).in('Candidate_name', candidateNames)
+          const exactSet = new Set((exact || []).map((c: any) => c.Candidate_name.toLowerCase().trim()))
+          const unmatched = candidateNames.filter(n => !exactSet.has(n.toLowerCase().trim()))
+          if (unmatched.length === 0) return { data: exact || [] }
+          // Fetch unmatched candidates with case-insensitive matching
+          const ilikeFilters = unmatched.map(n => `Candidate_name.ilike.${n}`).join(',')
+          const { data: fallback } = await lookupClient.from('Candidate_records').select(CANDIDATE_FIELDS).or(ilikeFilters)
+          return { data: [...(exact || []), ...(fallback || [])] }
+        })()
       : Promise.resolve({ data: [] }),
     lookupClient.from('marketing_reminder_logs').select('marketing_record_id, sent_at').is('error', null).in('marketing_record_id', data.map(r => r.id)).order('sent_at', { ascending: false }),
   ])
@@ -95,13 +105,13 @@ export async function GET(req: NextRequest) {
   const candidatesData = candidatesResult.data || []
   const reminderLogs = reminderResult.data || []
 
-  // Filter out records whose candidate status is Closed
+  // Filter out records whose candidate status is Closed (normalised keys)
   const candidateStatusMap = new Map<string, string>()
   for (const c of candidatesData as any[]) {
-    if (c.Candidate_name && c.status) candidateStatusMap.set(c.Candidate_name, c.status)
+    if (c.Candidate_name && c.status) candidateStatusMap.set(c.Candidate_name.toLowerCase().trim(), c.status)
   }
   data = data.filter(r => {
-    const status = candidateStatusMap.get(r.name)
+    const status = candidateStatusMap.get((r.name || '').toLowerCase().trim())
     return !status || status !== 'Closed'
   })
   if (data.length === 0) {
@@ -125,11 +135,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Build lookup by candidate name + technology
+  // Build lookup by candidate name + technology (normalized keys)
   const backupNamesByCandidate: Record<string, string> = {}
   const primaryOwnerByCandidate: Record<string, string> = {}
   for (const c of candidatesData as any[]) {
-    const key = (c.Candidate_name || '') + '|' + (c.technology || '').toLowerCase().trim()
+    const key = (c.Candidate_name || '').toLowerCase().trim() + '|' + (c.technology || '').toLowerCase().trim()
     const backupName = c.backup_employee_name || (c.backup_employee_id ? ownerNames[c.backup_employee_id] : null)
     if (backupName) backupNamesByCandidate[key] = backupName
     if (c.owner_id && ownerNames[c.owner_id]) {
@@ -145,7 +155,7 @@ export async function GET(req: NextRequest) {
   }
 
   const enriched = data.map(r => {
-    const lookupKey = (r.name || '') + '|' + (r.technology || '').toLowerCase().trim()
+    const lookupKey = (r.name || '').toLowerCase().trim() + '|' + (r.technology || '').toLowerCase().trim()
     return {
       ...r,
       status: (r as any).status || 'Telephone Call',
