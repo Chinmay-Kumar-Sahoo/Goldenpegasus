@@ -705,6 +705,15 @@ export default function MarketingPage({
     return available.filter(c => c.status !== 'Closed')
   }, [allCandidateOptions, isAdmin, editing])
 
+  const uniqueCandidateNames = useMemo(() => {
+    const seen = new Set<string>()
+    return filteredCandidates.filter(c => {
+      if (seen.has(c.name)) return false
+      seen.add(c.name)
+      return true
+    }).map(c => c.name)
+  }, [filteredCandidates])
+
   const handleCandidateSelect = (candidateName: string) => {
     setForm(prev => ({ ...prev, name: candidateName, technology: '', employee_name: '', backup_employee_name: '' }))
     if (isAdmin) setSelectedEmployeeId('')
@@ -1104,8 +1113,8 @@ export default function MarketingPage({
                   <select value={form.name} onChange={e => handleCandidateSelect(e.target.value)} required
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">Select Candidate</option>
-                    {filteredCandidates.map(c => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
+                    {uniqueCandidateNames.map(name => (
+                      <option key={name} value={name}>{name}</option>
                     ))}
                   </select>
                 </div>
