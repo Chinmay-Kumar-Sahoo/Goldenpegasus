@@ -333,8 +333,13 @@ export async function DELETE(req: NextRequest) {
       return supabase
     })()
 
-    const { error: delError } = await deleteClient.from('marketing_records').delete().in('id', ids)
-    if (delError) return NextResponse.json({ error: `Delete failed: ${delError.message}` }, { status: 500 })
+    // Delete in batches of 50 to avoid URL length issues with PostgREST .in() filter
+    const BATCH_SIZE = 50
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batch = ids.slice(i, i + BATCH_SIZE)
+      const { error: delError } = await deleteClient.from('marketing_records').delete().in('id', batch)
+      if (delError) return NextResponse.json({ error: `Delete failed at batch ${i / BATCH_SIZE + 1}: ${delError.message}` }, { status: 500 })
+    }
 
     const { error: auditError } = await deleteClient.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'marketing_record', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))
     if (auditError) return NextResponse.json({ error: `Audit log failed: ${auditError.message}` }, { status: 500 })
