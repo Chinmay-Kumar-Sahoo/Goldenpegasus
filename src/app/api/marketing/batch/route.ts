@@ -92,12 +92,17 @@ export async function PUT(req: NextRequest) {
     for (const e of (be || [])) if (e.full_name) idToName.set(e.user_id, e.full_name)
   }
 
-  // Build candidate lookup by normalized name + technology
+  // Build candidate lookups: by normalized name, and by normalized name + technology
+  const candidateByName = new Map<string, any[]>()
   const candidateLookup = new Map<string, any>()
   for (const c of candidatesData) {
-    const key = normalize(c.Candidate_name) + '|' + normalize(c.technology || '')
-    if (!candidateLookup.has(key)) {
-      candidateLookup.set(key, c)
+    const nameKey = normalize(c.Candidate_name)
+    if (!candidateByName.has(nameKey)) candidateByName.set(nameKey, [])
+    candidateByName.get(nameKey)!.push(c)
+
+    const techKey = nameKey + '|' + normalize(c.technology || '')
+    if (!candidateLookup.has(techKey)) {
+      candidateLookup.set(techKey, c)
     }
   }
 
@@ -117,34 +122,44 @@ export async function PUT(req: NextRequest) {
       continue
     }
 
-    // --- Step 1: Find candidate by name + technology ---
-    const lookupKey = normalize(name) + '|' + normalize(technology)
-    const candidateInfo = candidateLookup.get(lookupKey)
-
-    if (!candidateInfo) {
-      issues.push(`Candidate "${name}" with technology "${technology}" not found in All Candidates Records`)
+    // --- Step 1: Check Candidate Name exists in All Marketing Profiles ---
+    const nameKey = normalize(name)
+    const nameMatches = candidateByName.get(nameKey)
+    if (!nameMatches || nameMatches.length === 0) {
+      issues.push(`Candidate "${name}" does not exist in All Marketing Profiles`)
       errors.push({ name, issues })
       continue
     }
 
-    // --- Step 2: Check candidate status (Active / In-active / Closed) ---
-    const candidateStatus = (candidateInfo.status || '').toLowerCase()
+    // --- Step 2: Check candidate Status (Active / In-active / Closed) ---
+    // The status is the same across all technology rows for a candidate
+    const firstMatch = nameMatches[0]
+    const candidateStatus = (firstMatch.status || '').toLowerCase()
     const isClosed = candidateStatus === 'closed'
-
     if (isClosed) {
       closedCount++
     }
 
-    // --- Step 3: Resolve primary employee from Candidate_records (NOT from Excel) ---
+    // --- Step 3: Match Candidate Name + Technology ---
+    const techKey = nameKey + '|' + normalize(technology)
+    const candidateInfo = candidateLookup.get(techKey)
+
+    if (!candidateInfo) {
+      // Name exists but technology doesn't match — show specific error
+      const availableTechs = nameMatches.map((c: any) => c.technology || '(no technology)').join(', ')
+      issues.push(`Technology "${technology || '(none)'}" not found for candidate "${name}". Available technologies: ${availableTechs}`)
+      errors.push({ name, issues })
+      continue
+    }
+
+    // --- Step 4: Resolve Primary Employee and Backup Employee from the matched row ---
     const primaryUserId = candidateInfo.owner_id || user.id
     const primaryUserName = idToName.get(primaryUserId) || null
-
-    // --- Step 4: Resolve backup employee from Candidate_records (NOT from Excel) ---
     const backupEmployeeName = candidateInfo.backup_employee_name
       || (candidateInfo.backup_employee_id ? idToName.get(candidateInfo.backup_employee_id) : null)
       || null
 
-    // --- Step 5: Validate marketing status against pre-loaded list ---
+    // --- Step 5: Validate Marketing Status against predefined list ---
     const rawStatus = (r.status || '').trim()
     const validStatus = MARKETING_STATUSES.has(rawStatus) ? rawStatus : 'Telephone Call'
 
@@ -175,7 +190,7 @@ export async function PUT(req: NextRequest) {
     })
   }
 
-  // If any candidate-not-found errors, reject entire batch
+  // If any validation errors, reject entire batch
   if (errors.length > 0) {
     return NextResponse.json({
       error: 'Import validation failed. No records were imported.',
