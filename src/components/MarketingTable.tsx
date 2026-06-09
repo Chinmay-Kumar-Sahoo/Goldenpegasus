@@ -456,12 +456,15 @@ export default function MarketingPage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedIds) }),
       })
-      if (!res.ok) throw new Error('Failed to bulk delete')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `Bulk delete failed (${res.status})`)
+      }
       toast.success(`Deleted ${selectedIds.size} records`)
       setSelectedIds(new Set())
       fetchRecords()
-    } catch {
-      toast.error('Failed to bulk delete')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to bulk delete')
     }
   }
 
