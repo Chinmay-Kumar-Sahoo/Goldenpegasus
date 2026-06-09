@@ -29,6 +29,11 @@ export async function PUT(req: NextRequest) {
     return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime())
   }
 
+  const MARKETING_STATUSES = new Set([
+    'Initial Screening', 'Introductory call', 'Project Received',
+    'RTR Confirmed', 'Screening Call', 'Technical Interview', 'Telephone Call',
+  ])
+
   const MAX_RECORDS = 1000
   if (records.length > MAX_RECORDS) {
     return NextResponse.json({
@@ -87,10 +92,10 @@ export async function PUT(req: NextRequest) {
     for (const e of (be || [])) if (e.full_name) idToName.set(e.user_id, e.full_name)
   }
 
-  // Build candidate lookup by normalized name
+  // Build candidate lookup by normalized name + technology
   const candidateLookup = new Map<string, any>()
   for (const c of candidatesData) {
-    const key = normalize(c.Candidate_name)
+    const key = normalize(c.Candidate_name) + '|' + normalize(c.technology || '')
     if (!candidateLookup.has(key)) {
       candidateLookup.set(key, c)
     }
@@ -104,6 +109,7 @@ export async function PUT(req: NextRequest) {
   for (const r of records) {
     const issues: string[] = []
     const name = (r.name || '').trim()
+    const technology = (r.technology || '').trim()
 
     if (!name) {
       issues.push('Row has no Candidate Name')
@@ -111,16 +117,17 @@ export async function PUT(req: NextRequest) {
       continue
     }
 
-    // --- Step 1: Find candidate by name (case-insensitive) ---
-    const candidateInfo = candidateLookup.get(normalize(name))
+    // --- Step 1: Find candidate by name + technology ---
+    const lookupKey = normalize(name) + '|' + normalize(technology)
+    const candidateInfo = candidateLookup.get(lookupKey)
 
     if (!candidateInfo) {
-      issues.push(`Candidate "${name}" not found in All Candidates Records`)
+      issues.push(`Candidate "${name}" with technology "${technology}" not found in All Candidates Records`)
       errors.push({ name, issues })
       continue
     }
 
-    // --- Step 2: Check candidate status ---
+    // --- Step 2: Check candidate status (Active / In-active / Closed) ---
     const candidateStatus = (candidateInfo.status || '').toLowerCase()
     const isClosed = candidateStatus === 'closed'
 
@@ -128,20 +135,23 @@ export async function PUT(req: NextRequest) {
       closedCount++
     }
 
-    // --- Step 3: Resolve primary employee from Candidate_records ---
+    // --- Step 3: Resolve primary employee from Candidate_records (NOT from Excel) ---
     const primaryUserId = candidateInfo.owner_id || user.id
-    const primaryUserName = idToName.get(primaryUserId) || r.employee_name || null
+    const primaryUserName = idToName.get(primaryUserId) || null
 
-    // --- Step 4: Resolve backup employee from Candidate_records ---
+    // --- Step 4: Resolve backup employee from Candidate_records (NOT from Excel) ---
     const backupEmployeeName = candidateInfo.backup_employee_name
       || (candidateInfo.backup_employee_id ? idToName.get(candidateInfo.backup_employee_id) : null)
-      || r.backup_employee_name
       || null
+
+    // --- Step 5: Validate marketing status against pre-loaded list ---
+    const rawStatus = (r.status || '').trim()
+    const validStatus = MARKETING_STATUSES.has(rawStatus) ? rawStatus : 'Telephone Call'
 
     insertRecords.push({
       name,
       date: isValidISODate(r.date) ? r.date : null,
-      status: r.status || 'Telephone Call',
+      status: validStatus,
       recruiter_name: r.recruiter_name || null,
       recruiter_email: r.recruiter_email || null,
       organization_name: r.organization_name || null,
@@ -156,7 +166,7 @@ export async function PUT(req: NextRequest) {
       implementation_poc_email: r.implementation_poc_email || null,
       interviewer_email: r.interviewer_email || null,
       notes: r.notes || null,
-      technology: r.technology || null,
+      technology: technology || null,
       employee_name: primaryUserName,
       backup_employee_name: backupEmployeeName,
       owner_id: primaryUserId,
@@ -226,7 +236,8 @@ export async function PUT(req: NextRequest) {
 
     // --- Audit log ---
     if (insertedList.length > 0) {
-      await supabase.from('audit_logs').insert(
+      const auditClient = supabaseAdmin || supabase
+      await auditClient.from('audit_logs').insert(
         insertedList.map((r: any) => ({ action: 'created', entity_type: 'marketing_record', entity_id: r.id, user_id: user.id, created_at: now }))
       )
     }
@@ -234,7 +245,7 @@ export async function PUT(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    imported: insertedList.length,
+    imported: insertedList.length - closedCount,
     closed: closedCount,
     errors,
     total: records.length,

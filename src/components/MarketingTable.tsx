@@ -105,6 +105,7 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Technology': 'technology',
   'Employee': 'employee_name',
   'Primary Employee': 'employee_name',
+  'Status': 'status',
 
   'Recruiter Organization': 'recruiter_name',
   'Recruiter Email': 'recruiter_email',
@@ -249,7 +250,7 @@ export default function MarketingPage({
 
   const fetchingRef = useRef(false)
   const fetchedRef = useRef(serverRecords.length > 0)
-  const toastRef = useRef(toast)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => { currentUserIdRef.current = propUserId }, [propUserId])
   useEffect(() => { serverOwnerNamesRef.current = serverOwnerNames }, [serverOwnerNames])
@@ -263,17 +264,20 @@ export default function MarketingPage({
 
   const fetchRecords = useCallback(async () => {
     if (fetchingRef.current) return
+    abortRef.current?.abort()
+    const abortController = new AbortController()
+    abortRef.current = abortController
     fetchingRef.current = true
     setLoading(true)
     setError('')
     try {
       const params = new URLSearchParams()
       if (!isAdmin && currentUserIdRef.current) params.set('owner_id', currentUserIdRef.current)
+      params.set('limit', '500')
       const qs = params.toString()
       const url = `/api/marketing${qs ? '?' + qs : ''}`
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000)
-      const res = await fetch(url, { signal: controller.signal })
+      const timeoutId = setTimeout(() => abortController.abort(), 30000)
+      const res = await fetch(url, { signal: abortController.signal })
       clearTimeout(timeoutId)
       if (!res.ok) throw new Error('Failed to load records')
       const json = await res.json()
@@ -282,15 +286,17 @@ export default function MarketingPage({
       setPage(0)
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        toastRef.current.error('Request timed out. Please try again.')
+        if (!abortController.signal.aborted) return
+        toast.error('Request timed out. Please try again.')
         setError('Request timed out')
       } else {
-        toastRef.current.error('Failed to load records.')
+        toast.error('Failed to load records.')
         setError(err.message || 'Failed to load records')
       }
     } finally {
       setLoading(false)
       fetchingRef.current = false
+      if (abortRef.current === abortController) abortRef.current = null
     }
   }, [isAdmin])
 
@@ -299,13 +305,14 @@ export default function MarketingPage({
       fetchedRef.current = true
       fetchRecords()
     }
+    return () => { abortRef.current?.abort() }
   }, [fetchRecords])
 
   // Fetch candidates from API if server-side options are empty
   useEffect(() => {
     if (candidateOptions.length > 0) return
     const controller = new AbortController()
-    fetch('/api/candidates', { signal: controller.signal })
+    fetch('/api/candidates?limit=500', { signal: controller.signal })
       .then(res => res.ok ? res.json() : null)
       .then(json => {
         if (json?.records) {
@@ -633,6 +640,7 @@ export default function MarketingPage({
       const batchRecords = importRows.map(row => {
         const payload: Record<string, any> = { name: row.name || '' }
         for (const key of Object.keys(row)) {
+          if (key === 'employee_name' || key === 'backup_employee_name') continue
           const val = (row as any)[key]
           if (val !== null && val !== '') payload[key] = val
         }
@@ -695,7 +703,17 @@ export default function MarketingPage({
   }, [allCandidateOptions, isAdmin, editing])
 
   const handleCandidateSelect = (candidateName: string) => {
-    const candidate = allCandidateOptions.find(c => c.name === candidateName)
+    setForm(prev => ({ ...prev, name: candidateName, technology: '', employee_name: '', backup_employee_name: '' }))
+    if (isAdmin) setSelectedEmployeeId('')
+  }
+
+  const handleTechnologySelect = (tech: string) => {
+    if (!form.name || !tech) {
+      setForm(prev => ({ ...prev, technology: tech, employee_name: '', backup_employee_name: '' }))
+      if (isAdmin) setSelectedEmployeeId('')
+      return
+    }
+    const candidate = allCandidateOptions.find(c => c.name === form.name && c.technology === tech)
     let empName = '', backupName = '', empId = ''
     if (candidate) {
       if (candidate.owner_name) {
@@ -707,7 +725,7 @@ export default function MarketingPage({
       backupName = candidate.backup_employee_name || ''
       empId = candidate.owner_id || ''
     }
-    setForm(prev => ({ ...prev, name: candidateName, employee_name: empName, backup_employee_name: backupName, technology: candidate?.technology || '' }))
+    setForm(prev => ({ ...prev, technology: tech, employee_name: empName, backup_employee_name: backupName }))
     if (isAdmin) setSelectedEmployeeId(empId)
   }
 
@@ -774,8 +792,8 @@ export default function MarketingPage({
   }, [page, totalPages])
 
   const exportCSV = useCallback(() => {
-    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const rows = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -788,8 +806,8 @@ export default function MarketingPage({
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const data = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
+    const data = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
 
     autoTable(doc, {
       head: [headers],
@@ -880,7 +898,7 @@ export default function MarketingPage({
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
+                {[...(!readOnly ? ['SELECT' as const] : []), 'Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', isAdmin ? 'Last Reminder' : ''].filter(Boolean).map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -1038,15 +1056,15 @@ export default function MarketingPage({
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-white mb-6">{editing ? 'Edit Record' : 'Add Marketing Record'}</h2>
             <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
-              {/* Primary Employee - dropdown in admin edit, auto-filled otherwise */}
+              {/* Primary Employee - dropdown for admin (create + edit), auto-filled for non-admin */}
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee{isAdmin && editing ? ' *' : ''}</label>
-                {isAdmin && editing ? (
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Primary Employee{isAdmin ? ' *' : ''}</label>
+                {isAdmin ? (
                   <select value={selectedEmployeeId} onChange={e => {
                     const empId = e.target.value
                     setSelectedEmployeeId(empId)
                     const emp = employeeOptions.find(e => e.id === empId)
-                    setForm({ ...form, employee_name: emp?.full_name || '' })
+                    setForm(prev => ({ ...prev, employee_name: emp?.full_name || '' }))
                   }} required
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">Select Primary Employee</option>
@@ -1060,11 +1078,11 @@ export default function MarketingPage({
                 )}
                 {!editing && <p className="text-[10px] text-[#71717a] mt-1">Auto-filled from Candidate Records</p>}
               </div>
-              {/* Backup Employee - dropdown in admin edit, auto-filled otherwise */}
+              {/* Backup Employee - dropdown for admin (create + edit), auto-filled for non-admin */}
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Backup Employee</label>
-                {isAdmin && editing ? (
-                  <select value={form.backup_employee_name || ''} onChange={e => setForm({ ...form, backup_employee_name: e.target.value })}
+                {isAdmin ? (
+                  <select value={form.backup_employee_name || ''} onChange={e => setForm(prev => ({ ...prev, backup_employee_name: e.target.value }))}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">None</option>
                     {employeeOptions.map(emp => (
@@ -1098,10 +1116,10 @@ export default function MarketingPage({
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Technology</label>
                 {!editing ? (
-                  <select value={form.technology} onChange={e => setForm({ ...form, technology: e.target.value })} required={!!form.name}
+                  <select value={form.technology} onChange={e => handleTechnologySelect(e.target.value)} required={!!form.name}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">{form.name ? 'Select Technology' : 'Select a candidate first'}</option>
-                    {form.name && allCandidateOptions.find(c => c.name === form.name)?.technology?.split(',').map(t => t.trim()).filter(Boolean).map(t => (
+                    {form.name && [...new Set(allCandidateOptions.filter(c => c.name === form.name).map(c => c.technology).filter((t): t is string => !!t))].map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>

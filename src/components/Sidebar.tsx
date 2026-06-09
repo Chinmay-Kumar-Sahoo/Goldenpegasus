@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useMemo, memo } from 'react'
 import BrandLogo from '@/components/BrandLogo'
 
 interface NavItem {
@@ -39,20 +39,43 @@ const employeeNav: NavItem[] = [
   { label: 'Custom Tables', href: '/dashboard/tables', icon: '🏗️' },
 ]
 
+const NavItemLink = memo(function NavItemLink({ item, active, collapsed }: { item: NavItem; active: boolean; collapsed: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      title={collapsed ? item.label : undefined}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
+        active
+          ? 'bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20'
+          : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'
+      }`}
+    >
+      <span className="text-base flex-shrink-0">{item.icon}</span>
+      {!collapsed && <span>{item.label}</span>}
+    </Link>
+  )
+})
+
 export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
 
   const nav = role === 'admin' ? adminNav : employeeNav
 
-  const isActive = (href: string) => {
-    if (href === '/admin' || href === '/dashboard') return pathname === href
-    return pathname.startsWith(href)
-  }
+  const activeMap = useMemo(() => {
+    const map: Record<string, boolean> = {}
+    for (const item of nav) {
+      if (item.href === '/admin' || item.href === '/dashboard') {
+        map[item.href] = pathname === item.href
+      } else {
+        map[item.href] = pathname.startsWith(item.href)
+      }
+    }
+    return map
+  }, [pathname, nav])
 
   return (
     <aside className={`${collapsed ? 'w-16' : 'w-64'} min-h-screen bg-[#111111] border-r border-[#2a2a2a] flex flex-col transition-all duration-300 flex-shrink-0`}>
-      {/* Logo */}
       <div className="p-4 border-b border-[#2a2a2a] flex items-center justify-between">
         {!collapsed && (
           <Link href="/" className="flex items-center gap-3">
@@ -71,26 +94,12 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {nav.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            title={collapsed ? item.label : undefined}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
-              isActive(item.href)
-                ? 'bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20'
-                : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'
-            }`}
-          >
-            <span className="text-base flex-shrink-0">{item.icon}</span>
-            {!collapsed && <span>{item.label}</span>}
-          </Link>
+          <NavItemLink key={item.href} item={item} active={activeMap[item.href]} collapsed={collapsed} />
         ))}
       </nav>
 
-      {/* User info */}
       <div className="p-3 border-t border-[#2a2a2a]">
         {collapsed ? (
           <div className="flex flex-col items-center mb-2 gap-2">

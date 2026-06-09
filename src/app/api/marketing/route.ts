@@ -2,26 +2,35 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
+const MARKETING_FIELDS = 'id, owner_id, name, date, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, status, technology, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, employee_name, backup_employee_name, created_at, updated_at'
+const CANDIDATE_FIELDS = 'Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology'
+
+let _adminClient: ReturnType<typeof createAdminClient> | null = null
+function getAdminClient() {
+  if (_adminClient) return _adminClient
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  if (key) _adminClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, { auth: { autoRefreshToken: false, persistSession: false } })
+  return _adminClient
+}
+
+const MAX_RECORDS = 500
+
 export async function GET(req: NextRequest) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-  const lookupClient = serviceRoleKey
-    ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-    : supabase
+  const startTime = Date.now()
+  const lookupClient = getAdminClient() || supabase
 
   const { searchParams } = new URL(req.url)
   const ownerFilter = searchParams.get('owner_id')
-
-  const startTime = Date.now()
+  const limitParam = Math.min(Number(searchParams.get('limit')) || MAX_RECORDS, MAX_RECORDS)
 
   let data: any[] = []
   if (ownerFilter) {
     const [ownedResult, backupCandidatesResult] = await Promise.all([
-      supabase.from('marketing_records').select('*').eq('owner_id', ownerFilter).order('created_at', { ascending: false }),
+      supabase.from('marketing_records').select(MARKETING_FIELDS).eq('owner_id', ownerFilter).order('created_at', { ascending: false }).limit(limitParam),
       supabase.from('Candidate_records').select('Candidate_name').eq('backup_employee_id', ownerFilter),
     ])
 
@@ -33,9 +42,10 @@ export async function GET(req: NextRequest) {
     if (backupNames.length > 0) {
       const { data: br } = await supabase
         .from('marketing_records')
-        .select('*')
+        .select(MARKETING_FIELDS)
         .in('name', backupNames)
         .order('created_at', { ascending: false })
+        .limit(limitParam)
       backupRecords = br || []
     }
 
@@ -48,8 +58,9 @@ export async function GET(req: NextRequest) {
   } else {
     const { data: allRecords, error } = await supabase
       .from('marketing_records')
-      .select('*')
+      .select(MARKETING_FIELDS)
       .order('created_at', { ascending: false })
+      .limit(limitParam)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     data = allRecords || []
   }
@@ -59,7 +70,7 @@ export async function GET(req: NextRequest) {
   }
 
   const ownerIds = Array.from(new Set(data.map(r => r.owner_id).filter(Boolean) as string[]))
-  const candidateNames = data.map(r => r.name).filter(Boolean)
+  const candidateNames = [...new Set(data.map(r => r.name).filter(Boolean))] as string[]
 
   const [ownerNamesResult, candidatesResult, reminderResult] = await Promise.all([
     ownerIds.length > 0
@@ -75,9 +86,9 @@ export async function GET(req: NextRequest) {
         })()
       : Promise.resolve({} as Record<string, string>),
     candidateNames.length > 0
-      ? lookupClient.from('Candidate_records').select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology').in('Candidate_name', candidateNames)
+      ? lookupClient.from('Candidate_records').select(CANDIDATE_FIELDS).in('Candidate_name', candidateNames)
       : Promise.resolve({ data: [] }),
-    supabase.from('marketing_reminder_logs').select('marketing_record_id, sent_at').is('error', null).in('marketing_record_id', data.map(r => r.id)).order('sent_at', { ascending: false }),
+    lookupClient.from('marketing_reminder_logs').select('marketing_record_id, sent_at').is('error', null).in('marketing_record_id', data.map(r => r.id)).order('sent_at', { ascending: false }),
   ])
 
   const ownerNames = ownerNamesResult
@@ -114,14 +125,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Build lookup by candidate name
+  // Build lookup by candidate name + technology
   const backupNamesByCandidate: Record<string, string> = {}
   const primaryOwnerByCandidate: Record<string, string> = {}
   for (const c of candidatesData as any[]) {
-    const name = c.backup_employee_name || (c.backup_employee_id ? ownerNames[c.backup_employee_id] : null)
-    if (name) backupNamesByCandidate[c.Candidate_name] = name
+    const key = (c.Candidate_name || '') + '|' + (c.technology || '').toLowerCase().trim()
+    const backupName = c.backup_employee_name || (c.backup_employee_id ? ownerNames[c.backup_employee_id] : null)
+    if (backupName) backupNamesByCandidate[key] = backupName
     if (c.owner_id && ownerNames[c.owner_id]) {
-      primaryOwnerByCandidate[c.Candidate_name] = ownerNames[c.owner_id]
+      primaryOwnerByCandidate[key] = ownerNames[c.owner_id]
     }
   }
 
@@ -132,14 +144,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const enriched = data.map(r => ({
-    ...r,
-    status: (r as any).status || 'Telephone Call',
-    employee_name: primaryOwnerByCandidate[r.name] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
-    backup_employee_name: backupNamesByCandidate[r.name] || null,
-    technology: (r as any).technology || null,
-    last_reminder_sent_at: lastReminderByRecord[r.id] || null,
-  }))
+  const enriched = data.map(r => {
+    const lookupKey = (r.name || '') + '|' + (r.technology || '').toLowerCase().trim()
+    return {
+      ...r,
+      status: (r as any).status || 'Telephone Call',
+      employee_name: (r as any).employee_name || primaryOwnerByCandidate[lookupKey] || ownerNames[r.owner_id] || 'Unknown employee',
+      backup_employee_name: (r as any).backup_employee_name || backupNamesByCandidate[lookupKey] || null,
+      technology: (r as any).technology || null,
+      last_reminder_sent_at: lastReminderByRecord[r.id] || null,
+    }
+  })
 
   return NextResponse.json({ records: enriched, timing: Date.now() - startTime })
 }

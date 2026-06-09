@@ -2,6 +2,19 @@ import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+const CANDIDATE_FIELDS = 'id, Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology, created_at, updated_at'
+const PROFILE_FIELDS = 'id, full_name, email'
+
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+function getAdminClient() {
+  if (_supabaseAdmin) return _supabaseAdmin
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  if (key) _supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, { auth: { autoRefreshToken: false, persistSession: false } })
+  return _supabaseAdmin
+}
+
+const MAX_RECORDS = 500
+
 export async function GET(req: NextRequest) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -9,59 +22,58 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const ownerFilter = searchParams.get('owner_id')
+  const limitParam = Math.min(Number(searchParams.get('limit')) || MAX_RECORDS, MAX_RECORDS)
 
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-  const supabaseAdmin = serviceRoleKey
-    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-    : null
-  const lookupClient = supabaseAdmin || supabase
+  const supabaseAdmin = getAdminClient()
+  const adminClient = supabaseAdmin
+  const lookupClient = adminClient || supabase
 
   let records: any[] = []
   if (ownerFilter) {
-    const ownedQuery = supabase.from('Candidate_records').select('*').eq('owner_id', ownerFilter).order('created_at', { ascending: false })
-    const backupQuery = supabaseAdmin
-      ? supabaseAdmin.from('Candidate_records').select('*').eq('backup_employee_id', ownerFilter).order('created_at', { ascending: false })
-      : supabase.from('Candidate_records').select('*').eq('backup_employee_id', ownerFilter).order('created_at', { ascending: false })
-
-    const [ownedResult, backupResult] = await Promise.all([ownedQuery, backupQuery])
+    const baseQuery = () => lookupClient.from('Candidate_records').select(CANDIDATE_FIELDS).order('created_at', { ascending: false }).limit(limitParam)
+    const [ownedResult, backupResult] = await Promise.all([
+      baseQuery().eq('owner_id', ownerFilter),
+      baseQuery().eq('backup_employee_id', ownerFilter),
+    ])
     if (ownedResult.error) return NextResponse.json({ error: ownedResult.error.message }, { status: 500 })
     if (backupResult.error) return NextResponse.json({ error: backupResult.error.message }, { status: 500 })
     const recordMap = new Map<string, any>()
     for (const r of (ownedResult.data || [])) recordMap.set(r.id, r)
-    for (const r of (backupResult.data || [])) {
-      if (!recordMap.has(r.id)) recordMap.set(r.id, r)
-    }
+    for (const r of (backupResult.data || [])) if (!recordMap.has(r.id)) recordMap.set(r.id, r)
     records = Array.from(recordMap.values())
   } else {
     const { data, error } = await lookupClient
       .from('Candidate_records')
-      .select('*')
+      .select(CANDIDATE_FIELDS)
       .order('created_at', { ascending: false })
+      .limit(limitParam)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     records = data || []
   }
 
   if (records.length === 0) {
-    return NextResponse.json({ records: [] })
+    return NextResponse.json({ records: [], timing: 0 })
   }
 
-  const ownerIds = Array.from(new Set(records.map(r => r.owner_id).filter(Boolean)))
-  const backupIds = Array.from(new Set(records.map(r => (r as any).backup_employee_id).filter(Boolean)))
-  const allIds = Array.from(new Set([...ownerIds, ...backupIds]))
+  const allIds = Array.from(new Set([
+    ...records.map(r => r.owner_id).filter(Boolean),
+    ...records.map(r => r.backup_employee_id as string | undefined).filter(Boolean),
+  ]))
 
-  const [{ data: profiles }, { data: employees }] = await Promise.all([
-    lookupClient.from('profiles').select('id, full_name, email').in('id', allIds.length > 0 ? allIds : ['']),
-    lookupClient.from('employees').select('user_id, full_name, email').in('user_id', allIds.length > 0 ? allIds : ['']),
-  ])
-
-  const ownerNames: Record<string, string> = {}
-  for (const p of (profiles || [])) if (p.id) ownerNames[p.id] = p.full_name || p.email || 'Unknown employee'
-  for (const e of (employees || [])) if (e.user_id) ownerNames[e.user_id] = e.full_name || e.email || ownerNames[e.user_id] || 'Unknown employee'
+  let ownerNames: Record<string, string> = {}
+  if (allIds.length > 0) {
+    const [{ data: profiles }, { data: employees }] = await Promise.all([
+      lookupClient.from('profiles').select(PROFILE_FIELDS).in('id', allIds),
+      lookupClient.from('employees').select('user_id, full_name, email').in('user_id', allIds),
+    ])
+    for (const p of (profiles || [])) if (p.id) ownerNames[p.id] = p.full_name || p.email || 'Unknown employee'
+    for (const e of (employees || [])) if (e.user_id) ownerNames[e.user_id] = e.full_name || e.email || ownerNames[e.user_id] || 'Unknown employee'
+  }
 
   const enriched = records.map(r => ({
     ...r,
-    employee_name: ownerNames[r.owner_id] || null,
-    backup_employee_name: (r as any).backup_employee_name || ((r as any).backup_employee_id ? ownerNames[(r as any).backup_employee_id] : null) || null,
+    employee_name: r.owner_id ? (ownerNames[r.owner_id] || null) : null,
+    backup_employee_name: r.backup_employee_name || (r.backup_employee_id ? (ownerNames[r.backup_employee_id] || null) : null),
   }))
 
   return NextResponse.json({ records: enriched })
