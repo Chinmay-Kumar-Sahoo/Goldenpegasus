@@ -70,10 +70,19 @@ export async function POST(request: Request) {
           },
           { onConflict: "user_id" },
         );
+
+        // Reset password to match .env.local
+        const { error: pwError } = await supabaseAdmin.auth.admin.updateUserById(
+          existingAdmin.id,
+          { password: defaultAdminPassword }
+        );
+        if (pwError) {
+          console.error("Failed to reset admin password:", pwError);
+        }
       }
 
       return NextResponse.json({
-        message: "Root admin account already exists",
+        message: "Root admin password reset. You can now sign in.",
         email: defaultAdminEmail,
         status: "already_exists",
       });
