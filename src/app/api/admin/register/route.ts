@@ -146,15 +146,8 @@ export async function POST(request: Request) {
         }, { onConflict: 'user_id' })
       } catch { /* admin_profiles table may not be available yet */ }
 
-      // Always create/update profiles entry for the new admin
-      await supabaseAdmin.from('profiles').upsert({
-        id: data.user.id,
-        email: normalizedEmail,
-        full_name: fullName,
-        role: 'admin',
-        must_change_password: false,
-        email_confirmed_at: data.user.email_confirmed_at
-      }, { onConflict: 'id' })
+      // Profile is created automatically by the handle_user_email_confirmed DB trigger
+      // when the user confirms their email. We do NOT create it here.
     }
 
     return NextResponse.json({

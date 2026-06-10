@@ -117,18 +117,54 @@ function VerifyContent() {
         setStatus("Verification successful! Redirecting...");
 
         // Check user role and redirect accordingly
+        let profileRole: string | null = null
         try {
           const { data: profile } = await supabase
             .from("profiles")
             .select("role")
             .eq("id", activeUser.id)
             .single();
-          if (profile?.role === "admin") {
-            router.push("/admin");
-            return;
-          }
+          profileRole = profile?.role ?? null;
         } catch (e) {
-          // Profile might not exist yet, proceed anyway
+          // Profile might not exist yet — DB trigger may still be running.
+          // Retry once after a short delay.
+          try {
+            await new Promise(r => setTimeout(r, 800));
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("role")
+              .eq("id", activeUser.id)
+              .single();
+            profileRole = profile?.role ?? null;
+          } catch {
+            profileRole = null;
+          }
+        }
+
+        // If still no profile, call the server to create it
+        if (!profileRole) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (session) {
+              await fetch('/api/admin/finalize-signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken: session.access_token })
+              });
+              // Check again
+              const { data: profile } = await supabase
+                .from("profiles")
+                .select("role")
+                .eq("id", activeUser.id)
+                .single();
+              profileRole = profile?.role ?? null;
+            }
+          } catch { /* give up — redirect will handle it */ }
+        }
+
+        if (profileRole === "admin") {
+          router.push("/admin");
+          return;
         }
 
         setTimeout(() => {
