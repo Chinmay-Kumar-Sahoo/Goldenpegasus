@@ -53,7 +53,7 @@ export async function PUT(req: NextRequest) {
     const nameFilters = rawCandidateNames.map(n => `Candidate_name.ilike.${n}`).join(',')
     const { data } = await lookupClient
       .from('Candidate_records')
-      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology')
+      .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology, linkedin_url')
       .or(nameFilters)
     candidatesData = data || []
   }

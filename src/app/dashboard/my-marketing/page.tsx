@@ -34,8 +34,8 @@ export default async function MyMarketingPage() {
   }
 
   const candidateQuery = supabaseAdmin
-    ? supabaseAdmin.from('Candidate_records').select('id, Candidate_name, owner_id, status, technology, backup_employee_id, backup_employee_name').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
-    : supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status, technology, backup_employee_id, backup_employee_name').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+    ? supabaseAdmin.from('Candidate_records').select('id, Candidate_name, owner_id, status, technology, linkedin_url, backup_employee_id, backup_employee_name').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+    : supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status, technology, linkedin_url, backup_employee_id, backup_employee_name').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
   const { data: candidates } = await candidateQuery
 
   const ownedCandidateNames = (candidates || []).filter(c => c.owner_id === uid).map(c => c.Candidate_name)
