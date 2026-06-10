@@ -58,7 +58,7 @@ type MarketingImportField =
 const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDate?: boolean }> = [
   { key: 'name', labels: ['Name', 'Candidate Name'] },
   { key: 'technology', labels: ['Technology'] },
-  { key: 'date', labels: ['Date'], isDate: true },
+  { key: 'date', labels: ['Date', 'Created Date', 'CreatedDate', 'Creation Date', 'Date Created', 'Created On', 'Create Date'], isDate: true },
   { key: 'status', labels: ['Status'] },
 
   { key: 'recruiter_name', labels: ['Recruiter', 'Recruiter Name'] },
