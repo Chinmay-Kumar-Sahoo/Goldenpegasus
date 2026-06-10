@@ -71,7 +71,7 @@ const TableRow = memo(function TableRow({
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
       <td className="px-4 py-3 text-sm">
         {rec.linkedin_url ? (
-          <a href={rec.linkedin_url} target="_blank" rel="noopener noreferrer"
+          <a href={rec.linkedin_url.startsWith('http') ? rec.linkedin_url : 'https://' + rec.linkedin_url} target="_blank" rel="noopener noreferrer"
             className="text-[#0a66c2] hover:underline text-sm truncate block max-w-[200px]" title={rec.linkedin_url}>
             LinkedIn
           </a>
@@ -214,6 +214,9 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     setSaving(true)
     setError('')
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
+    if (cleanForm.linkedin_url && typeof cleanForm.linkedin_url === 'string' && !/^https?:\/\//i.test(cleanForm.linkedin_url)) {
+      cleanForm.linkedin_url = 'https://' + cleanForm.linkedin_url
+    }
     const payload = editing
       ? { ...cleanForm, id: editing.id, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}), ...(form.backup_employee_id ? { backupEmployeeId: form.backup_employee_id } : {}) }
       : { ...cleanForm, Candidate_name: form.Candidate_name, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}), ...(form.backup_employee_id ? { backupEmployeeId: form.backup_employee_id } : {}) }
@@ -634,7 +637,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                 { label: 'Candidate Name *', name: 'Candidate_name', type: 'text', required: true },
                 { label: 'Technology', name: 'technology', type: 'text' },
                 { label: 'Email', name: 'Candidate_email', type: 'email' },
-                { label: 'LinkedIn URL', name: 'linkedin_url', type: 'url' },
+                { label: 'LinkedIn URL', name: 'linkedin_url', type: 'text' },
                 { label: 'Phone', name: 'client_phone', type: 'text' },
                 { label: 'Company Name', name: 'company_name', type: 'text' },
                 { label: 'Address', name: 'address', type: 'text' },
