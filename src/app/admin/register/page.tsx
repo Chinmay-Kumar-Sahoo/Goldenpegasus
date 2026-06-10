@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
-import { createClient } from '@/lib/supabase/client'
 
 export default function RegisterAdminPage() {
   const [form, setForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '' })
@@ -34,20 +33,11 @@ export default function RegisterAdminPage() {
     const timeoutId = setTimeout(() => controller.abort(), 30000)
 
     try {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        throw new Error('You must be logged in as an admin to register new admins.')
-      }
-
       const res = await fetch('/api/admin/register', {
         signal: controller.signal,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           fullName: form.fullName,
           email: form.email,
