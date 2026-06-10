@@ -1,15 +1,53 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
+async function verifyAdmin(request: Request) {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceRoleKey) return null
+
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceRoleKey,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
+  const authHeader = request.headers.get('Authorization')
+  if (!authHeader) return null
+
+  const token = authHeader.replace('Bearer ', '')
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
+  if (error || !user) return null
+
+  const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin') return null
+
+  return { supabaseAdmin, adminUserId: user.id }
+}
+
+async function resendConfirmation(supabaseAdmin: ReturnType<typeof createClient>, email: string) {
+  // Reset confirmation so a new email is triggered
+  const { data: existing } = await supabaseAdmin.auth.admin.listUsers()
+  const existingUser = existing?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
+  if (existingUser) {
+    // Unconfirm so resend will send a fresh email
+    await supabaseAdmin.auth.admin.updateUserById(existingUser.id, { email_confirmed_at: null })
+  }
+  const supabaseClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+  return supabaseClient.auth.resend({ type: 'signup', email })
+}
+
 export async function POST(request: Request) {
   try {
-    const { fullName, email, password } = await request.json()
+    const { fullName, email, password, resend } = await request.json()
 
-    if (!email || !password || !fullName) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!email) {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
 
-    // Check if SUPABASE_SERVICE_ROLE_KEY is configured
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
     if (!serviceRoleKey) {
       return NextResponse.json(
@@ -18,59 +56,46 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create a Supabase admin client with the service role key to bypass RLS
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
+      { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Verify the caller is an admin
-    const authHeader = request.headers.get('Authorization')
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Missing Authorization header' }, { status: 401 })
+    // Resend flow — no auth required so the new admin can request resend
+    if (resend) {
+      const { error: resendError } = await resendConfirmation(supabaseAdmin, email)
+      if (resendError) {
+        return NextResponse.json({ error: resendError.message }, { status: 400 })
+      }
+      return NextResponse.json({ message: 'Verification email resent.' })
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: verifyError } = await supabaseAdmin.auth.getUser(token)
-    if (verifyError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Create flow — requires admin auth
+    if (!password || !fullName) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
-    
-    // Check if caller is actually admin
-    const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden: Only admins can register new admins.' }, { status: 403 })
+
+    const verified = await verifyAdmin(request)
+    if (!verified) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const normalizedEmail = email.trim().toLowerCase()
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+
     const supabaseSignup = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
+      { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Alternate admins must confirm email before they can access the admin portal.
     const { data, error } = await supabaseSignup.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: `${appUrl.replace(/\/$/, '')}/auth/verify?next=/admin`,
-        data: {
-          full_name: fullName,
-          role: 'admin'
-        }
+        data: { full_name: fullName, role: 'admin' }
       }
     })
 
@@ -85,7 +110,7 @@ export async function POST(request: Request) {
         full_name: fullName,
         is_root: false,
         status: data.user.email_confirmed_at ? 'active' : 'pending_verification',
-        created_by: user.id,
+        created_by: verified.adminUserId,
         email_confirmed_at: data.user.email_confirmed_at
       }, { onConflict: 'user_id' })
 
