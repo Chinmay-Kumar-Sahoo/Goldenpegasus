@@ -33,9 +33,11 @@ async function checkEmailExists(email: string): Promise<string | null> {
   } catch { /* skip */ }
 
   // Check Auth users
-  const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers()
-  const existing = authUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
-  if (existing) return 'This email is already registered in the system.'
+  try {
+    const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers()
+    const existing = authUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
+    if (existing) return 'This email is already registered in the system.'
+  } catch { /* auth list may not be available */ }
 
   return null
 }

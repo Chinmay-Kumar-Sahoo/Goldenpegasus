@@ -29,15 +29,20 @@ export default function RegisterAdminPage() {
     }
 
     setLoading(true)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
+
     try {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
-        throw new Error('Not authenticated')
+        throw new Error('You must be logged in as an admin to register new admins.')
       }
 
       const res = await fetch('/api/admin/register', {
+        signal: controller.signal,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -50,6 +55,8 @@ export default function RegisterAdminPage() {
         })
       })
 
+      clearTimeout(timeoutId)
+
       const data = await res.json()
 
       if (!res.ok) {
@@ -58,8 +65,13 @@ export default function RegisterAdminPage() {
 
       setSuccessEmail(form.email)
     } catch (err: any) {
-      setError(err.message)
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Please check your connection and try again.')
+      } else {
+        setError(err.message)
+      }
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
     }
   }
@@ -68,8 +80,13 @@ export default function RegisterAdminPage() {
     if (!successEmail) return
     setError('')
     setLoading(true)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
+
     try {
       const res = await fetch('/api/admin/register', {
+        signal: controller.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,12 +96,20 @@ export default function RegisterAdminPage() {
           resend: true
         })
       })
+
+      clearTimeout(timeoutId)
+
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to resend')
       setError('')
     } catch (err: any) {
-      setError(err.message)
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Please check your connection and try again.')
+      } else {
+        setError(err.message)
+      }
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
     }
   }
