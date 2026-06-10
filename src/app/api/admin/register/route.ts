@@ -5,34 +5,31 @@ function getServiceRoleKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
 }
 
-function getAdminClient() {
-  const key = getServiceRoleKey()
-  return createClient(
+async function checkEmailExists(email: string): Promise<string | null> {
+  const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    key!,
+    getServiceRoleKey()!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
-}
 
-async function checkEmailExists(supabaseAdmin: ReturnType<typeof createClient>, email: string): Promise<string | null> {
   // Check admin_profiles
   try {
-    const { data: adminProfile } = await supabaseAdmin
+    const { data } = await supabaseAdmin
       .from('admin_profiles')
       .select('email, status')
       .eq('email', email)
       .maybeSingle()
-    if (adminProfile) return 'This email is already registered as an admin.'
+    if (data) return 'This email is already registered as an admin.'
   } catch { /* table may not exist yet */ }
 
   // Check profiles
   try {
-    const { data: profile } = await supabaseAdmin
+    const { data } = await supabaseAdmin
       .from('profiles')
       .select('email, role')
       .eq('email', email)
       .maybeSingle()
-    if (profile) return `This email is already registered as a${profile.role === 'admin' ? 'n' : ''} ${profile.role}.`
+    if (data && typeof data === 'object' && 'role' in data) return 'This email is already registered.'
   } catch { /* skip */ }
 
   // Check Auth users
@@ -47,7 +44,11 @@ async function verifyAdmin(request: Request) {
   const key = getServiceRoleKey()
   if (!key) return null
 
-  const supabaseAdmin = getAdminClient()
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    key,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
   const authHeader = request.headers.get('Authorization')
   if (!authHeader) return null
 
@@ -55,18 +56,13 @@ async function verifyAdmin(request: Request) {
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
   if (error || !user) return null
 
-  const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single() as any
   if (profile?.role !== 'admin') return null
 
-  return { supabaseAdmin, adminUserId: user.id }
+  return { adminUserId: user.id }
 }
 
-async function resendConfirmation(supabaseAdmin: ReturnType<typeof createClient>, email: string) {
-  const { data: existing } = await supabaseAdmin.auth.admin.listUsers()
-  const existingUser = existing?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
-  if (existingUser) {
-    await supabaseAdmin.auth.admin.updateUserById(existingUser.id, { email_confirmed_at: null })
-  }
+async function resendConfirmation(email: string) {
   const supabaseClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -91,11 +87,9 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabaseAdmin = getAdminClient()
-
     // Resend flow — no auth required so the invitee can request a resend
     if (resend) {
-      const { error: resendError } = await resendConfirmation(supabaseAdmin, normalizedEmail)
+      const { error: resendError } = await resendConfirmation(normalizedEmail)
       if (resendError) return NextResponse.json({ error: resendError.message }, { status: 400 })
       return NextResponse.json({ message: 'Verification email resent.' })
     }
@@ -109,7 +103,7 @@ export async function POST(request: Request) {
     if (!verified) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Check if email already exists
-    const existsError = await checkEmailExists(supabaseAdmin, normalizedEmail)
+    const existsError = await checkEmailExists(normalizedEmail)
     if (existsError) return NextResponse.json({ error: existsError }, { status: 409 })
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
@@ -135,7 +129,12 @@ export async function POST(request: Request) {
 
       // Upsert into admin_profiles
       try {
-        await supabaseAdmin.from('admin_profiles').upsert({
+        const adminClient = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          key,
+          { auth: { autoRefreshToken: false, persistSession: false } }
+        )
+        await adminClient.from('admin_profiles').upsert({
           user_id: data.user.id,
           email: normalizedEmail,
           full_name: fullName,
