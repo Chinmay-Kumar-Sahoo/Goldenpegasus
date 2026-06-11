@@ -74,7 +74,7 @@ const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDat
   { key: 'client_email', labels: ['Client Email'] },
   { key: 'implementation_poc_email', labels: ['Implementation POC Email'] },
   { key: 'interviewer_email', labels: ['Interviewer Email'] },
-  { key: 'notes', labels: ['Notes'] },
+  { key: 'notes', labels: ['Notes', 'Comments'] },
   { key: 'employee_name', labels: ['Primary Employee', 'Employee', 'Employee Name', 'Primary Owner'] },
   { key: 'backup_employee_name', labels: ['Backup Employee', 'Backup Employee Name', 'Secondary Employee'] },
 ]
