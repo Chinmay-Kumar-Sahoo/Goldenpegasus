@@ -208,6 +208,7 @@ export default function MarketingPage({
   }, [employeeOptions])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
+  const tableRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [clientCandidates, setClientCandidates] = useState<typeof candidateOptions>([])
   const todayIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
@@ -919,7 +920,7 @@ export default function MarketingPage({
       </div>
 
       {/* Table */}
-      <div className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${(activeDateFilter || activeTextFilter) ? 'overflow-visible' : 'overflow-hidden'}`}>
+      <div ref={tableRef} className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${(activeDateFilter || activeTextFilter) ? 'overflow-visible' : 'overflow-hidden'}`}>
         <div className={`flex-1 ${(activeDateFilter || activeTextFilter) ? 'overflow-hidden' : 'overflow-auto'}`}>
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
@@ -1062,12 +1063,12 @@ export default function MarketingPage({
           <div className="flex items-center gap-3">
             <span>Showing {(page * pageSize) + 1}-{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length} records</span>
             <div className="flex items-center gap-1">
-              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+              <button onClick={() => { setPage(p => Math.max(0, p - 1)); tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} disabled={page === 0}
                 className="px-2 py-1 rounded-lg border border-[#2a2a2a] hover:bg-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
                 Prev
               </button>
               <span className="px-2 text-white">{page + 1}/{totalPages}</span>
-              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+              <button onClick={() => { setPage(p => Math.min(totalPages - 1, p + 1)); tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} disabled={page >= totalPages - 1}
                 className="px-2 py-1 rounded-lg border border-[#2a2a2a] hover:bg-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
                 Next
               </button>
