@@ -44,7 +44,7 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
 
 const PAGE_SIZES = [25, 50, 100] as const
 
-function wordScore(val: string | null, q: string): number {
+function wordScore(val: string | null | undefined, q: string): number {
   const v = (val ?? '').toLowerCase()
   if (!v || !q) return 0
   const words = v.split(/[\s\-_./@]+/)
@@ -364,9 +364,12 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
       }
       if (!hasSearch) return true
       return         wordScore(r.Candidate_name, query) > 0 ||
-        wordScore(r.company_name, query) > 0 ||
+        wordScore(r.technology, query) > 0 ||
         wordScore(r.Candidate_email, query) > 0 ||
         wordScore(r.client_phone, query) > 0 ||
+        wordScore(r.company_name, query) > 0 ||
+        wordScore(r.employee_name, query) > 0 ||
+        wordScore(r.backup_employee_name, query) > 0 ||
         wordScore(r.address, query) > 0 ||
         wordScore(r.notes, query) > 0
     })
@@ -377,9 +380,12 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     const scored = filtered.map(r => {
       const score = Math.max(
         wordScore(r.Candidate_name, query),
-        wordScore(r.company_name, query),
+        wordScore(r.technology, query),
         wordScore(r.Candidate_email, query),
         wordScore(r.client_phone, query),
+        wordScore(r.company_name, query),
+        wordScore(r.employee_name, query),
+        wordScore(r.backup_employee_name, query),
         wordScore(r.address, query),
         wordScore(r.notes, query),
       )
