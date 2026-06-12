@@ -32,51 +32,44 @@ export default function AdminProfileContent({ initialProfile, initialEmployee, u
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+
     setSaving(true)
     setError('')
     setSuccess('')
+
     try {
       const userId = propUserId || (await supabase.auth.getUser()).data?.user?.id
-      if (!userId) { setError('User not authenticated'); setSaving(false); return }
+      if (!userId) { setError('User not authenticated'); return }
 
-      const [{ error: profError }, { error: empError }] = await Promise.all([
-        supabase.from('profiles').update({ full_name: profile.full_name, updated_at: new Date().toISOString() }).eq('id', userId),
-        supabase.from('employees').upsert({
-          user_id: userId,
-          employee_id: employee.employee_id || `ADM-${Date.now()}`,
-          full_name: profile.full_name,
-          email: profile.email,
-          contact: employee.contact || null,
-          address: employee.address || null,
-          date_of_birth: employee.date_of_birth || null,
-          joining_date: employee.joining_date || null,
-          company_id: employee.company_id || null,
-          designation: employee.designation || 'Administrator',
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' }),
-      ])
+      const { error: profError } = await supabase.from('profiles').update({ full_name: profile.full_name, updated_at: new Date().toISOString() }).eq('id', userId)
+      if (profError) { setError(profError.message); return }
 
-      if (profError) { setError(profError.message); setSaving(false); return }
-      if (empError) { setError(empError.message); setSaving(false); return }
+      const { error: empError } = await supabase.from('employees').upsert({
+        user_id: userId,
+        employee_id: employee.employee_id || `ADM-${Date.now()}`,
+        full_name: profile.full_name,
+        email: profile.email,
+        contact: employee.contact || null,
+        address: employee.address || null,
+        date_of_birth: employee.date_of_birth || null,
+        joining_date: employee.joining_date || null,
+        company_id: employee.company_id || null,
+        designation: employee.designation || 'Administrator',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+      if (empError) { setError(empError.message); return }
 
       if (newPassword) {
         if (newPassword !== confirmPassword) {
           setError('Passwords do not match.')
-          setSaving(false)
           return
         }
         if (newPassword.length < 8) {
           setError('Password must be at least 8 characters.')
-          setSaving(false)
           return
         }
-
         const { error: authError } = await supabase.auth.updateUser({ password: newPassword })
-        if (authError) {
-          setError(`Password update failed: ${authError.message}`)
-          setSaving(false)
-          return
-        }
+        if (authError) { setError(`Password update failed: ${authError.message}`); return }
         await supabase.from('profiles').update({ must_change_password: false }).eq('id', userId)
       }
 
