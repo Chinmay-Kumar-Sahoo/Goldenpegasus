@@ -405,6 +405,18 @@ export default function MarketingPage({
     e.preventDefault()
     setSaving(true)
     setError('')
+    // Client-side email validation
+    const emailFields = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
+    const isValidEmail = (v: string) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+    for (const field of emailFields) {
+      const val = form[field as keyof typeof form]
+      if (val && !isValidEmail(val)) {
+        const label = field.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+        setError(`"${val}" is not a valid email address in ${label}`)
+        setSaving(false)
+        return
+      }
+    }
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
     const payload = editing
       ? { ...cleanForm, id: editing.id, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}) }

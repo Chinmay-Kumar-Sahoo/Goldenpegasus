@@ -29,6 +29,10 @@ export async function PUT(req: NextRequest) {
     return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime())
   }
 
+  const EMAIL_FIELDS = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email'] as const
+
+  const isValidEmail = (v: string | null) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+
   const MARKETING_STATUSES = new Set([
     'Initial Screening', 'Introductory call', 'Project Received',
     'RTR Confirmed', 'Screening Call', 'Technical Interview', 'Telephone Call',
@@ -165,7 +169,20 @@ export async function PUT(req: NextRequest) {
       || (candidateInfo.backup_employee_id ? idToName.get(candidateInfo.backup_employee_id) : null)
       || null
 
-    // --- Step 5: Validate Marketing Status against predefined list ---
+    // --- Step 5: Validate email fields ---
+    for (const field of EMAIL_FIELDS) {
+      const val = r[field]
+      if (val && !isValidEmail(val)) {
+        const label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        issues.push(`"${val}" is not a valid email address in ${label}`)
+      }
+    }
+    if (issues.length > 0) {
+      errors.push({ name, issues })
+      continue
+    }
+
+    // --- Step 6: Validate Marketing Status against predefined list ---
     const rawStatus = (r.status || '').trim()
     const validStatus = MARKETING_STATUSES.has(rawStatus) ? rawStatus : 'Telephone Call'
 

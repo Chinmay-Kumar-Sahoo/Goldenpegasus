@@ -177,6 +177,17 @@ export async function POST(req: NextRequest) {
   let effectiveOwnerId = user.id
   let employeeName = recordData.employee_name || null
 
+  // Validate email fields
+  const emailFields = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
+  const isValidEmail = (v: string | null | undefined) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+  for (const field of emailFields) {
+    const val = recordData[field]
+    if (val && !isValidEmail(val)) {
+      const label = field.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+      return NextResponse.json({ error: `"${val}" is not a valid email address in ${label}` }, { status: 400 })
+    }
+  }
+
   // When creating a new record with candidate name + technology, auto-fill from Candidate_records
   if (!body.id && recordData.name) {
     const { data: candidates } = await supabase
