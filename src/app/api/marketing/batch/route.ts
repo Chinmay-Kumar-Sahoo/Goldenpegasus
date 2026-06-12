@@ -58,12 +58,15 @@ export async function PUT(req: NextRequest) {
     candidatesData = data || []
   }
 
-  // If non-admin, restrict to only candidates they are assigned to
-  if (!isAdmin) {
-    candidatesData = candidatesData.filter((c: any) =>
-      c.owner_id === user.id || c.backup_employee_id === user.id
-    )
-  }
+  // Build set of all candidate names that exist (regardless of assignment)
+  const allCandidateNameSet = new Set(candidatesData.map((c: any) => normalize(c.Candidate_name)))
+
+  // Determine which candidates are accessible to the current user
+  const accessibleRecords = !isAdmin
+    ? candidatesData.filter((c: any) => c.owner_id === user.id || c.backup_employee_id === user.id)
+    : candidatesData
+
+  const accessibleNameSet = new Set(accessibleRecords.map((c: any) => normalize(c.Candidate_name)))
 
   // Resolve names for IDs found in Candidate_records (owner_id, backup_employee_id)
   const allCandIds = [...new Set([
@@ -80,10 +83,10 @@ export async function PUT(req: NextRequest) {
     for (const e of (be || [])) if (e.full_name) idToName.set(e.user_id, e.full_name)
   }
 
-  // Build candidate lookups: by normalized name, and by normalized name + technology
+  // Build candidate lookups from ACCESSIBLE records only
   const candidateByName = new Map<string, any[]>()
   const candidateLookup = new Map<string, any>()
-  for (const c of candidatesData) {
+  for (const c of accessibleRecords) {
     const nameKey = normalize(c.Candidate_name)
     if (!candidateByName.has(nameKey)) candidateByName.set(nameKey, [])
     candidateByName.get(nameKey)!.push(c)
@@ -112,9 +115,24 @@ export async function PUT(req: NextRequest) {
 
     // --- Step 1: Check Candidate Name exists in All Marketing Profiles ---
     const nameKey = normalize(name)
-    const nameMatches = candidateByName.get(nameKey)
-    if (!nameMatches || nameMatches.length === 0) {
+
+    // First, check if the candidate exists at all (regardless of owner)
+    if (!allCandidateNameSet.has(nameKey)) {
       issues.push(`Candidate "${name}" does not exist in All Marketing Profiles`)
+      errors.push({ name, issues })
+      continue
+    }
+
+    // Next, for non-admin, check if the candidate is assigned to the current user
+    if (!isAdmin && !accessibleNameSet.has(nameKey)) {
+      issues.push(`Candidate "${name}" exists in All Marketing Profiles but is not assigned to you. Please contact an admin to assign this candidate.`)
+      errors.push({ name, issues })
+      continue
+    }
+
+    const nameMatches = candidateByName.get(nameKey)
+    if (!nameMatches) {
+      issues.push(`Candidate "${name}" row data unavailable. Please contact an admin.`)
       errors.push({ name, issues })
       continue
     }
