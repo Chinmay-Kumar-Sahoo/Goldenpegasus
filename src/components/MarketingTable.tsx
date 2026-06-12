@@ -247,6 +247,7 @@ export default function MarketingPage({
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkForm, setBulkForm] = useState({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', interviewer_email: '' })
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [cleaningUp, setCleaningUp] = useState(false)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(50)
 
@@ -408,7 +409,7 @@ export default function MarketingPage({
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
     // Client-side email validation (silently clear invalid emails in payload)
     const emailFields = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
-    const isValidEmail = (v: string) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+    const isValidEmail = (v: string) => !v || /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(v)
     for (const field of emailFields) {
       const val = cleanForm[field]
       if (val && !isValidEmail(val)) {
@@ -495,6 +496,22 @@ export default function MarketingPage({
       fetchRecords()
     } catch {
       toast.error('Failed to delete record')
+    }
+  }
+
+  const handleCleanup = async () => {
+    if (!confirm('Normalize company names and clean invalid emails in all existing records?')) return
+    setCleaningUp(true)
+    try {
+      const res = await fetch('/api/admin/marketing-cleanup', { method: 'POST' })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Cleanup failed')
+      toast.success(`Updated ${result.updated} fields, cleared ${result.emailCleared} invalid emails`)
+      fetchRecords()
+    } catch (err: any) {
+      toast.error(err.message || 'Cleanup failed')
+    } finally {
+      setCleaningUp(false)
     }
   }
 
@@ -900,6 +917,12 @@ export default function MarketingPage({
             <button onClick={() => openModal()} suppressHydrationWarning className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">
               + Add Record
             </button>
+            {isAdmin && (
+              <button onClick={handleCleanup} disabled={cleaningUp}
+                className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all disabled:opacity-50">
+                {cleaningUp ? 'Cleaning...' : 'Cleanup'}
+              </button>
+            )}
           </>
         )}
         <div ref={exportMenuRef} className="relative">

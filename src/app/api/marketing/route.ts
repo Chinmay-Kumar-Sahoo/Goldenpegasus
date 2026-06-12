@@ -179,13 +179,72 @@ export async function POST(req: NextRequest) {
 
   // Clean invalid email fields (silently clear, don't reject)
   const emailFields = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
-  const isValidEmail = (v: string | null | undefined) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+  const isValidEmail = (v: string | null | undefined) => !v || /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(v)
   for (const field of emailFields) {
     const val = recordData[field]
     if (val && !isValidEmail(val)) {
       recordData[field] = null
     }
   }
+
+  // Normalize company name fields
+  const COMPANY_VARIATIONS: Record<string, string> = {
+    'techm': 'Tech Mahindra',
+    'tech mahindra': 'Tech Mahindra',
+    'tech mahindra limited': 'Tech Mahindra',
+    'mahindra': 'Tech Mahindra',
+    'infosys': 'Infosys',
+    'infy': 'Infosys',
+    'tcs': 'TCS',
+    'tata consultancy services': 'TCS',
+    'tata consultancy': 'TCS',
+    'wipro': 'Wipro',
+    'wipro limited': 'Wipro',
+    'wipro technologies': 'Wipro',
+    'hcl': 'HCL',
+    'hcl technologies': 'HCL',
+    'hcl tech': 'HCL',
+    'accenture': 'Accenture',
+    'accenture technology': 'Accenture',
+    'accenture technologies': 'Accenture',
+    'cognizant': 'Cognizant',
+    'cognizant technology solutions': 'Cognizant',
+    'cts': 'Cognizant',
+    'ibm': 'IBM',
+    'i.b.m.': 'IBM',
+    'capgemini': 'Capgemini',
+    'capg': 'Capgemini',
+    'lti': 'LTI',
+    'l&t infotech': 'LTI',
+    'larsen & toubro infotech': 'LTI',
+    'mindtree': 'Mindtree',
+    'ltimindtree': 'LTI Mindtree',
+    'dell': 'Dell',
+    'dell technologies': 'Dell',
+    'deloitte': 'Deloitte',
+    'deloitte consulting': 'Deloitte',
+    'epam': 'EPAM',
+    'epam systems': 'EPAM',
+    'mphasis': 'Mphasis',
+    'hexaware': 'Hexaware',
+    'hexaware technologies': 'Hexaware',
+    'persistent': 'Persistent',
+    'persistent systems': 'Persistent',
+    'synechron': 'Synechron',
+    'teksystems': 'TekSystems',
+    'tek systems': 'TekSystems',
+    'randstad': 'Randstad',
+    'randstad technologies': 'Randstad',
+  }
+  const normalizeCompanyName = (value: string | null): string | null => {
+    if (!value) return null
+    const trimmed = value.trim().replace(/\s+/g, ' ')
+    if (!trimmed) return null
+    const key = trimmed.toLowerCase()
+    return COMPANY_VARIATIONS[key] || trimmed
+  }
+  if (recordData.organization_name) recordData.organization_name = normalizeCompanyName(recordData.organization_name)
+  if (recordData.implementation_partner) recordData.implementation_partner = normalizeCompanyName(recordData.implementation_partner)
 
   // When creating a new record with candidate name + technology, auto-fill from Candidate_records
   if (!body.id && recordData.name) {
@@ -306,6 +365,9 @@ export async function POST(req: NextRequest) {
       delete updatableFields.backup_employee_name
     }
     const updatePayload: any = { ...updatableFields, updated_at: new Date().toISOString() }
+    // Normalize company name fields on edit
+    if (updatePayload.organization_name) updatePayload.organization_name = normalizeCompanyName(updatePayload.organization_name)
+    if (updatePayload.implementation_partner) updatePayload.implementation_partner = normalizeCompanyName(updatePayload.implementation_partner)
 
     // Admin can edit date
     if (isAdminUser && date !== undefined) {
@@ -371,21 +433,17 @@ export async function POST(req: NextRequest) {
   delete insertData.selectedEmployeeId
   delete insertData.id
 
-  // --- Dedup: skip if same name+technology+owner_id already exists ---
+  // --- Dedup: skip if ALL user-facing fields match an existing record (same owner_id) ---
   if (insertData.name) {
-    let dupQuery = supabase
+    const dedupFields = ['name','date','status','recruiter_name','recruiter_email','organization_name','implementation_partner','end_client','project_start_date','project_end_date','interview_date','interview_type','client_name','client_email','implementation_poc_email','interviewer_email','notes','technology']
+    const buildKey = (r: any) => dedupFields.map(f => ((r[f] ?? '') + '').toLowerCase().trim()).join('|||') + '|||' + (r.owner_id || '')
+    const incomingKey = buildKey(insertData)
+    const { data: existing } = await supabase
       .from('marketing_records')
-      .select('id')
+      .select('id, name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, technology, owner_id')
       .eq('name', insertData.name)
       .eq('owner_id', effectiveOwnerId)
-    const tech = insertData.technology
-    if (tech) {
-      dupQuery = dupQuery.eq('technology', tech)
-    } else {
-      dupQuery = dupQuery.is('technology', null)
-    }
-    const { data: dupes } = await dupQuery.maybeSingle()
-    if (dupes) {
+    if (existing?.some(r => buildKey(r) === incomingKey)) {
       return NextResponse.json({ success: true, skipped: true })
     }
   }

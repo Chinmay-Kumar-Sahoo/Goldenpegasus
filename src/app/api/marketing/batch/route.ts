@@ -2,6 +2,66 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+const EMAIL_FIELDS = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email'] as const
+
+const isValidEmail = (v: string | null) => !v || /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(v)
+
+const COMPANY_VARIATIONS: Record<string, string> = {
+  'techm': 'Tech Mahindra',
+  'tech mahindra': 'Tech Mahindra',
+  'tech mahindra limited': 'Tech Mahindra',
+  'mahindra': 'Tech Mahindra',
+  'infosys': 'Infosys',
+  'infy': 'Infosys',
+  'tcs': 'TCS',
+  'tata consultancy services': 'TCS',
+  'tata consultancy': 'TCS',
+  'wipro': 'Wipro',
+  'wipro limited': 'Wipro',
+  'wipro technologies': 'Wipro',
+  'hcl': 'HCL',
+  'hcl technologies': 'HCL',
+  'hcl tech': 'HCL',
+  'accenture': 'Accenture',
+  'accenture technology': 'Accenture',
+  'accenture technologies': 'Accenture',
+  'cognizant': 'Cognizant',
+  'cognizant technology solutions': 'Cognizant',
+  'cts': 'Cognizant',
+  'ibm': 'IBM',
+  'i.b.m.': 'IBM',
+  'capgemini': 'Capgemini',
+  'capg': 'Capgemini',
+  'lti': 'LTI',
+  'l&t infotech': 'LTI',
+  'larsen & toubro infotech': 'LTI',
+  'mindtree': 'Mindtree',
+  'ltimindtree': 'LTI Mindtree',
+  'dell': 'Dell',
+  'dell technologies': 'Dell',
+  'deloitte': 'Deloitte',
+  'deloitte consulting': 'Deloitte',
+  'epam': 'EPAM',
+  'epam systems': 'EPAM',
+  'mphasis': 'Mphasis',
+  'hexaware': 'Hexaware',
+  'hexaware technologies': 'Hexaware',
+  'persistent': 'Persistent',
+  'persistent systems': 'Persistent',
+  'synechron': 'Synechron',
+  'teksystems': 'TekSystems',
+  'tek systems': 'TekSystems',
+  'randstad': 'Randstad',
+  'randstad technologies': 'Randstad',
+}
+const normalizeCompanyName = (value: string | null): string | null => {
+  if (!value) return null
+  const trimmed = value.trim().replace(/\s+/g, ' ')
+  if (!trimmed) return null
+  const key = trimmed.toLowerCase()
+  return COMPANY_VARIATIONS[key] || trimmed
+}
+
 export async function PUT(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -28,10 +88,6 @@ export async function PUT(req: NextRequest) {
     if (!s) return true
     return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime())
   }
-
-  const EMAIL_FIELDS = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email'] as const
-
-  const isValidEmail = (v: string | null) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
   const MARKETING_STATUSES = new Set([
     'Initial Screening', 'Introductory call', 'Project Received',
@@ -187,8 +243,8 @@ export async function PUT(req: NextRequest) {
       status: validStatus,
       recruiter_name: r.recruiter_name || null,
       recruiter_email: r.recruiter_email || null,
-      organization_name: r.organization_name || null,
-      implementation_partner: r.implementation_partner || null,
+      organization_name: normalizeCompanyName(r.organization_name),
+      implementation_partner: normalizeCompanyName(r.implementation_partner),
       end_client: r.end_client || null,
       project_start_date: isValidISODate(r.project_start_date) ? r.project_start_date : null,
       project_end_date: isValidISODate(r.project_end_date) ? r.project_end_date : null,
@@ -219,37 +275,60 @@ export async function PUT(req: NextRequest) {
     }, { status: 400 })
   }
 
-  // --- Dedup: skip records that already exist (same name+technology+owner_id) ---
+  // --- Dedup: skip records where ALL user-facing fields match an existing record (same owner_id) ---
+  const recordFields = ['name','date','status','recruiter_name','recruiter_email','organization_name','implementation_partner','end_client','project_start_date','project_end_date','interview_date','interview_type','client_name','client_email','implementation_poc_email','interviewer_email','notes','technology']
+  const buildFullKey = (r: any) => {
+    const parts = recordFields.map(f => normalize(String(r[f] ?? '') || ''))
+    parts.push(r.owner_id || '')
+    return parts.join('|||')
+  }
   let skippedCount = 0
   if (insertRecords.length > 0) {
     const existingKeys = new Set<string>()
-    const dedupKey = (r: any) => normalize(r.name || '') + '|' + normalize(r.technology || '') + '|' + (r.owner_id || '')
-    // Query existing marketing_records that match any of the incoming name+owner_id combos
-    const uniqueNameOwner = [...new Set(insertRecords.map(r => (r.name || '').trim() + '|||' + (r.owner_id || '')))]
-    for (const pair of uniqueNameOwner) {
-      const [n, oid] = pair.split('|||')
-      if (!n || !oid) continue
-      const { data: existing } = await supabase
-        .from('marketing_records')
-        .select('name, technology, owner_id')
-        .eq('name', n)
-        .eq('owner_id', oid)
-      for (const ex of (existing || [])) {
-        existingKeys.add(normalize(ex.name || '') + '|' + normalize(ex.technology || '') + '|' + (ex.owner_id || ''))
-      }
-    }
-    const deduped: typeof insertRecords = []
+    // Dedup within the import batch first
+    const batchDeduped: typeof insertRecords = []
+    const batchSeen = new Set<string>()
     for (const r of insertRecords) {
-      const key = dedupKey(r)
-      if (existingKeys.has(key)) {
+      const key = buildFullKey(r)
+      if (batchSeen.has(key)) {
         skippedCount++
       } else {
-        existingKeys.add(key)
-        deduped.push(r)
+        batchSeen.add(key)
+        batchDeduped.push(r)
       }
     }
     insertRecords.length = 0
-    insertRecords.push(...deduped)
+    insertRecords.push(...batchDeduped)
+    // Dedup against existing DB records
+    if (insertRecords.length > 0) {
+      const uniqueNameOwner = [...new Set(insertRecords.map(r => (r.name || '').trim() + '|||' + (r.owner_id || '')))]
+      const allExistingRecords: any[] = []
+      for (const pair of uniqueNameOwner) {
+        const [n, oid] = pair.split('|||')
+        if (!n || !oid) continue
+        const { data: existing } = await supabase
+          .from('marketing_records')
+          .select(`name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, technology, owner_id`)
+          .eq('name', n)
+          .eq('owner_id', oid)
+        if (existing) allExistingRecords.push(...existing)
+      }
+      for (const ex of allExistingRecords) {
+        existingKeys.add(buildFullKey(ex))
+      }
+      const dbDeduped: typeof insertRecords = []
+      for (const r of insertRecords) {
+        const key = buildFullKey(r)
+        if (existingKeys.has(key)) {
+          skippedCount++
+        } else {
+          existingKeys.add(key)
+          dbDeduped.push(r)
+        }
+      }
+      insertRecords.length = 0
+      insertRecords.push(...dbDeduped)
+    }
   }
 
   const insertedList: Array<{ id: string; name: string; owner_id: string }> = []
@@ -335,6 +414,18 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(ids) || ids.length === 0) {
     return NextResponse.json({ error: 'No records specified' }, { status: 400 })
   }
+
+  // Clean invalid email fields
+  for (const field of EMAIL_FIELDS) {
+    const val = updates[field]
+    if (val && !isValidEmail(val)) {
+      updates[field] = null
+    }
+  }
+
+  // Normalize company name fields
+  if (updates.organization_name) updates.organization_name = normalizeCompanyName(updates.organization_name)
+  if (updates.implementation_partner) updates.implementation_partner = normalizeCompanyName(updates.implementation_partner)
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const isAdmin = profile?.role === 'admin'
