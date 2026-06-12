@@ -441,7 +441,7 @@ export async function POST(req: NextRequest) {
     const { data: existing } = await supabase
       .from('marketing_records')
       .select('id, name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, technology, owner_id')
-      .eq('name', insertData.name)
+      .ilike('name', insertData.name)
       .eq('owner_id', effectiveOwnerId)
     if (existing?.some(r => buildKey(r) === incomingKey)) {
       return NextResponse.json({ success: true, skipped: true })

@@ -506,7 +506,7 @@ export default function MarketingPage({
       const res = await fetch('/api/admin/marketing-cleanup', { method: 'POST' })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Cleanup failed')
-      toast.success(`Updated ${result.updated} fields, cleared ${result.emailCleared} invalid emails`)
+      toast.success(`Updated ${result.updated} fields, cleared ${result.emailCleared} invalid emails, removed ${result.removedDupes} duplicates`)
       fetchRecords()
     } catch (err: any) {
       toast.error(err.message || 'Cleanup failed')

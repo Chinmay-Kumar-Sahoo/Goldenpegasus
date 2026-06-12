@@ -309,7 +309,7 @@ export async function PUT(req: NextRequest) {
         const { data: existing } = await supabase
           .from('marketing_records')
           .select(`name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, technology, owner_id`)
-          .eq('name', n)
+          .ilike('name', n)
           .eq('owner_id', oid)
         if (existing) allExistingRecords.push(...existing)
       }
