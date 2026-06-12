@@ -29,5 +29,5 @@ export default async function AdminProfilePage() {
     designation: employee.designation || '',
   } : undefined
 
-  return <AdminProfileContent initialProfile={initialProfile} initialEmployee={initialEmployee} />
+  return <AdminProfileContent initialProfile={initialProfile} initialEmployee={initialEmployee} userId={user.id} />
 }

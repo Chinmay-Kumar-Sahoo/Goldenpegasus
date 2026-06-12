@@ -19,7 +19,7 @@ interface Employee {
   designation: string
 }
 
-export default function ProfileContent({ initialProfile, initialEmployee }: { initialProfile?: Profile; initialEmployee?: Employee }) {
+export default function ProfileContent({ initialProfile, initialEmployee, userId: propUserId }: { initialProfile?: Profile; initialEmployee?: Employee; userId?: string }) {
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile>(initialProfile || { full_name: '', email: '' })
   const [employee, setEmployee] = useState<Employee>(initialEmployee || { employee_id: '', contact: '', address: '', date_of_birth: '', joining_date: '', company_id: '', designation: '' })
@@ -30,18 +30,13 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
   const fieldsLocked = !!(initialEmployee?.employee_id)
   const joiningDateLocked = !!(initialEmployee?.joining_date)
 
-  const ensureUserId = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    return user?.id
-  }
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError('')
     setSuccess('')
     try {
-      const userId = await ensureUserId()
+      const userId = propUserId || (await supabase.auth.getUser()).data?.user?.id
       if (!userId) { setError('User not authenticated'); setSaving(false); return }
 
       const [{ error: profError }, { error: empError }] = await Promise.all([
