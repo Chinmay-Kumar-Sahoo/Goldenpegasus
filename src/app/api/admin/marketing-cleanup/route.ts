@@ -109,13 +109,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // --- Remove duplicate records (same values across ALL user-facing fields + same owner_id) ---
-  const dedupFields = ['name','date','status','recruiter_name','recruiter_email','organization_name','implementation_partner','end_client','project_start_date','project_end_date','interview_date','interview_type','client_name','client_email','implementation_poc_email','interviewer_email','notes','technology']
+  // --- Remove duplicate records (same values across key user-facing fields + same owner_id) ---
+  // Excluding date fields and notes as those commonly vary between otherwise identical records
+  const dedupFields = ['name','technology','status','recruiter_name','recruiter_email','organization_name','implementation_partner','end_client','interview_type','client_name','client_email','implementation_poc_email','interviewer_email']
   const buildKey = (r: any) => dedupFields.map(f => ((r[f] ?? '') + '').toLowerCase().trim()).join('|||') + '|||' + (r.owner_id || '')
   let removedDupes = 0
   const { data: allRecords } = await adminClient
     .from('marketing_records')
-    .select('id, created_at, name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, technology, owner_id')
+    .select('id, created_at, name, technology, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, owner_id')
     .order('created_at', { ascending: true })
   if (allRecords?.length) {
     const seen = new Map<string, string>()
