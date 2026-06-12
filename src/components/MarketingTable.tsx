@@ -426,7 +426,11 @@ export default function MarketingPage({
       })
       const json = await res.json()
       if (!res.ok) { throw new Error(json.error || 'Failed to save record') }
-      toast.success(editing ? 'Record updated successfully' : 'Record added successfully')
+      if (json.skipped) {
+        toast.success('Record already exists — duplicate skipped')
+      } else {
+        toast.success(editing ? 'Record updated successfully' : 'Record added successfully')
+      }
       setSaving(false)
       setShowModal(false)
       fetchRecords()
@@ -683,6 +687,7 @@ export default function MarketingPage({
 
       const parts: string[] = [`Imported ${result.imported} record${result.imported === 1 ? '' : 's'}`]
       if (result.closed > 0) parts.push(`${result.closed} for Closed candidates (hidden)`)
+      if (result.skipped > 0) parts.push(`${result.skipped} duplicate${result.skipped === 1 ? '' : 's'} skipped`)
       const summary = parts.join(', ')
       const errors = result.errors || []
       if (errors.length > 0) {

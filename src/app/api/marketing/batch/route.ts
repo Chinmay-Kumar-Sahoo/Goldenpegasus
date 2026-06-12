@@ -219,6 +219,39 @@ export async function PUT(req: NextRequest) {
     }, { status: 400 })
   }
 
+  // --- Dedup: skip records that already exist (same name+technology+owner_id) ---
+  let skippedCount = 0
+  if (insertRecords.length > 0) {
+    const existingKeys = new Set<string>()
+    const dedupKey = (r: any) => normalize(r.name || '') + '|' + normalize(r.technology || '') + '|' + (r.owner_id || '')
+    // Query existing marketing_records that match any of the incoming name+owner_id combos
+    const uniqueNameOwner = [...new Set(insertRecords.map(r => (r.name || '').trim() + '|||' + (r.owner_id || '')))]
+    for (const pair of uniqueNameOwner) {
+      const [n, oid] = pair.split('|||')
+      if (!n || !oid) continue
+      const { data: existing } = await supabase
+        .from('marketing_records')
+        .select('name, technology, owner_id')
+        .eq('name', n)
+        .eq('owner_id', oid)
+      for (const ex of (existing || [])) {
+        existingKeys.add(normalize(ex.name || '') + '|' + normalize(ex.technology || '') + '|' + (ex.owner_id || ''))
+      }
+    }
+    const deduped: typeof insertRecords = []
+    for (const r of insertRecords) {
+      const key = dedupKey(r)
+      if (existingKeys.has(key)) {
+        skippedCount++
+      } else {
+        existingKeys.add(key)
+        deduped.push(r)
+      }
+    }
+    insertRecords.length = 0
+    insertRecords.push(...deduped)
+  }
+
   const insertedList: Array<{ id: string; name: string; owner_id: string }> = []
   if (insertRecords.length > 0) {
     const { data: inserted, error } = await supabase
@@ -287,6 +320,7 @@ export async function PUT(req: NextRequest) {
     success: true,
     imported: insertedList.length - closedCount,
     closed: closedCount,
+    skipped: skippedCount,
     errors,
     total: records.length,
   })

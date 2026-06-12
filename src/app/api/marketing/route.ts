@@ -371,6 +371,25 @@ export async function POST(req: NextRequest) {
   delete insertData.selectedEmployeeId
   delete insertData.id
 
+  // --- Dedup: skip if same name+technology+owner_id already exists ---
+  if (insertData.name) {
+    let dupQuery = supabase
+      .from('marketing_records')
+      .select('id')
+      .eq('name', insertData.name)
+      .eq('owner_id', effectiveOwnerId)
+    const tech = insertData.technology
+    if (tech) {
+      dupQuery = dupQuery.eq('technology', tech)
+    } else {
+      dupQuery = dupQuery.is('technology', null)
+    }
+    const { data: dupes } = await dupQuery.maybeSingle()
+    if (dupes) {
+      return NextResponse.json({ success: true, skipped: true })
+    }
+  }
+
   const { data: inserted, error } = await supabase
     .from('marketing_records')
     .insert(insertData)
