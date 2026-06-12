@@ -275,7 +275,7 @@ export default function MarketingPage({
     try {
       const params = new URLSearchParams()
       if (!isAdmin && currentUserIdRef.current) params.set('owner_id', currentUserIdRef.current)
-      params.set('limit', '500')
+      params.set('limit', '2000')
       const qs = params.toString()
       const url = `/api/marketing${qs ? '?' + qs : ''}`
       const timeoutId = setTimeout(() => abortController.abort(), 30000)
@@ -314,7 +314,7 @@ export default function MarketingPage({
   useEffect(() => {
     if (candidateOptions.length > 0 || readOnly) return
     const controller = new AbortController()
-    fetch('/api/candidates?limit=500', { signal: controller.signal })
+    fetch('/api/candidates?limit=2000', { signal: controller.signal })
       .then(res => res.ok ? res.json() : null)
       .then(json => {
         if (json?.records) {
@@ -405,19 +405,16 @@ export default function MarketingPage({
     e.preventDefault()
     setSaving(true)
     setError('')
-    // Client-side email validation
+    const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
+    // Client-side email validation (silently clear invalid emails in payload)
     const emailFields = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
     const isValidEmail = (v: string) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
     for (const field of emailFields) {
-      const val = form[field as keyof typeof form]
+      const val = cleanForm[field]
       if (val && !isValidEmail(val)) {
-        const label = field.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
-        setError(`"${val}" is not a valid email address in ${label}`)
-        setSaving(false)
-        return
+        cleanForm[field] = null
       }
     }
-    const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
     const payload = editing
       ? { ...cleanForm, id: editing.id, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}) }
       : { ...cleanForm, name: form.name, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}) }

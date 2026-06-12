@@ -42,9 +42,9 @@ export default async function MyMarketingPage() {
   const backupCandidateNames = (candidates || []).filter(c => c.backup_employee_id === uid).map(c => c.Candidate_name)
 
   const [{ data: ownedRecords }, { data: backupRecords }] = await Promise.all([
-    supabase.from('marketing_records').select('*').eq('owner_id', uid).order('created_at', { ascending: false }).limit(500),
+    supabase.from('marketing_records').select('*').eq('owner_id', uid).order('created_at', { ascending: false }).limit(2000),
     backupCandidateNames.length > 0
-      ? supabase.from('marketing_records').select('*').in('name', backupCandidateNames).order('created_at', { ascending: false }).limit(500)
+      ? supabase.from('marketing_records').select('*').in('name', backupCandidateNames).order('created_at', { ascending: false }).limit(2000)
       : Promise.resolve({ data: [] }),
   ])
 

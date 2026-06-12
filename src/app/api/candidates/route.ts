@@ -13,7 +13,7 @@ function getAdminClient() {
   return _supabaseAdmin
 }
 
-const MAX_RECORDS = 500
+const MAX_RECORDS = 2000
 
 export async function GET(req: NextRequest) {
   const supabase = await createServerClient()

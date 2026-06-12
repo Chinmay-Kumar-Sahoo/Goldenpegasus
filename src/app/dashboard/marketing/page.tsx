@@ -18,7 +18,7 @@ export default async function AllMarketingPage() {
     .from('marketing_records')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(500)
+    .limit(2000)
 
   if (!rawRecords) {
     return <MarketingTable isAdmin={false} readOnly={true} currentUserId={user?.id ?? null} />

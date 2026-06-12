@@ -169,17 +169,12 @@ export async function PUT(req: NextRequest) {
       || (candidateInfo.backup_employee_id ? idToName.get(candidateInfo.backup_employee_id) : null)
       || null
 
-    // --- Step 5: Validate email fields ---
+    // --- Step 5: Clean invalid email fields (silently clear, don't reject) ---
     for (const field of EMAIL_FIELDS) {
       const val = r[field]
       if (val && !isValidEmail(val)) {
-        const label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-        issues.push(`"${val}" is not a valid email address in ${label}`)
+        r[field] = null
       }
-    }
-    if (issues.length > 0) {
-      errors.push({ name, issues })
-      continue
     }
 
     // --- Step 6: Validate Marketing Status against predefined list ---

@@ -15,7 +15,7 @@ export default async function AdminMarketingPage() {
     : supabase
 
   const [recordsResult, employeeProfiles, employeesFromTable, candidatesResult] = await Promise.all([
-    supabase.from('marketing_records').select('*').order('created_at', { ascending: false }).limit(500),
+    supabase.from('marketing_records').select('*').order('created_at', { ascending: false }).limit(2000),
     lookupClient.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
     lookupClient.from('employees').select('user_id, full_name, email'),
     lookupClient.from('Candidate_records').select('id, Candidate_name, owner_id, status, technology, linkedin_url, backup_employee_id, backup_employee_name'),

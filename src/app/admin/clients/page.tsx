@@ -5,7 +5,7 @@ export default async function AdminClientsPage() {
   const supabase = await createClient()
 
   const [recordsResult, employeeProfiles, employeesFromTable] = await Promise.all([
-    supabase.from('Candidate_records').select('*').order('created_at', { ascending: false }).limit(500),
+    supabase.from('Candidate_records').select('*').order('created_at', { ascending: false }).limit(2000),
     supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
     supabase.from('employees').select('user_id, full_name, email'),
   ])

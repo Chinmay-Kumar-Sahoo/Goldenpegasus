@@ -13,7 +13,7 @@ function getAdminClient() {
   return _adminClient
 }
 
-const MAX_RECORDS = 500
+const MAX_RECORDS = 2000
 
 export async function GET(req: NextRequest) {
   const supabase = await createServerClient()
@@ -177,14 +177,13 @@ export async function POST(req: NextRequest) {
   let effectiveOwnerId = user.id
   let employeeName = recordData.employee_name || null
 
-  // Validate email fields
+  // Clean invalid email fields (silently clear, don't reject)
   const emailFields = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
   const isValidEmail = (v: string | null | undefined) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
   for (const field of emailFields) {
     const val = recordData[field]
     if (val && !isValidEmail(val)) {
-      const label = field.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
-      return NextResponse.json({ error: `"${val}" is not a valid email address in ${label}` }, { status: 400 })
+      recordData[field] = null
     }
   }
 
