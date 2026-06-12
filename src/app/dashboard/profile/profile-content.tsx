@@ -40,31 +40,35 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
     setSaving(true)
     setError('')
     setSuccess('')
+    try {
+      const userId = await ensureUserId()
+      if (!userId) { setError('User not authenticated'); setSaving(false); return }
 
-    const userId = await ensureUserId()
-    if (!userId) return
+      const [{ error: profError }, { error: empError }] = await Promise.all([
+        supabase.from('profiles').update({ full_name: profile.full_name, updated_at: new Date().toISOString() }).eq('id', userId),
+        supabase.from('employees').upsert({
+          user_id: userId,
+          employee_id: employee.employee_id || `EMP-${Date.now()}`,
+          full_name: profile.full_name,
+          contact: employee.contact || null,
+          address: employee.address || null,
+          date_of_birth: employee.date_of_birth || null,
+          joining_date: employee.joining_date || null,
+          company_id: employee.company_id || null,
+          designation: employee.designation || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' }),
+      ])
 
-    const [{ error: profError }, { error: empError }] = await Promise.all([
-      supabase.from('profiles').update({ full_name: profile.full_name, updated_at: new Date().toISOString() }).eq('id', userId),
-      supabase.from('employees').upsert({
-        user_id: userId,
-        employee_id: employee.employee_id || `EMP-${Date.now()}`,
-        full_name: profile.full_name,
-        contact: employee.contact || null,
-        address: employee.address || null,
-        date_of_birth: employee.date_of_birth || null,
-        joining_date: employee.joining_date || null,
-        company_id: employee.company_id || null,
-        designation: employee.designation || null,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' }),
-    ])
-
-    if (profError) { setError(profError.message); setSaving(false); return }
-    if (empError) { setError(empError.message); setSaving(false); return }
-    setSuccess('Profile updated successfully!')
-    setSaving(false)
-    window.location.reload()
+      if (profError) { setError(profError.message); setSaving(false); return }
+      if (empError) { setError(empError.message); setSaving(false); return }
+      setSuccess('Profile updated successfully!')
+      setSaving(false)
+      window.location.reload()
+    } catch (err: any) {
+      setError(err?.message || 'An unexpected error occurred')
+      setSaving(false)
+    }
   }
 
   if (loading) {

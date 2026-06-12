@@ -40,55 +40,59 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
     setSaving(true)
     setError('')
     setSuccess('')
+    try {
+      const userId = await ensureUserId()
+      if (!userId) { setError('User not authenticated'); setSaving(false); return }
 
-    const userId = await ensureUserId()
-    if (!userId) return
+      const [{ error: profError }, { error: empError }] = await Promise.all([
+        supabase.from('profiles').update({ full_name: profile.full_name, updated_at: new Date().toISOString() }).eq('id', userId),
+        supabase.from('employees').upsert({
+          user_id: userId,
+          employee_id: employee.employee_id || `ADM-${Date.now()}`,
+          full_name: profile.full_name,
+          email: profile.email,
+          contact: employee.contact || null,
+          address: employee.address || null,
+          date_of_birth: employee.date_of_birth || null,
+          joining_date: employee.joining_date || null,
+          company_id: employee.company_id || null,
+          designation: employee.designation || 'Administrator',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' }),
+      ])
 
-    const [{ error: profError }, { error: empError }] = await Promise.all([
-      supabase.from('profiles').update({ full_name: profile.full_name, updated_at: new Date().toISOString() }).eq('id', userId),
-      supabase.from('employees').upsert({
-        user_id: userId,
-        employee_id: employee.employee_id || `ADM-${Date.now()}`,
-        full_name: profile.full_name,
-        email: profile.email,
-        contact: employee.contact || null,
-        address: employee.address || null,
-        date_of_birth: employee.date_of_birth || null,
-        joining_date: employee.joining_date || null,
-        company_id: employee.company_id || null,
-        designation: employee.designation || 'Administrator',
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' }),
-    ])
+      if (profError) { setError(profError.message); setSaving(false); return }
+      if (empError) { setError(empError.message); setSaving(false); return }
 
-    if (profError) { setError(profError.message); setSaving(false); return }
-    if (empError) { setError(empError.message); setSaving(false); return }
+      if (newPassword) {
+        if (newPassword !== confirmPassword) {
+          setError('Passwords do not match.')
+          setSaving(false)
+          return
+        }
+        if (newPassword.length < 8) {
+          setError('Password must be at least 8 characters.')
+          setSaving(false)
+          return
+        }
 
-    if (newPassword) {
-      if (newPassword !== confirmPassword) {
-        setError('Passwords do not match.')
-        setSaving(false)
-        return
+        const { error: authError } = await supabase.auth.updateUser({ password: newPassword })
+        if (authError) {
+          setError(`Password update failed: ${authError.message}`)
+          setSaving(false)
+          return
+        }
+        await supabase.from('profiles').update({ must_change_password: false }).eq('id', userId)
       }
-      if (newPassword.length < 8) {
-        setError('Password must be at least 8 characters.')
-        setSaving(false)
-        return
-      }
 
-      const { error: authError } = await supabase.auth.updateUser({ password: newPassword })
-      if (authError) {
-        setError(`Password update failed: ${authError.message}`)
-        setSaving(false)
-        return
-      }
-      await supabase.from('profiles').update({ must_change_password: false }).eq('id', userId)
+      setSuccess('Profile and security settings updated successfully!')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err: any) {
+      setError(err?.message || 'An unexpected error occurred')
+    } finally {
+      setSaving(false)
     }
-
-    setSuccess('Profile and security settings updated successfully!')
-    setNewPassword('')
-    setConfirmPassword('')
-    setSaving(false)
   }
 
   if (loading) {
