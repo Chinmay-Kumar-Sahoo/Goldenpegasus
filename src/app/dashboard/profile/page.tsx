@@ -29,5 +29,5 @@ export default async function ProfilePage() {
     designation: employee.designation || '',
   } : undefined
 
-  return <ProfileContent initialProfile={initialProfile} initialEmployee={initialEmployee} userId={user.id} />
+  return <ProfileContent initialProfile={initialProfile} initialEmployee={initialEmployee} />
 }

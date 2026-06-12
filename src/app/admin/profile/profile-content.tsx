@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/PageHeader'
 
 interface Profile {
@@ -19,8 +18,7 @@ interface Employee {
   designation: string
 }
 
-export default function AdminProfileContent({ initialProfile, initialEmployee, userId: propUserId }: { initialProfile?: Profile; initialEmployee?: Employee; userId?: string }) {
-  const supabase = createClient()
+export default function AdminProfileContent({ initialProfile, initialEmployee }: { initialProfile?: Profile; initialEmployee?: Employee }) {
   const [profile, setProfile] = useState<Profile>(initialProfile || { full_name: '', email: '' })
   const [employee, setEmployee] = useState<Employee>(initialEmployee || { employee_id: '', contact: '', address: '', date_of_birth: '', joining_date: '', company_id: '', designation: '' })
   const [loading, setLoading] = useState(!initialProfile)
@@ -40,38 +38,33 @@ export default function AdminProfileContent({ initialProfile, initialEmployee, u
     const safetyTimer = setTimeout(() => { setSaving(false); setError('Save timed out after 15 seconds. Please try again.') }, 15000)
 
     try {
-      const userId = propUserId || (await supabase.auth.getUser()).data?.user?.id
-      if (!userId) { clearTimeout(safetyTimer); setError('User not authenticated'); setSaving(false); return }
-
-      const { error: profError } = await supabase.from('profiles').update({ full_name: profile.full_name, updated_at: new Date().toISOString() }).eq('id', userId)
-      if (profError) { clearTimeout(safetyTimer); setError(profError.message); setSaving(false); return }
-
-      const { error: empError } = await supabase.from('employees').upsert({
-        user_id: userId,
-        employee_id: employee.employee_id || `ADM-${Date.now()}`,
-        full_name: profile.full_name,
-        email: profile.email,
-        contact: employee.contact || null,
-        address: employee.address || null,
-        date_of_birth: employee.date_of_birth || null,
-        joining_date: employee.joining_date || null,
-        company_id: employee.company_id || null,
-        designation: employee.designation || 'Administrator',
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' })
-      if (empError) { clearTimeout(safetyTimer); setError(empError.message); setSaving(false); return }
-
-      if (newPassword) {
-        if (newPassword !== confirmPassword) {
-          clearTimeout(safetyTimer); setError('Passwords do not match.'); setSaving(false); return
-        }
-        if (newPassword.length < 8) {
-          clearTimeout(safetyTimer); setError('Password must be at least 8 characters.'); setSaving(false); return
-        }
-        const { error: authError } = await supabase.auth.updateUser({ password: newPassword })
-        if (authError) { clearTimeout(safetyTimer); setError(`Password update failed: ${authError.message}`); setSaving(false); return }
-        await supabase.from('profiles').update({ must_change_password: false }).eq('id', userId)
+      if (newPassword && newPassword !== confirmPassword) {
+        clearTimeout(safetyTimer); setError('Passwords do not match.'); setSaving(false); return
       }
+      if (newPassword && newPassword.length < 8) {
+        clearTimeout(safetyTimer); setError('Password must be at least 8 characters.'); setSaving(false); return
+      }
+
+      const res = await fetch('/api/profile/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile: { full_name: profile.full_name },
+          employee: {
+            employee_id: employee.employee_id,
+            email: profile.email,
+            contact: employee.contact,
+            address: employee.address,
+            date_of_birth: employee.date_of_birth,
+            joining_date: employee.joining_date,
+            company_id: employee.company_id,
+            designation: employee.designation || 'Administrator',
+          },
+          newPassword: newPassword || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { clearTimeout(safetyTimer); setError(data.error); setSaving(false); return }
 
       clearTimeout(safetyTimer)
       setSuccess('Profile and security settings updated successfully!')
