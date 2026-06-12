@@ -120,6 +120,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const [textFilterSearch, setTextFilterSearch] = useState('')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(50)
+  const tableRef = useRef<HTMLDivElement | null>(null)
 
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -405,6 +406,11 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     if (page >= totalPages && totalPages > 0) setPage(0)
   }, [page, totalPages])
 
+  // Scroll to top of table on page change
+  useEffect(() => {
+    tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [page])
+
   const anyFilterActive = hasTextFilter || !!searchInput
 
   return (
@@ -461,7 +467,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
       )}
       </div>
 
-      <div className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeTextFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
+      <div ref={tableRef} className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${activeTextFilter ? 'overflow-visible' : 'overflow-hidden'}`}>
         <div className={`flex-1 ${activeTextFilter ? 'overflow-hidden' : 'overflow-auto'}`}>
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-[#111111]">

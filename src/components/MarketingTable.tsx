@@ -505,13 +505,20 @@ export default function MarketingPage({
 
   const toISODate = (y: number, m: number, d: number): string | null => {
     const dt = new Date(y, m, d)
-    return !Number.isNaN(dt.getTime()) ? dt.toISOString().slice(0, 10) : null
+    if (Number.isNaN(dt.getTime())) return null
+    const yy = String(y).padStart(4, '0')
+    const mm = String(m + 1).padStart(2, '0')
+    const dd = String(d).padStart(2, '0')
+    return `${yy}-${mm}-${dd}`
   }
 
   const formatExcelDate = (value: unknown, XLSX: any): string | null => {
     if (!value) return null
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
-      return value.toISOString().slice(0, 10)
+      const y = value.getFullYear()
+      const m = String(value.getMonth() + 1).padStart(2, '0')
+      const d = String(value.getDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
     }
     if (typeof value === 'number') {
       const parsed = XLSX.SSF.parse_date_code(value)
@@ -828,6 +835,11 @@ export default function MarketingPage({
     if (page >= totalPages && totalPages > 0) setPage(0)
   }, [page, totalPages])
 
+  // Scroll to top of table on page change
+  useEffect(() => {
+    tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [page])
+
   const exportCSV = useCallback(() => {
     const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
     const rows = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
@@ -1083,12 +1095,12 @@ export default function MarketingPage({
           <div className="flex items-center gap-3">
             <span>Showing {(page * pageSize) + 1}-{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length} records</span>
             <div className="flex items-center gap-1">
-              <button onClick={() => { setPage(p => Math.max(0, p - 1)); tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} disabled={page === 0}
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
                 className="px-2 py-1 rounded-lg border border-[#2a2a2a] hover:bg-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
                 Prev
               </button>
               <span className="px-2 text-white">{page + 1}/{totalPages}</span>
-              <button onClick={() => { setPage(p => Math.min(totalPages - 1, p + 1)); tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} disabled={page >= totalPages - 1}
+              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
                 className="px-2 py-1 rounded-lg border border-[#2a2a2a] hover:bg-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
                 Next
               </button>
