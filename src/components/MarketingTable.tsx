@@ -233,6 +233,7 @@ export default function MarketingPage({
   const [editing, setEditing] = useState<MarketingRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importError, setImportError] = useState('')
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     name: '', date: '', recruiter_name: '', recruiter_email: '', organization_name: '',
@@ -309,9 +310,9 @@ export default function MarketingPage({
     return () => { abortRef.current?.abort() }
   }, [fetchRecords])
 
-  // Fetch candidates from API if server-side options are empty
+  // Fetch candidates from API if server-side options are empty (skip for read-only views)
   useEffect(() => {
-    if (candidateOptions.length > 0) return
+    if (candidateOptions.length > 0 || readOnly) return
     const controller = new AbortController()
     fetch('/api/candidates?limit=500', { signal: controller.signal })
       .then(res => res.ok ? res.json() : null)
@@ -600,7 +601,7 @@ export default function MarketingPage({
     if (!file) return
 
     setImporting(true)
-    setError('')
+    setImportError('')
 
     try {
       const XLSX = await import('xlsx')
@@ -671,16 +672,16 @@ export default function MarketingPage({
       if (errors.length > 0) {
         const firstFew = errors.slice(0, 5).map((e: any) => `${e.name}: ${e.issues.join(', ')}`)
         const more = errors.length > 5 ? `...and ${errors.length - 5} more` : ''
-        setError(`${summary}. Errors:\n${firstFew.join('\n')}${more ? '\n' + more : ''}`)
+        setImportError(`${summary}. Errors:\n${firstFew.join('\n')}${more ? '\n' + more : ''}`)
         toast.error(`${summary} — ${errors.length} row${errors.length === 1 ? '' : 's'} had issues`)
       } else {
-        setError('')
+        setImportError('')
         toast.success(summary)
       }
       fetchRecords()
     } catch (err: any) {
       const message = err.message || 'Failed to import Excel file.'
-      setError(message)
+      setImportError(message)
       toast.error(message)
     } finally {
       setImporting(false)
@@ -918,6 +919,16 @@ export default function MarketingPage({
         </div>
       )}
       </div>
+
+      {/* Import Error Banner */}
+      {importError && (
+        <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+          <div className="flex items-start gap-3">
+            <div className="flex-1 text-sm text-red-400 whitespace-pre-line">{importError}</div>
+            <button onClick={() => setImportError('')} className="text-red-400 hover:text-red-300 text-lg leading-none">&times;</button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div ref={tableRef} className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${(activeDateFilter || activeTextFilter) ? 'overflow-visible' : 'overflow-hidden'}`}>
