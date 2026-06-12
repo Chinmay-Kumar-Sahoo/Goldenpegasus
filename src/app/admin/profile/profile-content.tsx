@@ -37,12 +37,14 @@ export default function AdminProfileContent({ initialProfile, initialEmployee, u
     setError('')
     setSuccess('')
 
+    const safetyTimer = setTimeout(() => { setSaving(false); setError('Save timed out after 15 seconds. Please try again.') }, 15000)
+
     try {
       const userId = propUserId || (await supabase.auth.getUser()).data?.user?.id
-      if (!userId) { setError('User not authenticated'); return }
+      if (!userId) { clearTimeout(safetyTimer); setError('User not authenticated'); setSaving(false); return }
 
       const { error: profError } = await supabase.from('profiles').update({ full_name: profile.full_name, updated_at: new Date().toISOString() }).eq('id', userId)
-      if (profError) { setError(profError.message); return }
+      if (profError) { clearTimeout(safetyTimer); setError(profError.message); setSaving(false); return }
 
       const { error: empError } = await supabase.from('employees').upsert({
         user_id: userId,
@@ -57,28 +59,28 @@ export default function AdminProfileContent({ initialProfile, initialEmployee, u
         designation: employee.designation || 'Administrator',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' })
-      if (empError) { setError(empError.message); return }
+      if (empError) { clearTimeout(safetyTimer); setError(empError.message); setSaving(false); return }
 
       if (newPassword) {
         if (newPassword !== confirmPassword) {
-          setError('Passwords do not match.')
-          return
+          clearTimeout(safetyTimer); setError('Passwords do not match.'); setSaving(false); return
         }
         if (newPassword.length < 8) {
-          setError('Password must be at least 8 characters.')
-          return
+          clearTimeout(safetyTimer); setError('Password must be at least 8 characters.'); setSaving(false); return
         }
         const { error: authError } = await supabase.auth.updateUser({ password: newPassword })
-        if (authError) { setError(`Password update failed: ${authError.message}`); return }
+        if (authError) { clearTimeout(safetyTimer); setError(`Password update failed: ${authError.message}`); setSaving(false); return }
         await supabase.from('profiles').update({ must_change_password: false }).eq('id', userId)
       }
 
+      clearTimeout(safetyTimer)
       setSuccess('Profile and security settings updated successfully!')
       setNewPassword('')
       setConfirmPassword('')
+      setSaving(false)
     } catch (err: any) {
+      clearTimeout(safetyTimer)
       setError(err?.message || 'An unexpected error occurred')
-    } finally {
       setSaving(false)
     }
   }

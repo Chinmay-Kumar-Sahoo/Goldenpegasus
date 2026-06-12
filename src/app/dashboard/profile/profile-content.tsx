@@ -37,12 +37,14 @@ export default function ProfileContent({ initialProfile, initialEmployee, userId
     setError('')
     setSuccess('')
 
+    const safetyTimer = setTimeout(() => { setSaving(false); setError('Save timed out after 15 seconds. Please try again.') }, 15000)
+
     try {
       const userId = propUserId || (await supabase.auth.getUser()).data?.user?.id
-      if (!userId) { setError('User not authenticated'); return }
+      if (!userId) { clearTimeout(safetyTimer); setError('User not authenticated'); setSaving(false); return }
 
       const { error: profError } = await supabase.from('profiles').update({ full_name: profile.full_name, updated_at: new Date().toISOString() }).eq('id', userId)
-      if (profError) { setError(profError.message); return }
+      if (profError) { clearTimeout(safetyTimer); setError(profError.message); setSaving(false); return }
 
       const { error: empError } = await supabase.from('employees').upsert({
         user_id: userId,
@@ -56,13 +58,15 @@ export default function ProfileContent({ initialProfile, initialEmployee, userId
         designation: employee.designation || null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' })
-      if (empError) { setError(empError.message); return }
+      if (empError) { clearTimeout(safetyTimer); setError(empError.message); setSaving(false); return }
 
+      clearTimeout(safetyTimer)
       setSuccess('Profile updated successfully!')
+      setSaving(false)
       window.location.reload()
     } catch (err: any) {
+      clearTimeout(safetyTimer)
       setError(err?.message || 'An unexpected error occurred')
-    } finally {
       setSaving(false)
     }
   }
