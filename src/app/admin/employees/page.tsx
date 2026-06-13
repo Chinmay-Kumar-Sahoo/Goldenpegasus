@@ -403,14 +403,14 @@ export default function AdminEmployeesPage() {
                 { label: 'Employee ID', name: 'employee_id', type: 'text', placeholder: 'EMP-001' },
                 { label: 'Full Name', name: 'full_name', type: 'text', placeholder: 'John Doe' },
                 { label: 'Email', name: 'email', type: 'email', placeholder: 'john@example.com' },
-                { label: 'Contact', name: 'contact', type: 'text', placeholder: '+1 234 567 8900' },
+                { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric', placeholder: '+1 234 567 8900' },
                 { label: 'Designation', name: 'designation', type: 'text', placeholder: 'Software Engineer' },
                 { label: 'Joining Date', name: 'joining_date' as const, type: 'date', placeholder: '' },
                 ...(editing ? [] : [{ label: 'Password', name: 'password' as const, type: 'password' as const, placeholder: 'Min. 8 characters' }]),
               ].map(field => (
                 <div key={field.name}>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
-                  <input type={field.type} value={form[field.name as keyof FormData]} onChange={e => setForm({ ...form, [field.name]: e.target.value })} placeholder={field.placeholder}
+                  <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={form[field.name as keyof FormData]} onChange={e => setForm({ ...form, [field.name]: field.name === 'contact' ? e.target.value.replace(/\D/g, '') : e.target.value })} placeholder={field.placeholder}
                     required={['employee_id', 'full_name', 'email'].includes(field.name) || (!editing && field.name === 'password')}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60 transition-all" />
                 </div>
@@ -436,11 +436,11 @@ export default function AdminEmployeesPage() {
             <div className="space-y-3">
               {[
                 { label: 'Designation', name: 'designation', type: 'text' },
-                { label: 'Contact', name: 'contact', type: 'text' },
+                { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric' },
               ].map(f => (
                 <div key={f.name}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{f.label}</label>
-                  <input type={f.type} value={bulkForm[f.name as keyof typeof bulkForm]} onChange={e => setBulkForm({ ...bulkForm, [f.name]: e.target.value })}
+                  <input type={f.type} inputMode={(f as any).inputMode || 'text'} value={bulkForm[f.name as keyof typeof bulkForm]} onChange={e => setBulkForm({ ...bulkForm, [f.name]: f.name === 'contact' ? e.target.value.replace(/\D/g, '') : e.target.value })}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 </div>
               ))}

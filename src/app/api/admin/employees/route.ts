@@ -62,9 +62,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
 
     if (body.id) {
-      const updateData = { ...body }
-      delete updateData.id
-      delete updateData.password
+      const updateData: Record<string, any> = {}
+      for (const [key, val] of Object.entries(body)) {
+        if (key === 'id' || key === 'password') continue
+        if ((key === 'joining_date' || key === 'date_of_birth') && !val) continue
+        if (key === 'contact') { updateData.contact = String(val || '').replace(/\D/g, ''); continue }
+        updateData[key] = val
+      }
       const { error } = await supabase.from('employees').update(updateData).eq('user_id', body.id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       await logAudit(supabase, auth.user.id, 'updated', 'employee', body.id)
@@ -96,7 +100,7 @@ export async function POST(req: NextRequest) {
         full_name: body.full_name,
         role: 'employee',
         employee_id: body.employee_id || '',
-        contact: body.contact || '',
+        contact: (body.contact || '').replace(/\D/g, ''),
         designation: body.designation || '',
         joining_date: body.joining_date || '',
       },

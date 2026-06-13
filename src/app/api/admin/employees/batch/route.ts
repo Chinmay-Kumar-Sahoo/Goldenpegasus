@@ -10,9 +10,16 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { ids, updates } = await req.json()
+  const { ids, updates: rawUpdates } = await req.json()
   if (!Array.isArray(ids) || ids.length === 0) {
     return NextResponse.json({ error: 'No records specified' }, { status: 400 })
+  }
+
+  const updates: Record<string, any> = {}
+  for (const [key, val] of Object.entries(rawUpdates)) {
+    if ((key === 'joining_date' || key === 'date_of_birth') && !val) continue
+    if (key === 'contact') { updates.contact = String(val || '').replace(/\D/g, ''); continue }
+    updates[key] = val
   }
 
   const { error } = await supabase.from('employees').update(updates).in('user_id', ids)
