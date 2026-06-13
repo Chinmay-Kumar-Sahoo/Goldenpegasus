@@ -108,6 +108,7 @@ export default function AdminEmployeesPage() {
     setSuccessMessage('')
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (form.email && !emailRe.test(form.email)) { setError('Invalid email format'); return }
+    if (form.contact && /\D/.test(form.contact)) { setError('Contact must contain only digits'); return }
     setSaving(true)
     let saveError: string | null = null
     try {
@@ -154,6 +155,7 @@ export default function AdminEmployeesPage() {
   }
 
   const handleBulkUpdate = async () => {
+    if (bulkForm.contact && /\D/.test(bulkForm.contact)) { toast.error('Contact must contain only digits'); return }
     const updates = Object.fromEntries(Object.entries(bulkForm).filter(([_, v]) => v !== ''))
     if (Object.keys(updates).length === 0) { toast.error('No fields to update'); return }
     setBulkSaving(true)
@@ -412,7 +414,7 @@ export default function AdminEmployeesPage() {
               ].map(field => (
                 <div key={field.name}>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
-                  <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={form[field.name as keyof FormData]} onChange={e => setForm({ ...form, [field.name]: field.name === 'contact' ? e.target.value.replace(/\D/g, '') : e.target.value })} placeholder={field.placeholder}
+                  <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={form[field.name as keyof FormData]} onChange={e => setForm({ ...form, [field.name]: e.target.value })} placeholder={field.placeholder}
                     required={['employee_id', 'full_name', 'email'].includes(field.name) || (!editing && field.name === 'password')}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60 transition-all" />
                 </div>
@@ -442,7 +444,7 @@ export default function AdminEmployeesPage() {
               ].map(f => (
                 <div key={f.name}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{f.label}</label>
-                  <input type={f.type} inputMode={(f as any).inputMode || 'text'} value={bulkForm[f.name as keyof typeof bulkForm]} onChange={e => setBulkForm({ ...bulkForm, [f.name]: f.name === 'contact' ? e.target.value.replace(/\D/g, '') : e.target.value })}
+                  <input type={f.type} inputMode={(f as any).inputMode || 'text'} value={bulkForm[f.name as keyof typeof bulkForm]} onChange={e => setBulkForm({ ...bulkForm, [f.name]: e.target.value })}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 </div>
               ))}

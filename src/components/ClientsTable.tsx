@@ -215,9 +215,9 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     setError('')
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (form.Candidate_email && !emailRe.test(form.Candidate_email)) { setError('Invalid email format'); return }
+    if (form.client_phone && /\D/.test(form.client_phone)) { setError('Phone must contain only digits'); return }
     setSaving(true)
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
-    if (cleanForm.client_phone) cleanForm.client_phone = String(cleanForm.client_phone).replace(/\D/g, '')
     if (cleanForm.linkedin_url && typeof cleanForm.linkedin_url === 'string' && !/^https?:\/\//i.test(cleanForm.linkedin_url)) {
       cleanForm.linkedin_url = 'https://' + cleanForm.linkedin_url
     }
@@ -653,13 +653,13 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                 { label: 'Technology', name: 'technology', type: 'text' },
                 { label: 'Email', name: 'Candidate_email', type: 'email' },
                 { label: 'LinkedIn URL', name: 'linkedin_url', type: 'text' },
-                { label: 'Phone', name: 'client_phone', type: 'text' },
+                { label: 'Phone', name: 'client_phone', type: 'text', inputMode: 'numeric' as const },
                 { label: 'Company Name', name: 'company_name', type: 'text' },
                 { label: 'Address', name: 'address', type: 'text' },
               ].map(field => (
                 <div key={field.name}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
-                  <input type={field.type} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} required={field.required}
+                  <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} required={field.required}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 </div>
               ))}

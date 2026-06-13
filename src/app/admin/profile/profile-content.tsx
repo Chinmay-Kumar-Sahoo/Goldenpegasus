@@ -38,6 +38,9 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
     const safetyTimer = setTimeout(() => { setSaving(false); setError('Save timed out after 15 seconds. Please try again.') }, 15000)
 
     try {
+      if (employee.contact && /\D/.test(employee.contact)) {
+        clearTimeout(safetyTimer); setError('Contact must contain only digits'); setSaving(false); return
+      }
       if (newPassword && newPassword !== confirmPassword) {
         clearTimeout(safetyTimer); setError('Passwords do not match.'); setSaving(false); return
       }
@@ -127,7 +130,7 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
                 ].map(field => (
                   <div key={field.name}>
                     <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
-                    <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: field.name === 'contact' ? e.target.value.replace(/\D/g, '') : e.target.value })} placeholder={field.placeholder}
+                    <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: e.target.value })} placeholder={field.placeholder}
                       className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                   </div>
                 ))}
