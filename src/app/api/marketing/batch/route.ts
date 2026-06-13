@@ -277,7 +277,7 @@ export async function PUT(req: NextRequest) {
 
   // --- Dedup: skip records where key fields match an existing record (same owner_id) ---
   // Excluding date fields, notes, status, recruiter_name, and interview_type which commonly vary
-  const recordFields = ['name','technology','recruiter_email','organization_name','implementation_partner','end_client','client_name','client_email','implementation_poc_email','interviewer_email']
+  const recordFields = ['name', 'technology', 'recruiter_email', 'implementation_partner']
   const buildFullKey = (r: any) => {
     const parts = recordFields.map(f => normalize(String(r[f] ?? '') || ''))
     parts.push(r.owner_id || '')
