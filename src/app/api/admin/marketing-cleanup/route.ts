@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
 
   // --- Remove duplicate records (same values across key user-facing fields + same owner_id) ---
   // Excluding date fields and notes as those commonly vary between otherwise identical records
-  const dedupFields = ['name','technology','recruiter_email','organization_name','implementation_partner','end_client','client_name','client_email','implementation_poc_email','interviewer_email']
+  const dedupFields = ['name', 'technology', 'recruiter_email', 'implementation_partner']
   const buildKey = (r: any) => dedupFields.map(f => ((r[f] ?? '') + '').toLowerCase().trim()).join('|||') + '|||' + (r.owner_id || '')
   let removedDupes = 0
   const { data: allRecords } = await adminClient
