@@ -20,7 +20,6 @@ interface CandidateRecord {
   backup_employee_id?: string | null
   backup_employee_name?: string | null
   technology?: string | null
-  linkedin_url?: string | null
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -100,7 +99,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const [editing, setEditing] = useState<CandidateRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '', linkedin_url: '' })
+  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
@@ -190,11 +189,11 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const openModal = (rec?: CandidateRecord) => {
     if (rec) {
       setEditing(rec)
-      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', notes: rec.notes || '', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '', technology: rec.technology || '', linkedin_url: rec.linkedin_url || '' })
+      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', company_name: rec.company_name || '', address: rec.address || '', status: rec.status || 'Active', notes: rec.notes || '', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '', technology: rec.technology || '' })
       setSelectedEmployeeId(rec.owner_id || '')
     } else {
       setEditing(null)
-      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '', linkedin_url: '' })
+      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', company_name: '', address: '', status: 'Active', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
       setSelectedEmployeeId('')
     }
     setError('')
@@ -209,9 +208,6 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     if (form.client_phone && /\D/.test(form.client_phone)) { setError('Phone must contain only digits'); return }
     setSaving(true)
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
-    if (cleanForm.linkedin_url && typeof cleanForm.linkedin_url === 'string' && !/^https?:\/\//i.test(cleanForm.linkedin_url)) {
-      cleanForm.linkedin_url = 'https://' + cleanForm.linkedin_url
-    }
     const payload = editing
       ? { ...cleanForm, id: editing.id, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}), ...(form.backup_employee_id ? { backupEmployeeId: form.backup_employee_id } : {}) }
       : { ...cleanForm, Candidate_name: form.Candidate_name, ...(isAdmin && selectedEmployeeId ? { selectedEmployeeId } : {}), ...(form.backup_employee_id ? { backupEmployeeId: form.backup_employee_id } : {}) }
@@ -643,7 +639,6 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                 { label: 'Candidate Name *', name: 'Candidate_name', type: 'text', required: true },
                 { label: 'Technology', name: 'technology', type: 'text' },
                 { label: 'Email', name: 'Candidate_email', type: 'email' },
-                { label: 'LinkedIn URL', name: 'linkedin_url', type: 'text' },
                 { label: 'Phone', name: 'client_phone', type: 'text', inputMode: 'numeric' as const },
                 { label: 'Company Name', name: 'company_name', type: 'text' },
                 { label: 'Address', name: 'address', type: 'text' },
