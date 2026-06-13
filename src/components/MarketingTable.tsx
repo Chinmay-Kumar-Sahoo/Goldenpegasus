@@ -216,6 +216,7 @@ export default function MarketingPage({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
   const tableRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [clientCandidates, setClientCandidates] = useState<typeof candidateOptions>([])
   const todayIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
@@ -897,7 +898,7 @@ export default function MarketingPage({
 
   // Scroll to top of table on page change
   useEffect(() => {
-    tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    scrollRef.current?.scrollTo(0, 0)
   }, [page])
 
   const exportCSV = useCallback(() => {
@@ -1019,7 +1020,7 @@ export default function MarketingPage({
 
       {/* Table */}
       <div ref={tableRef} className={`flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl ${(activeDateFilter || activeTextFilter) ? 'overflow-visible' : 'overflow-hidden'}`}>
-        <div className={`flex-1 ${(activeDateFilter || activeTextFilter) ? 'overflow-hidden' : 'overflow-auto'}`}>
+        <div ref={scrollRef} className={`flex-1 ${(activeDateFilter || activeTextFilter) ? 'overflow-hidden' : 'overflow-auto'}`}>
           <table className="w-full">
             <thead ref={dateFilterRef} className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
