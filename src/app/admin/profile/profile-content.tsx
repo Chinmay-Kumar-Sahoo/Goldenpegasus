@@ -120,14 +120,14 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
                 {[
                   { label: 'Admin ID', name: 'employee_id', type: 'text', placeholder: 'ADM-001' },
                   { label: 'Designation', name: 'designation', type: 'text', placeholder: 'Administrator' },
-                  { label: 'Contact', name: 'contact', type: 'text', placeholder: '+1 234 567 8900' },
+                  { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric', placeholder: '+1 234 567 8900' },
                   { label: 'Company ID', name: 'company_id', type: 'text', placeholder: 'GPEG-123' },
                   { label: 'Date of Birth', name: 'date_of_birth', type: 'date', placeholder: '' },
                   { label: 'Joining Date', name: 'joining_date', type: 'date', placeholder: '' },
                 ].map(field => (
                   <div key={field.name}>
                     <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
-                    <input type={field.type} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: e.target.value })} placeholder={field.placeholder}
+                    <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: field.name === 'contact' ? e.target.value.replace(/\D/g, '') : e.target.value })} placeholder={field.placeholder}
                       className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                   </div>
                 ))}
