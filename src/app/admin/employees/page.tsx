@@ -104,9 +104,11 @@ export default function AdminEmployeesPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSaving(true)
     setError('')
     setSuccessMessage('')
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (form.email && !emailRe.test(form.email)) { setError('Invalid email format'); return }
+    setSaving(true)
     let saveError: string | null = null
     try {
       const res = await fetch('/api/admin/employees', {

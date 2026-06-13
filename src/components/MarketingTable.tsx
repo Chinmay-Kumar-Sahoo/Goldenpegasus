@@ -407,13 +407,15 @@ export default function MarketingPage({
     setSaving(true)
     setError('')
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
-    // Client-side email validation (silently clear invalid emails in payload)
+    // Client-side email validation
     const emailFields = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
     const isValidEmail = (v: string) => !v || /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(v)
     for (const field of emailFields) {
       const val = cleanForm[field]
       if (val && !isValidEmail(val)) {
-        cleanForm[field] = null
+        setError(`Invalid email format for ${field}`)
+        setSaving(false)
+        return
       }
     }
     const payload = editing

@@ -105,6 +105,12 @@ export async function POST(req: NextRequest) {
     if (employeeResult.data?.full_name) backupName = employeeResult.data.full_name
   }
 
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (recordData.Candidate_email && !emailRe.test(recordData.Candidate_email)) {
+    return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+  }
+  if (recordData.client_phone) recordData.client_phone = String(recordData.client_phone).replace(/\D/g, '')
+
   if (body.id) {
     const updateData: any = { ...recordData, updated_at: new Date().toISOString() }
     if (selectedEmployeeId) updateData.owner_id = selectedEmployeeId

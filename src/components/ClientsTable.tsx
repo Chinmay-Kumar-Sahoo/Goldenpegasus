@@ -212,9 +212,12 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSaving(true)
     setError('')
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (form.Candidate_email && !emailRe.test(form.Candidate_email)) { setError('Invalid email format'); return }
+    setSaving(true)
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
+    if (cleanForm.client_phone) cleanForm.client_phone = String(cleanForm.client_phone).replace(/\D/g, '')
     if (cleanForm.linkedin_url && typeof cleanForm.linkedin_url === 'string' && !/^https?:\/\//i.test(cleanForm.linkedin_url)) {
       cleanForm.linkedin_url = 'https://' + cleanForm.linkedin_url
     }

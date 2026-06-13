@@ -177,13 +177,13 @@ export async function POST(req: NextRequest) {
   let effectiveOwnerId = user.id
   let employeeName = recordData.employee_name || null
 
-  // Clean invalid email fields (silently clear, don't reject)
+  // Validate email fields
   const emailFields = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
   const isValidEmail = (v: string | null | undefined) => !v || /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(v)
   for (const field of emailFields) {
     const val = recordData[field]
     if (val && !isValidEmail(val)) {
-      recordData[field] = null
+      return NextResponse.json({ error: `Invalid email format for ${field}` }, { status: 400 })
     }
   }
 

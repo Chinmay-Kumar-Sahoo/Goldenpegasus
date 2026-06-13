@@ -416,11 +416,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No records specified' }, { status: 400 })
   }
 
-  // Clean invalid email fields
+  // Validate email fields
   for (const field of EMAIL_FIELDS) {
     const val = updates[field]
     if (val && !isValidEmail(val)) {
-      updates[field] = null
+      return NextResponse.json({ error: `Invalid email format for ${field}` }, { status: 400 })
     }
   }
 
