@@ -502,7 +502,7 @@ export default function MarketingPage({
   }
 
   const handleCleanup = async () => {
-    if (!confirm('Normalize company names and clean invalid emails in all existing records?')) return
+    if (!confirm('Normalize company names, clean invalid emails, and remove duplicate records?')) return
     setCleaningUp(true)
     try {
       const res = await fetch('/api/admin/marketing-cleanup', { method: 'POST' })
