@@ -15,6 +15,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No records specified' }, { status: 400 })
   }
 
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceRoleKey) {
+    return NextResponse.json({ error: 'Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is missing' }, { status: 500 })
+  }
+
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceRoleKey,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
   const updates: Record<string, any> = {}
   for (const [key, val] of Object.entries(rawUpdates)) {
     if ((key === 'joining_date' || key === 'date_of_birth') && !val) continue
@@ -22,7 +33,7 @@ export async function POST(req: NextRequest) {
     updates[key] = val
   }
 
-  const { error } = await supabase.from('employees').update(updates).in('user_id', ids)
+  const { error } = await supabaseAdmin.from('employees').update(updates).in('user_id', ids)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_updated', entity_type: 'employee', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))

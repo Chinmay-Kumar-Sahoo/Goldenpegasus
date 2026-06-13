@@ -53,6 +53,8 @@ export async function GET() {
   }
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createServerClient()
@@ -60,24 +62,6 @@ export async function POST(req: NextRequest) {
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
     const body = await req.json()
-
-    if (body.id) {
-      const updateData: Record<string, any> = {}
-      for (const [key, val] of Object.entries(body)) {
-        if (key === 'id' || key === 'password') continue
-        if ((key === 'joining_date' || key === 'date_of_birth') && !val) continue
-        if (key === 'contact') { updateData.contact = String(val || '').replace(/\D/g, ''); continue }
-        updateData[key] = val
-      }
-      const { error } = await supabase.from('employees').update(updateData).eq('user_id', body.id)
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      await logAudit(supabase, auth.user.id, 'updated', 'employee', body.id)
-      return NextResponse.json({ success: true })
-    }
-
-    if (!body.password) {
-      return NextResponse.json({ error: 'Password is required to create a new employee' }, { status: 400 })
-    }
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
     if (!serviceRoleKey) {
@@ -89,6 +73,29 @@ export async function POST(req: NextRequest) {
       serviceRoleKey,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
+
+    if (body.id) {
+      if (body.email) {
+        const emailCheck = String(body.email).trim().toLowerCase()
+        if (!EMAIL_RE.test(emailCheck)) return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+      }
+
+      const updateData: Record<string, any> = {}
+      for (const [key, val] of Object.entries(body)) {
+        if (key === 'id' || key === 'password') continue
+        if ((key === 'joining_date' || key === 'date_of_birth') && !val) continue
+        if (key === 'contact') { updateData.contact = String(val || '').replace(/\D/g, ''); continue }
+        updateData[key] = val
+      }
+      const { error } = await supabaseAdmin.from('employees').update(updateData).eq('user_id', body.id)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      await logAudit(supabase, auth.user.id, 'updated', 'employee', body.id)
+      return NextResponse.json({ success: true })
+    }
+
+    if (!body.password) {
+      return NextResponse.json({ error: 'Password is required to create a new employee' }, { status: 400 })
+    }
 
     const email = body.email.trim().toLowerCase()
 
