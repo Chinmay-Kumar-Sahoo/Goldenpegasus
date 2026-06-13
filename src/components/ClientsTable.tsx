@@ -40,6 +40,12 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Backup Employee': 'backup_employee_name',
 }
 
+const SORT_FIELDS: Record<string, string> = {
+  ...TEXT_FILTER_COLUMNS,
+  'Phone': 'client_phone',
+  'Status': 'status',
+}
+
 const PAGE_SIZES = [25, 50, 100] as const
 
 function wordScore(val: string | null | undefined, q: string): number {
@@ -108,6 +114,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const [activeTextFilter, setActiveTextFilter] = useState<string | null>(null)
   const [textFilters, setTextFilters] = useState<Record<string, string[]>>({})
   const [textFilterSearch, setTextFilterSearch] = useState('')
+  const [sortBy, setSortBy] = useState('Candidate Name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(50)
   const tableRef = useRef<HTMLDivElement | null>(null)
@@ -198,6 +206,15 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     }
     setError('')
     setShowModal(true)
+  }
+
+  const handleSort = (header: string) => {
+    if (sortBy === header) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(header)
+      setSortDir('asc')
+    }
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -367,24 +384,43 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   }, [records, query, textFilters, hasTextFilter])
 
   const sorted = useMemo(() => {
-    if (!query) return filtered
-    const scored = filtered.map(r => {
-      const score = Math.max(
-        wordScore(r.Candidate_name, query),
-        wordScore(r.technology, query),
-        wordScore(r.Candidate_email, query),
-        wordScore(r.client_phone, query),
-        wordScore(r.company_name, query),
-        wordScore(r.employee_name, query),
-        wordScore(r.backup_employee_name, query),
-        wordScore(r.address, query),
-        wordScore(r.notes, query),
-      )
-      return { rec: r, score }
-    })
-    scored.sort((a, b) => b.score - a.score)
-    return scored.map(x => x.rec)
-  }, [filtered, query])
+    const fieldKey = SORT_FIELDS[sortBy]
+    let result: CandidateRecord[]
+    if (query) {
+      const scored = filtered.map(r => {
+        const score = Math.max(
+          wordScore(r.Candidate_name, query),
+          wordScore(r.technology, query),
+          wordScore(r.Candidate_email, query),
+          wordScore(r.client_phone, query),
+          wordScore(r.company_name, query),
+          wordScore(r.employee_name, query),
+          wordScore(r.backup_employee_name, query),
+          wordScore(r.address, query),
+          wordScore(r.notes, query),
+        )
+        return { rec: r, score }
+      })
+      scored.sort((a, b) => b.score - a.score)
+      result = scored.map(x => x.rec)
+    } else {
+      result = [...filtered]
+    }
+    if (fieldKey) {
+      result.sort((a, b) => {
+        const aVal = (a as any)[fieldKey]
+        const bVal = (b as any)[fieldKey]
+        if (aVal == null && bVal == null) return 0
+        if (aVal == null) return 1
+        if (bVal == null) return -1
+        const cmp = typeof aVal === 'string' && typeof bVal === 'string'
+          ? aVal.toLowerCase().localeCompare(bVal.toLowerCase())
+          : String(aVal).localeCompare(String(bVal))
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    }
+    return result
+  }, [filtered, query, sortBy, sortDir])
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
   const paginated = useMemo(() => {
@@ -474,19 +510,35 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                   const textKey = TEXT_FILTER_COLUMNS[h]
                   const textIsActive = textKey && activeTextFilter === h
                   const textHasFilter = textKey && (textFilters[h]?.length ?? 0) > 0
+                  const sortFieldKey = SORT_FIELDS[h]
                   return (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap relative">
-                      {textKey ? (
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        {sortFieldKey ? (
+                          <button onClick={() => handleSort(h)} className="flex items-center gap-1 hover:text-white transition-colors">
+                            <span>{h}</span>
+                            {sortBy === h && (
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                {sortDir === 'asc' ? (
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                                ) : (
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                )}
+                              </svg>
+                            )}
+                          </button>
+                        ) : (
                           <span>{h}</span>
+                        )}
+                        {textKey && (
                           <button onClick={(e) => { e.stopPropagation(); setActiveTextFilter(textIsActive ? null : h) }}
                             className={`p-0.5 rounded transition-colors ${textHasFilter ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                             </svg>
                           </button>
-                        </div>
-                      ) : h}
+                        )}
+                      </div>
                       {textKey && textIsActive && (
                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl z-[9999] shadow-2xl min-w-[240px]" onClick={e => e.stopPropagation()}>
                           <div className="p-3.5 space-y-2">

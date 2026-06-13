@@ -117,6 +117,13 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Backup Employee': 'backup_employee_name',
 }
 
+const SORT_FIELDS: Record<string, string> = {
+  ...TEXT_FILTER_COLUMNS,
+  ...DATE_COLUMNS,
+  'Comments': 'notes',
+  'Last Reminder': 'last_reminder_sent_at',
+}
+
 const LOCKABLE_FIELDS = new Set(['name', 'employee_name', 'backup_employee_name'])
 
 const PAGE_SIZES = [25, 50, 100] as const
@@ -248,6 +255,8 @@ export default function MarketingPage({
   const [bulkForm, setBulkForm] = useState({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', interviewer_email: '' })
   const [bulkSaving, setBulkSaving] = useState(false)
   const [cleaningUp, setCleaningUp] = useState(false)
+  const [sortBy, setSortBy] = useState('Candidate Name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(50)
 
@@ -400,6 +409,15 @@ export default function MarketingPage({
     }
     setError('')
     setShowModal(true)
+  }
+
+  const handleSort = (header: string) => {
+    if (sortBy === header) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(header)
+      setSortDir('asc')
+    }
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -849,11 +867,29 @@ export default function MarketingPage({
     })
   }, [records, search, dateFilters, textFilters])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const sorted = useMemo(() => {
+    const fieldKey = SORT_FIELDS[sortBy]
+    if (!fieldKey) return filtered
+    const s = [...filtered]
+    s.sort((a, b) => {
+      const aVal = (a as any)[fieldKey]
+      const bVal = (b as any)[fieldKey]
+      if (aVal == null && bVal == null) return 0
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+      const cmp = typeof aVal === 'string' && typeof bVal === 'string'
+        ? aVal.toLowerCase().localeCompare(bVal.toLowerCase())
+        : String(aVal).localeCompare(String(bVal))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return s
+  }, [filtered, sortBy, sortDir])
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
   const paginated = useMemo(() => {
     const start = page * pageSize
-    return filtered.slice(start, start + pageSize)
-  }, [filtered, page, pageSize])
+    return sorted.slice(start, start + pageSize)
+  }, [sorted, page, pageSize])
 
   useEffect(() => {
     if (page >= totalPages && totalPages > 0) setPage(0)
@@ -866,7 +902,7 @@ export default function MarketingPage({
 
   const exportCSV = useCallback(() => {
     const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const rows = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_name, r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -880,7 +916,7 @@ export default function MarketingPage({
     const doc = new jsPDF({ orientation: 'landscape' })
 
     const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Organization', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const data = filtered.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const data = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_name || '', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
 
     autoTable(doc, {
       head: [headers],
@@ -1003,11 +1039,27 @@ export default function MarketingPage({
                   const textIsActive = textKey && activeTextFilter === h
                   const dateHasFilter = dateKey && !!(dateFilters[dateKey as keyof typeof dateFilters]?.start || dateFilters[dateKey as keyof typeof dateFilters]?.end)
                   const textHasFilter = textKey && (textFilters[h]?.length ?? 0) > 0
+                  const sortFieldKey = SORT_FIELDS[h]
                   return (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap relative">
-                      {isFilterable ? (
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        {sortFieldKey ? (
+                          <button onClick={() => handleSort(h)} className="flex items-center gap-1 hover:text-white transition-colors">
+                            <span>{h}</span>
+                            {sortBy === h && (
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                {sortDir === 'asc' ? (
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                                ) : (
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                )}
+                              </svg>
+                            )}
+                          </button>
+                        ) : (
                           <span>{h}</span>
+                        )}
+                        {isFilterable && (
                           <button ref={dateKey && dateKey === activeDateFilter ? (el) => { dateFilterBtnRef.current = el } : undefined}
                             onClick={(e) => { e.stopPropagation(); if (dateKey) { setActiveDateFilter(dateIsActive ? null : dateKey); setActiveTextFilter(null) } else { setActiveTextFilter(textIsActive ? null : h); setActiveDateFilter(null) } }}
                             className={`p-0.5 rounded transition-colors ${(dateHasFilter || textHasFilter) ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
@@ -1015,8 +1067,8 @@ export default function MarketingPage({
                               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                             </svg>
                           </button>
-                        </div>
-                      ) : h}
+                        )}
+                      </div>
                       {dateKey && dateIsActive && (
                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3.5 z-[9999] shadow-2xl min-w-[260px]" onClick={e => e.stopPropagation()}>
                           <div className="space-y-3">
