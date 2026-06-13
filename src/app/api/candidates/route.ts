@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
         ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
         : null
 
-      // Sync owner_id change to all related marketing records
+      // Sync owner_id change to all related marketing records (match by name + technology)
       if (selectedEmployeeId) {
         const [pResult, eResult] = await Promise.all([
           supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId).maybeSingle(),
@@ -146,22 +146,23 @@ export async function POST(req: NextRequest) {
         const empName = pResult.data?.full_name || eResult.data?.full_name || ''
 
         const client = supabaseAdmin || supabase
-        await client
-          .from('marketing_records')
-          .update({ owner_id: selectedEmployeeId, employee_name: empName || null, updated_at: new Date().toISOString() })
-          .eq('name', candidate.Candidate_name)
+        const mktQ = client.from('marketing_records').update({ owner_id: selectedEmployeeId, employee_name: empName || null, updated_at: new Date().toISOString() }).eq('name', candidate.Candidate_name)
+        if (recordData.technology) {
+          await mktQ.eq('technology', recordData.technology)
+        } else {
+          await mktQ.is('technology', null)
+        }
       }
 
-      // Sync backup_employee change to related marketing records
+      // Sync backup_employee change to related marketing records (match by name + technology)
       if (backupEmployeeId !== undefined) {
         const client = supabaseAdmin || supabase
-        await client
-          .from('marketing_records')
-          .update({
-            backup_employee_name: backupName,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('name', candidate.Candidate_name)
+        const mktQ = client.from('marketing_records').update({ backup_employee_name: backupName, updated_at: new Date().toISOString() }).eq('name', candidate.Candidate_name)
+        if (recordData.technology) {
+          await mktQ.eq('technology', recordData.technology)
+        } else {
+          await mktQ.is('technology', null)
+        }
       }
     }
 

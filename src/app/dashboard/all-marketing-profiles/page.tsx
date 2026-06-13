@@ -40,7 +40,7 @@ export default async function AllMarketingProfilesPage() {
     ownerNames[opt.id] = opt.full_name
   }
 
-  const records = (rawRecords || []).map(r => ({ ...r, employee_name: r.employee_name || ownerNames[r.owner_id] || null, backup_employee_name: (r as any).backup_employee_name || ((r as any).backup_employee_id ? ownerNames[(r as any).backup_employee_id] : null) || null }))
+  const records = (rawRecords || []).map(r => ({ ...r, employee_name: ownerNames[r.owner_id] || null, backup_employee_name: ((r as any).backup_employee_id ? ownerNames[(r as any).backup_employee_id] : null) || (r as any).backup_employee_name || null }))
 
   return <ClientsTable isAdmin={false} readOnly={true} initialRecords={records} employeeOptions={employeeOptions} initialOwnerNames={ownerNames} currentUserId={uid} />
 }

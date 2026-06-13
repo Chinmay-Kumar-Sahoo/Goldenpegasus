@@ -435,7 +435,7 @@ export async function POST(req: NextRequest) {
 
   // --- Dedup: skip if ALL user-facing fields match an existing record (same owner_id) ---
   if (insertData.name) {
-    const dedupFields = ['name','technology','recruiter_email','organization_name','implementation_partner','end_client','client_name','client_email','implementation_poc_email','interviewer_email']
+    const dedupFields = ['name', 'technology', 'recruiter_email', 'implementation_partner']
     const buildKey = (r: any) => dedupFields.map(f => ((r[f] ?? '') + '').toLowerCase().trim()).join('|||') + '|||' + (r.owner_id || '')
     const incomingKey = buildKey(insertData)
     const { data: existing } = await supabase

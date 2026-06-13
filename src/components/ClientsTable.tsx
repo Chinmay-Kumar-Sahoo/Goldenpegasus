@@ -36,7 +36,6 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'Candidate_name',
   'Technology': 'technology',
   'Email': 'Candidate_email',
-  'LinkedIn': 'linkedin_url',
   'Company': 'company_name',
   'Primary Employee': 'employee_name',
   'Backup Employee': 'backup_employee_name',
@@ -69,14 +68,6 @@ const TableRow = memo(function TableRow({
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.Candidate_name}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.technology || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
-      <td className="px-4 py-3 text-sm">
-        {rec.linkedin_url ? (
-          <a href={rec.linkedin_url.startsWith('http') ? rec.linkedin_url : 'https://' + rec.linkedin_url} target="_blank" rel="noopener noreferrer"
-            className="text-[#0a66c2] hover:underline text-sm truncate block max-w-[200px]" title={rec.linkedin_url}>
-            LinkedIn
-          </a>
-        ) : <span className="text-[#71717a]">—</span>}
-      </td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.client_phone || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.company_name || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.employee_name || '—'}</td>
@@ -305,8 +296,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', 'Technology', 'Email', 'LinkedIn URL', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Notes']
-    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email, r.linkedin_url || '', r.client_phone, r.company_name, r.employee_name, r.backup_employee_name, r.notes])
+    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Notes']
+    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email, r.client_phone, r.company_name, r.employee_name, r.backup_employee_name, r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -319,8 +310,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Technology', 'Email', 'LinkedIn URL', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Notes']
-    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email || '', r.linkedin_url || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.backup_employee_name || '', r.notes || ''])
+    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Notes']
+    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email || '', r.client_phone || '', r.company_name || '', r.employee_name || '', r.backup_employee_name || '', r.notes || ''])
 
     autoTable(doc, {
       head: [headers],
@@ -475,7 +466,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'LinkedIn', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status'].map(h => {
+                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Company', 'Primary Employee', 'Backup Employee', 'Status'].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
