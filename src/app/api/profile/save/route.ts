@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       const contactDigits = employee.contact ? employee.contact.replace(/\D/g, '') : null
       const empPayload: Record<string, any> = {
         user_id: user.id,
-        employee_id: employee.employee_id || (employee.designation === 'Administrator' ? `ADM-${Date.now()}` : `EMP-${Date.now()}`),
+        employee_id: (employee.employee_id || '').replace(/\D/g, '') || (employee.designation === 'Administrator' ? `ADM-${Date.now()}` : `EMP-${Date.now()}`),
         full_name: profile.full_name,
         contact: contactDigits,
         address: employee.address || null,

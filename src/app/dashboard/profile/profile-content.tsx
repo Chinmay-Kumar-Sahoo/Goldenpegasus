@@ -111,7 +111,7 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
               <div className="text-xs font-semibold text-[#22c55e] uppercase tracking-wider mb-4">Employee Details</div>
               <div className="grid sm:grid-cols-2 gap-4">
                 {[
-                  { label: 'Employee ID', name: 'employee_id', type: 'text', placeholder: 'EMP-001' },
+                  { label: 'Employee ID', name: 'employee_id', type: 'text', inputMode: 'numeric', placeholder: 'e.g. 1001' },
                   { label: 'Designation', name: 'designation', type: 'text', placeholder: 'Software Engineer' },
                   { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric', placeholder: '+1 234 567 8900' },
                   { label: 'Company ID', name: 'company_id', type: 'text', placeholder: 'GPEG-123' },
@@ -122,7 +122,7 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
                   return (
                   <div key={field.name}>
                     <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
-                    <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: e.target.value })} placeholder={field.placeholder} disabled={isLocked}
+                    <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: field.name === 'employee_id' ? e.target.value.replace(/\D/g, '') : e.target.value })} placeholder={field.placeholder} disabled={isLocked}
                       className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm ${isLocked ? 'text-[#71717a] cursor-not-allowed' : 'text-white focus:outline-none focus:border-[#22c55e]/60'}`} />
                   </div>
                   )

@@ -404,7 +404,7 @@ export default function AdminEmployeesPage() {
             <h2 className="text-lg font-bold text-white mb-6">{editing ? 'Edit Employee' : 'Add Employee'}</h2>
             <form onSubmit={handleSave} className="space-y-4">
               {[
-                { label: 'Employee ID', name: 'employee_id', type: 'text', placeholder: 'EMP-001' },
+                { label: 'Employee ID', name: 'employee_id', type: 'text', inputMode: 'numeric', placeholder: 'e.g. 1001' },
                 { label: 'Full Name', name: 'full_name', type: 'text', placeholder: 'John Doe' },
                 { label: 'Email', name: 'email', type: 'email', placeholder: 'john@example.com' },
                 { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric', placeholder: '+1 234 567 8900' },
@@ -414,7 +414,7 @@ export default function AdminEmployeesPage() {
               ].map(field => (
                 <div key={field.name}>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
-                  <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={form[field.name as keyof FormData]} onChange={e => setForm({ ...form, [field.name]: e.target.value })} placeholder={field.placeholder}
+                  <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={form[field.name as keyof FormData]} onChange={e => setForm({ ...form, [field.name]: field.name === 'employee_id' ? e.target.value.replace(/\D/g, '') : e.target.value })} placeholder={field.placeholder}
                     required={['employee_id', 'full_name', 'email'].includes(field.name) || (!editing && field.name === 'password')}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60 transition-all" />
                 </div>

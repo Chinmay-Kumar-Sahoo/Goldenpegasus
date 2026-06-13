@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
         if (key === 'id' || key === 'password') continue
         if ((key === 'joining_date' || key === 'date_of_birth') && !val) continue
         if (key === 'contact') { updateData.contact = String(val || '').replace(/\D/g, ''); continue }
+        if (key === 'employee_id') { updateData.employee_id = String(val || '').replace(/\D/g, ''); continue }
         updateData[key] = val
       }
       const { error } = await supabaseAdmin.from('employees').update(updateData).eq('user_id', body.id)
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
       user_metadata: {
         full_name: body.full_name,
         role: 'employee',
-        employee_id: body.employee_id || '',
+        employee_id: (body.employee_id || '').replace(/\D/g, ''),
         contact: (body.contact || '').replace(/\D/g, ''),
         designation: body.designation || '',
         joining_date: body.joining_date || '',
