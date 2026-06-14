@@ -19,7 +19,7 @@ interface TableRecord { id: string; table_id: string; owner_id: string; data: Re
 interface Profile { id: string; full_name: string; email: string }
 interface Permission { id: string; table_id: string; user_id: string; permission: string; profiles?: { full_name: string; email: string } }
 
-const FIELD_TYPES = ['text', 'number', 'email', 'date', 'textarea']
+const FIELD_TYPES = ['text', 'number', 'email', 'date']
 
 export default function DynamicTablesPage({ isAdmin = false, initialTables = [], initialUserId = null }: { isAdmin?: boolean; initialTables?: DynamicTable[]; initialUserId?: string | null }) {
   const [tables, setTables] = useState<DynamicTable[]>(initialTables)
