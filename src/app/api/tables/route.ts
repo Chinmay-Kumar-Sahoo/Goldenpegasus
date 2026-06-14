@@ -57,6 +57,32 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const action = body.action || 'table'
 
+  if (action === 'update_table') {
+    const { data: existing } = await supabase
+      .from('dynamic_tables')
+      .select('owner_id')
+      .eq('id', body.id)
+      .single()
+    if (!existing) return NextResponse.json({ error: 'Table not found' }, { status: 404 })
+    const isAdminResult = await supabase.rpc('is_admin')
+    const isAdmin = isAdminResult.data ?? false
+    if (existing.owner_id !== user.id && !isAdmin)
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { error } = await supabase
+      .from('dynamic_tables')
+      .update({
+        table_name: body.table_name,
+        description: body.description || null,
+        schema_definition: body.schema_definition,
+        is_global: body.is_global || false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', body.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await supabase.from('audit_logs').insert({ action: 'updated', entity_type: 'dynamic_table', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })
+    return NextResponse.json({ success: true })
+  }
+
   if (action === 'table') {
     const { data: inserted, error } = await supabase.from('dynamic_tables').insert({
       owner_id: user.id,

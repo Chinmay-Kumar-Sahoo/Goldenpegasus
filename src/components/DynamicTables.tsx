@@ -19,7 +19,7 @@ interface TableRecord { id: string; table_id: string; owner_id: string; data: Re
 interface Profile { id: string; full_name: string; email: string }
 interface Permission { id: string; table_id: string; user_id: string; permission: string; profiles?: { full_name: string; email: string } }
 
-const FIELD_TYPES = ['text', 'number', 'email', 'date', 'textarea', 'select']
+const FIELD_TYPES = ['text', 'number', 'email', 'date', 'textarea']
 
 export default function DynamicTablesPage({ isAdmin = false, initialTables = [], initialUserId = null }: { isAdmin?: boolean; initialTables?: DynamicTable[]; initialUserId?: string | null }) {
   const [tables, setTables] = useState<DynamicTable[]>(initialTables)
@@ -29,6 +29,7 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
   const [records, setRecords] = useState<TableRecord[]>([])
   const [recordsLoading, setRecordsLoading] = useState(false)
   const [showTableModal, setShowTableModal] = useState(false)
+  const [editingTable, setEditingTable] = useState<DynamicTable | null>(null)
   const [showRecordModal, setShowRecordModal] = useState(false)
   const [showPermModal, setShowPermModal] = useState(false)
   const [editingRecord, setEditingRecord] = useState<TableRecord | null>(null)
@@ -96,6 +97,7 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
         body: JSON.stringify({ action: 'table', table_name: newTableForm.table_name, description: newTableForm.description, schema_definition: fields, is_global: isAdmin ? newTableForm.is_global : false }),
       })
       setShowTableModal(false)
+      setEditingTable(null)
       setNewTableForm({ table_name: '', description: '', is_global: false })
       setFields([{ name: 'field1', label: 'Field 1', type: 'text', required: false }])
       toast.success('Table created successfully')
@@ -115,6 +117,41 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
       toast.success('Table deleted')
       fetchTables()
     } catch { toast.error('Failed to delete table') }
+  }
+
+  const openEditTable = (table: DynamicTable) => {
+    setEditingTable(table)
+    setNewTableForm({ table_name: table.table_name, description: table.description || '', is_global: table.is_global })
+    setFields(table.schema_definition.map(f => ({ ...f })))
+    setShowTableModal(true)
+  }
+
+  const handleUpdateTable = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingTable) return
+    setSaving(true); setError('')
+    try {
+      await api('/api/tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_table', id: editingTable.id, table_name: newTableForm.table_name, description: newTableForm.description, schema_definition: fields, is_global: isAdmin ? newTableForm.is_global : false }),
+      })
+      setShowTableModal(false)
+      setEditingTable(null)
+      setNewTableForm({ table_name: '', description: '', is_global: false })
+      setFields([{ name: 'field1', label: 'Field 1', type: 'text', required: false }])
+      toast.success('Table updated successfully')
+      // Refresh active table if it was the one edited
+      if (activeTable?.id === editingTable.id) {
+        const updated = tables.find(t => t.id === editingTable.id)
+        if (updated) setActiveTable(updated)
+      }
+      fetchTables()
+    } catch (err: any) {
+      setError(err.message)
+      toast.error('Failed to update table')
+    }
+    setSaving(false)
   }
 
   const openRecordModal = (rec?: TableRecord) => {
@@ -241,8 +278,12 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                     </div>
                   </div>
                   {canManageTable(table) && (
-                    <button onClick={e => { e.stopPropagation(); handleDeleteTable(table.id) }}
-                      className="text-xs text-[#71717a] hover:text-red-400 transition-colors flex-shrink-0">✕</button>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button onClick={e => { e.stopPropagation(); openEditTable(table) }}
+                        className="text-xs text-[#71717a] hover:text-white transition-colors">✎</button>
+                      <button onClick={e => { e.stopPropagation(); handleDeleteTable(table.id) }}
+                        className="text-xs text-[#71717a] hover:text-red-400 transition-colors">✕</button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -318,12 +359,12 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
         </div>
       </div>
 
-      {/* Create Table Modal */}
+      {/* Create / Edit Table Modal */}
       {showTableModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold text-white mb-6">Create New Table</h2>
-            <form onSubmit={handleCreateTable} className="space-y-5">
+            <h2 className="text-lg font-bold text-white mb-6">{editingTable ? 'Edit Table' : 'Create New Table'}</h2>
+            <form onSubmit={editingTable ? handleUpdateTable : handleCreateTable} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Table Name *</label>
                 <input type="text" value={newTableForm.table_name} onChange={e => setNewTableForm({ ...newTableForm, table_name: e.target.value })} required placeholder="My Custom Table"
@@ -374,9 +415,9 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
 
               {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
               <div className="flex gap-3">
-                <button type="button" onClick={() => setShowTableModal(false)} className="flex-1 border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white py-2.5 rounded-xl text-sm transition-all">Cancel</button>
+                <button type="button" onClick={() => { setShowTableModal(false); setEditingTable(null); setNewTableForm({ table_name: '', description: '', is_global: false }); setFields([{ name: 'field1', label: 'Field 1', type: 'text', required: false }]) }} className="flex-1 border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white py-2.5 rounded-xl text-sm transition-all">Cancel</button>
                 <button type="submit" disabled={saving} className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold py-2.5 rounded-xl text-sm transition-all disabled:opacity-50">
-                  {saving ? 'Creating...' : 'Create Table'}
+                  {saving ? (editingTable ? 'Updating...' : 'Creating...') : (editingTable ? 'Update Table' : 'Create Table')}
                 </button>
               </div>
             </form>
@@ -397,7 +438,7 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                     <textarea value={recordForm[field.name] || ''} onChange={e => setRecordForm({ ...recordForm, [field.name]: e.target.value })} required={field.required} rows={3}
                       className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-none" />
                   ) : (
-                    <input type={field.type === 'select' ? 'text' : field.type} value={recordForm[field.name] || ''} onChange={e => setRecordForm({ ...recordForm, [field.name]: e.target.value })} required={field.required}
+                    <input type={field.type} value={recordForm[field.name] || ''} onChange={e => setRecordForm({ ...recordForm, [field.name]: e.target.value })} required={field.required}
                       className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                   )}
                 </div>
