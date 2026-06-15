@@ -35,6 +35,32 @@ export default async function EmployeeClientsPage() {
   }
   const rawRecords = Array.from(recordMap.values())
 
+  // Backfill: auto-create missing Candidate_records from marketing_records
+  if (supabaseAdmin && uid) {
+    const existingNames = new Set(rawRecords.map(r => (r as any).Candidate_name?.toLowerCase().trim()).filter(Boolean))
+    const { data: mktRecords } = await supabaseAdmin
+      .from('marketing_records')
+      .select('name, technology, owner_id')
+      .eq('owner_id', uid)
+      .order('created_at', { ascending: false })
+      .limit(200)
+    if (mktRecords) {
+      const seen = new Set<string>()
+      const payloads: any[] = []
+      const now = new Date().toISOString()
+      for (const r of mktRecords as any[]) {
+        const n = (r.name || '').toLowerCase().trim()
+        if (!n || existingNames.has(n) || seen.has(n)) continue
+        seen.add(n)
+        payloads.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || uid, status: 'Active', updated_at: now })
+      }
+      if (payloads.length > 0) {
+        const { data: created } = await supabaseAdmin.from('Candidate_records').insert(payloads).select()
+        if (created) rawRecords.push(...(created as any[]))
+      }
+    }
+  }
+
   // Build employee name lookup map
   const employeeMap = new Map(((employeesFromTable?.data || []) as any[]).map((e: any) => [e.user_id, e]))
   const employeeOptions = (employeeProfiles.data || []).map((p: any) => {

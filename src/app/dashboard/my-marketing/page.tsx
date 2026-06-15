@@ -36,7 +36,7 @@ export default async function MyMarketingPage() {
   const candidateQuery = supabaseAdmin
     ? supabaseAdmin.from('Candidate_records').select('id, Candidate_name, owner_id, status, technology, linkedin_url, backup_employee_id, backup_employee_name').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
     : supabase.from('Candidate_records').select('id, Candidate_name, owner_id, status, technology, linkedin_url, backup_employee_id, backup_employee_name').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
-  const { data: candidates } = await candidateQuery
+  let { data: candidates } = await candidateQuery
 
   const ownedCandidateNames = (candidates || []).filter(c => c.owner_id === uid).map(c => c.Candidate_name)
   const backupCandidateNames = (candidates || []).filter(c => c.backup_employee_id === uid).map(c => c.Candidate_name)
@@ -54,6 +54,24 @@ export default async function MyMarketingPage() {
     if (!recordMap.has(r.id)) recordMap.set(r.id, { ...r, is_backup_record: r.owner_id !== uid })
   }
   const mergedRecords = Array.from(recordMap.values())
+
+  // Backfill: auto-create missing Candidate_records for marketing records without matching candidates
+  if (supabaseAdmin && mergedRecords.length > 0) {
+    const candidateNameSet = new Set((candidates || []).map(c => (c as any).Candidate_name?.toLowerCase().trim()).filter(Boolean))
+    const seen = new Set<string>()
+    const payloads: any[] = []
+    const now = new Date().toISOString()
+    for (const r of mergedRecords) {
+      const n = (r.name || '').toLowerCase().trim()
+      if (!n || candidateNameSet.has(n) || seen.has(n)) continue
+      seen.add(n)
+      payloads.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || uid, status: 'Active', updated_at: now })
+    }
+    if (payloads.length > 0) {
+      const { data: created } = await supabaseAdmin.from('Candidate_records').insert(payloads).select()
+      if (created) candidates = [...(candidates || []), ...(created as any[])]
+    }
+  }
 
   // Build owner names from all records
   const ownerIds = Array.from(new Set(mergedRecords.map(r => r.owner_id).filter(Boolean)))
