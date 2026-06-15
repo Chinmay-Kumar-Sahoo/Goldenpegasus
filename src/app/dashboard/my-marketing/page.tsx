@@ -42,16 +42,27 @@ export default async function MyMarketingPage() {
   const ownedCandidateNames = (candidates || []).filter(c => c.owner_id === uid).map(c => c.Candidate_name)
   const backupCandidateNames = (candidates || []).filter(c => c.backup_employee_id === uid).map(c => c.Candidate_name)
 
-  const [{ data: ownedRecords }, { data: backupRecords }] = await Promise.all([
+  // Resolve current user's full name for backup_employee_name fallback
+  const currentUserProfile = (empProfilesResult?.data || []).find((p: any) => p.id === uid)
+  const currentUserEmployee = (empFromTableResult?.data || []).find((e: any) => e.user_id === uid)
+  const currentUserFullName = currentUserProfile?.full_name || currentUserEmployee?.full_name || null
+
+  const [{ data: ownedRecords }, { data: backupRecords }, { data: nameBackupRecords }] = await Promise.all([
     supabase.from('marketing_records').select('*').eq('owner_id', uid).order('created_at', { ascending: false }).limit(2000),
     backupCandidateNames.length > 0
       ? lookupClient.from('marketing_records').select('*').in('name', backupCandidateNames).order('created_at', { ascending: false }).limit(2000)
+      : Promise.resolve({ data: [] }),
+    currentUserFullName
+      ? lookupClient.from('marketing_records').select('*').ilike('backup_employee_name', currentUserFullName).neq('owner_id', uid).order('created_at', { ascending: false }).limit(2000)
       : Promise.resolve({ data: [] }),
   ])
 
   const recordMap = new Map<string, any>()
   for (const r of (ownedRecords || [])) recordMap.set(r.id, { ...r, is_backup_record: false })
   for (const r of (backupRecords || [])) {
+    if (!recordMap.has(r.id)) recordMap.set(r.id, { ...r, is_backup_record: r.owner_id !== uid })
+  }
+  for (const r of (nameBackupRecords || [])) {
     if (!recordMap.has(r.id)) recordMap.set(r.id, { ...r, is_backup_record: r.owner_id !== uid })
   }
   const mergedRecords = Array.from(recordMap.values())
@@ -66,7 +77,21 @@ export default async function MyMarketingPage() {
       const n = (r.name || '').toLowerCase().trim()
       if (!n || candidateNameSet.has(n) || seen.has(n)) continue
       seen.add(n)
-      payloads.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || uid, status: 'Active', updated_at: now })
+      const backupName = (r as any).backup_employee_name
+      let backupId: string | null = null
+      if (backupName) {
+        const eOpt = employeeOptions.find((e: any) => e.full_name?.toLowerCase().trim() === backupName.toLowerCase().trim())
+        if (eOpt) backupId = eOpt.id
+      }
+      payloads.push({
+        Candidate_name: r.name,
+        technology: r.technology || null,
+        owner_id: r.owner_id || uid,
+        status: 'Active',
+        backup_employee_id: backupId,
+        backup_employee_name: backupName || null,
+        updated_at: now,
+      })
     }
     if (payloads.length > 0) {
       const { data: created, error: insertErr } = await supabaseAdmin.from('Candidate_records').insert(payloads).select()

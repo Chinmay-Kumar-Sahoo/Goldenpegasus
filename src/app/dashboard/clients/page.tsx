@@ -40,7 +40,7 @@ export default async function EmployeeClientsPage() {
     const existingNames = new Set(rawRecords.map(r => (r as any).Candidate_name?.toLowerCase().trim()).filter(Boolean))
     const { data: mktRecords } = await supabaseAdmin
       .from('marketing_records')
-      .select('name, technology, owner_id')
+      .select('name, technology, owner_id, backup_employee_name')
       .eq('owner_id', uid)
       .order('created_at', { ascending: false })
       .limit(200)
@@ -52,7 +52,8 @@ export default async function EmployeeClientsPage() {
         const n = (r.name || '').toLowerCase().trim()
         if (!n || existingNames.has(n) || seen.has(n)) continue
         seen.add(n)
-        payloads.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || uid, status: 'Active', updated_at: now })
+        const backupName = r.backup_employee_name || null
+        payloads.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || uid, status: 'Active', backup_employee_name: backupName, updated_at: now })
       }
       if (payloads.length > 0) {
         const { data: created } = await supabaseAdmin.from('Candidate_records').insert(payloads).select()

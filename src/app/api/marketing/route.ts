@@ -39,6 +39,8 @@ export async function GET(req: NextRequest) {
     const backupNames = backupCandidates.map(c => c.Candidate_name)
 
     let backupRecords: any[] = []
+
+    // 1) Match by Candidate_records backup_employee_id → candidate name → marketing_records name
     if (backupNames.length > 0) {
       const { data: br } = await lookupClient
         .from('marketing_records')
@@ -47,6 +49,27 @@ export async function GET(req: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(limitParam)
       backupRecords = br || []
+    }
+
+    // 2) Fallback: match by marketing_records.backup_employee_name (handles records synced without backup_employee_id)
+    const [{ data: myProfile }, { data: myEmployee }] = await Promise.all([
+      lookupClient.from('profiles').select('full_name').eq('id', ownerFilter).maybeSingle(),
+      lookupClient.from('employees').select('full_name').eq('user_id', ownerFilter).maybeSingle(),
+    ])
+    const myName = myProfile?.full_name || myEmployee?.full_name
+    if (myName) {
+      const { data: nameBackupRecords } = await lookupClient
+        .from('marketing_records')
+        .select(MARKETING_FIELDS)
+        .ilike('backup_employee_name', myName)
+        .neq('owner_id', ownerFilter)
+        .order('created_at', { ascending: false })
+        .limit(limitParam)
+      if (nameBackupRecords) {
+        for (const r of nameBackupRecords) {
+          if (!backupRecords.some(b => b.id === r.id)) backupRecords.push(r)
+        }
+      }
     }
 
     const recordMap = new Map<string, any>()
@@ -357,11 +380,11 @@ export async function POST(req: NextRequest) {
 
   if (body.id) {
     // --- EDITING EXISTING RECORD ---
-    const { data: existingRecord } = await supabase
-      .from('marketing_records')
-      .select('owner_id, name, technology')
-      .eq('id', body.id)
-      .single()
+      const { data: existingRecord } = await supabase
+        .from('marketing_records')
+        .select('owner_id, name, technology, backup_employee_name')
+        .eq('id', body.id)
+        .single()
 
     if (!existingRecord) {
       return NextResponse.json({ error: 'Record not found' }, { status: 404 })
@@ -451,7 +474,7 @@ export async function POST(req: NextRequest) {
     const adminClient = getAdminClient()
     if (adminClient && existingRecord.name) {
       const { data: existingCandidate } = await (adminClient.from('Candidate_records') as any)
-        .select('id')
+        .select('id, backup_employee_id, backup_employee_name')
         .ilike('Candidate_name', existingRecord.name)
         .maybeSingle() as any
       const candPayload: any = { updated_at: new Date().toISOString() }
@@ -461,10 +484,23 @@ export async function POST(req: NextRequest) {
       if (effectiveOwnerId) candPayload.owner_id = effectiveOwnerId
       if (recordData.backup_employee_id !== undefined) candPayload.backup_employee_id = recordData.backup_employee_id || null
       if (recordData.backup_employee_name !== undefined) candPayload.backup_employee_name = recordData.backup_employee_name || null
+      // Preserve existing backup values if not provided in request
+      if (existingCandidate?.backup_employee_id && candPayload.backup_employee_id === undefined) {
+        candPayload.backup_employee_id = existingCandidate.backup_employee_id
+        candPayload.backup_employee_name = existingCandidate.backup_employee_name || candPayload.backup_employee_name
+      }
       if (existingCandidate) {
         await (adminClient.from('Candidate_records') as any).update(candPayload).eq('id', existingCandidate.id)
       } else {
         candPayload.Candidate_name = existingRecord.name
+        // Try to resolve backup_employee_id from backup_employee_name for new records
+        if (existingRecord.backup_employee_name && candPayload.backup_employee_id === undefined) {
+          const [pResult, eResult] = await Promise.all([
+            (adminClient.from('profiles') as any).select('id').ilike('full_name', existingRecord.backup_employee_name).maybeSingle(),
+            (adminClient.from('employees') as any).select('user_id').ilike('full_name', existingRecord.backup_employee_name).maybeSingle(),
+          ])
+          candPayload.backup_employee_id = pResult?.data?.id || eResult?.data?.user_id || null
+        }
         await (adminClient.from('Candidate_records') as any).insert(candPayload)
       }
     }
@@ -512,7 +548,7 @@ export async function POST(req: NextRequest) {
     const adminClient = getAdminClient()
     if (adminClient) {
       const { data: existing } = await (adminClient.from('Candidate_records') as any)
-        .select('id')
+        .select('id, backup_employee_id, backup_employee_name')
         .ilike('Candidate_name', insertData.name)
         .maybeSingle() as any
       const candPayload: any = {
@@ -525,6 +561,19 @@ export async function POST(req: NextRequest) {
       }
       if (insertData.backup_employee_id !== undefined) candPayload.backup_employee_id = insertData.backup_employee_id || null
       if (insertData.backup_employee_name !== undefined) candPayload.backup_employee_name = insertData.backup_employee_name || null
+      // Preserve existing backup values if not provided in request
+      if (existing?.backup_employee_id && candPayload.backup_employee_id === undefined) {
+        candPayload.backup_employee_id = existing.backup_employee_id
+        candPayload.backup_employee_name = existing.backup_employee_name || candPayload.backup_employee_name
+      }
+      // For new candidates, try to resolve backup_employee_id from backup_employee_name
+      if (!existing && insertData.backup_employee_name && candPayload.backup_employee_id === undefined) {
+        const [pResult, eResult] = await Promise.all([
+            (adminClient.from('profiles') as any).select('id').ilike('full_name', insertData.backup_employee_name).maybeSingle(),
+            (adminClient.from('employees') as any).select('user_id').ilike('full_name', insertData.backup_employee_name).maybeSingle(),
+        ])
+        candPayload.backup_employee_id = pResult?.data?.id || eResult?.data?.user_id || null
+      }
       if (existing) {
         await (adminClient.from('Candidate_records') as any).update(candPayload).eq('id', existing.id)
       } else {
