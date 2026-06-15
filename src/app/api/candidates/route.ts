@@ -51,6 +51,16 @@ export async function GET(req: NextRequest) {
     records = data || []
   }
 
+  // Resolve current user's full name for backup employee matching
+  let currentUserFullName: string | null = null
+  if (ownerFilter) {
+    const [{ data: p }, { data: e }] = await Promise.all([
+      supabase.from('profiles').select('full_name').eq('id', ownerFilter).maybeSingle(),
+      supabase.from('employees').select('full_name').eq('user_id', ownerFilter).maybeSingle(),
+    ])
+    currentUserFullName = p?.full_name || e?.full_name || null
+  }
+
   // Auto-create missing Candidate_records for records that exist in marketing but not here
   if (supabaseAdmin && records.length === 0) {
     // No candidate records at all — check marketing_records for orphaned names
@@ -74,6 +84,33 @@ export async function GET(req: NextRequest) {
         const { data: created } = await (supabaseAdmin.from('Candidate_records') as any).insert(payloads).select()
         if (created) {
           for (const c of created as any[]) records.push(c)
+        }
+      }
+    }
+    // Also backfill backup employee records
+    if (currentUserFullName) {
+      const existingKeys = new Set(records.map(r => ((r.Candidate_name || '') + '|' + (r.technology || '')).toLowerCase().trim()).filter(Boolean))
+      const { data: backupMkt } = await (supabaseAdmin.from('marketing_records') as any)
+        .select('name, technology, owner_id')
+        .ilike('backup_employee_name', currentUserFullName)
+        .neq('owner_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(200) as any
+      if (backupMkt) {
+        const seen = new Set<string>()
+        const payloads: any[] = []
+        const now = new Date().toISOString()
+        for (const m of backupMkt) {
+          const key = ((m.name || '') + '|' + (m.technology || '')).toLowerCase().trim()
+          if (!key || existingKeys.has(key) || seen.has(key)) continue
+          seen.add(key)
+          payloads.push({ Candidate_name: m.name, technology: m.technology || null, owner_id: m.owner_id || user.id, backup_employee_id: user.id, backup_employee_name: currentUserFullName, status: 'Active', updated_at: now })
+        }
+        if (payloads.length > 0) {
+          const { data: created } = await (supabaseAdmin.from('Candidate_records') as any).insert(payloads).select()
+          if (created) {
+            for (const c of created as any[]) records.push(c)
+          }
         }
       }
     }
@@ -101,6 +138,32 @@ export async function GET(req: NextRequest) {
         const { data: created } = await (supabaseAdmin.from('Candidate_records') as any).insert(payloads).select()
         if (created) {
           for (const c of created as any[]) records.push(c)
+        }
+      }
+    }
+    // Also backfill from marketing_records where user is the backup employee
+    if (ownerFilter && currentUserFullName) {
+      const { data: backupMkt } = await (supabaseAdmin.from('marketing_records') as any)
+        .select('name, technology, owner_id')
+        .ilike('backup_employee_name', currentUserFullName)
+        .neq('owner_id', ownerFilter)
+        .order('created_at', { ascending: false })
+        .limit(200) as any
+      if (backupMkt) {
+        const seen = new Set<string>()
+        const payloads: any[] = []
+        const now = new Date().toISOString()
+        for (const m of backupMkt) {
+          const key = ((m.name || '') + '|' + (m.technology || '')).toLowerCase().trim()
+          if (!key || existingKeys.has(key) || seen.has(key)) continue
+          seen.add(key)
+          payloads.push({ Candidate_name: m.name, technology: m.technology || null, owner_id: m.owner_id || ownerFilter, backup_employee_id: ownerFilter, backup_employee_name: currentUserFullName, status: 'Active', updated_at: now })
+        }
+        if (payloads.length > 0) {
+          const { data: created } = await (supabaseAdmin.from('Candidate_records') as any).insert(payloads).select()
+          if (created) {
+            for (const c of created as any[]) records.push(c)
+          }
         }
       }
     }

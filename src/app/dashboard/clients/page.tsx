@@ -36,6 +36,16 @@ export default async function EmployeeClientsPage() {
   }
   const rawRecords = Array.from(recordMap.values())
 
+  // Resolve current user's full name for backup_employee_name matching
+  let currentUserFullName: string | null = null
+  if (uid) {
+    const [{ data: p }, { data: e }] = await Promise.all([
+      supabase.from('profiles').select('full_name').eq('id', uid).maybeSingle(),
+      supabase.from('employees').select('full_name').eq('user_id', uid).maybeSingle(),
+    ])
+    currentUserFullName = p?.full_name || e?.full_name || null
+  }
+
   // Backfill: auto-create missing Candidate_records from marketing_records
   if (supabaseAdmin && uid) {
     const existingNames = new Set(rawRecords.map(r => (r as any).Candidate_name?.toLowerCase().trim()).filter(Boolean))
@@ -59,6 +69,33 @@ export default async function EmployeeClientsPage() {
       if (payloads.length > 0) {
         const { data: created } = await supabaseAdmin.from('Candidate_records').insert(payloads).select()
         if (created) rawRecords.push(...(created as any[]))
+      }
+    }
+
+    // Also backfill from marketing_records where user is the backup employee
+    if (currentUserFullName) {
+      const existingKeys = new Set(rawRecords.map(r => ((r as any).Candidate_name || '') + '|' + ((r as any).technology || '')).map((k: string) => k.toLowerCase().trim()).filter(Boolean))
+      const { data: backupMktRecords } = await supabaseAdmin
+        .from('marketing_records')
+        .select('name, technology, owner_id, backup_employee_name')
+        .ilike('backup_employee_name', currentUserFullName)
+        .neq('owner_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(200)
+      if (backupMktRecords) {
+        const seen = new Set<string>()
+        const payloads: any[] = []
+        const now = new Date().toISOString()
+        for (const r of backupMktRecords as any[]) {
+          const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
+          if (!key || existingKeys.has(key) || seen.has(key)) continue
+          seen.add(key)
+          payloads.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || uid, status: 'Active', backup_employee_id: uid, backup_employee_name: currentUserFullName, updated_at: now })
+        }
+        if (payloads.length > 0) {
+          const { data: created } = await supabaseAdmin.from('Candidate_records').insert(payloads).select()
+          if (created) rawRecords.push(...(created as any[]))
+        }
       }
     }
   }
