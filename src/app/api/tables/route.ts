@@ -97,6 +97,16 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'record') {
+    if (body.table_id) {
+      const { data: table } = await supabase.from('dynamic_tables').select('schema_definition').eq('id', body.table_id).single()
+      if (table?.schema_definition) {
+        for (const field of table.schema_definition as any[]) {
+          if (field.type === 'text' && body.data[field.name] && !/^[a-zA-Z\s]*$/.test(body.data[field.name])) {
+            return NextResponse.json({ error: `${field.label} must only contain alphabetic characters` }, { status: 400 })
+          }
+        }
+      }
+    }
     if (body.id) {
       const { error } = await supabase
         .from('dynamic_table_records')

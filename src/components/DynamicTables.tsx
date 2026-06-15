@@ -515,7 +515,7 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                     <textarea value={recordForm[field.name] || ''} onChange={e => setRecordForm({ ...recordForm, [field.name]: e.target.value })} required={field.required} rows={3}
                       className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-none" />
                   ) : (
-                    <input type={field.type} value={recordForm[field.name] || ''} onChange={e => setRecordForm({ ...recordForm, [field.name]: e.target.value })} required={field.required}
+                    <input type={field.type} value={recordForm[field.name] || ''} onChange={e => { const v = field.type === 'text' ? e.target.value.replace(/[^a-zA-Z\s]/g, '') : e.target.value; setRecordForm({ ...recordForm, [field.name]: v }) }} required={field.required}
                       className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                   )}
                 </div>
@@ -542,7 +542,7 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
               {activeTable.schema_definition.map(f => (
                 <div key={f.name}>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{f.label}</label>
-                  <input type={f.type === 'number' ? 'text' : f.type} value={bulkRecordForm[f.name] || ''} onChange={e => setBulkRecordForm({ ...bulkRecordForm, [f.name]: e.target.value })}
+                   <input type={f.type === 'number' ? 'text' : f.type} value={bulkRecordForm[f.name] || ''} onChange={e => { const v = f.type === 'text' ? e.target.value.replace(/[^a-zA-Z\s]/g, '') : e.target.value; setBulkRecordForm({ ...bulkRecordForm, [f.name]: v }) }}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 </div>
               ))}
