@@ -51,6 +51,60 @@ export async function GET(req: NextRequest) {
     records = data || []
   }
 
+  // Auto-create missing Candidate_records for records that exist in marketing but not here
+  if (supabaseAdmin && records.length === 0) {
+    // No candidate records at all — check marketing_records for orphaned names
+    const { data: marketingNames } = await (supabaseAdmin.from('marketing_records') as any)
+      .select('name, technology, owner_id')
+      .order('created_at', { ascending: false })
+      .limit(200) as any
+    if (marketingNames) {
+      const seen = new Set<string>()
+      const payloads: any[] = []
+      const now = new Date().toISOString()
+      for (const m of marketingNames) {
+        const n = (m.name || '').toLowerCase().trim()
+        if (!n || seen.has(n)) continue
+        seen.add(n)
+        payloads.push({ Candidate_name: m.name, technology: m.technology || null, owner_id: m.owner_id || null, status: 'Active', updated_at: now })
+      }
+      if (payloads.length > 0) {
+        const { data: created } = await (supabaseAdmin.from('Candidate_records') as any).insert(payloads).select()
+        if (created) {
+          for (const c of created as any[]) records.push(c)
+        }
+      }
+    }
+  } else if (supabaseAdmin && records.length > 0) {
+    // Check if any marketing records for our owner are missing from Candidate_records
+    const existingNames = new Set(records.map(r => (r.Candidate_name || '').toLowerCase().trim()).filter(Boolean))
+    let marketingQuery = (supabaseAdmin.from('marketing_records') as any).select('name, technology, owner_id').order('created_at', { ascending: false }).limit(200)
+    if (ownerFilter) marketingQuery = marketingQuery.eq('owner_id', ownerFilter) as any
+    const { data: marketingNames } = await marketingQuery
+    if (marketingNames) {
+      const missingCandidates = new Map<string, { name: string; technology: string | null; owner_id: string | null }>()
+      for (const m of marketingNames) {
+        const n = (m.name || '').toLowerCase().trim()
+        if (!n || existingNames.has(n)) continue
+        const key = n + '|' + ((m.technology || '') + '').toLowerCase().trim()
+        if (!missingCandidates.has(key)) {
+          missingCandidates.set(key, { name: m.name, technology: m.technology || null, owner_id: m.owner_id || null })
+        }
+      }
+      if (missingCandidates.size > 0) {
+        const now = new Date().toISOString()
+        const payloads: any[] = []
+        for (const [, p] of missingCandidates) {
+          payloads.push({ Candidate_name: p.name, technology: p.technology, owner_id: p.owner_id, status: 'Active', updated_at: now })
+        }
+        const { data: created } = await (supabaseAdmin.from('Candidate_records') as any).insert(payloads).select()
+        if (created) {
+          for (const c of created as any[]) records.push(c)
+        }
+      }
+    }
+  }
+
   if (records.length === 0) {
     return NextResponse.json({ records: [], timing: 0 })
   }
