@@ -1,3 +1,4 @@
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
@@ -11,20 +12,59 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [
-    { count: mktCount },
-    { count: clientCount },
-    { count: tableCount },
-    { data: _profileData },
-  ] = await Promise.all([
-    supabase.from('marketing_records').select('*', { count: 'exact', head: true }).eq('owner_id', user.id),
-    supabase.from('Candidate_records').select('*', { count: 'exact', head: true }).eq('owner_id', user.id),
-    supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }).eq('owner_id', user.id),
-    supabase.from('profiles').select('full_name, email').eq('id', user.id).single(),
+  const uid = user.id
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  const supabaseAdmin = serviceRoleKey
+    ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : null
+  const lookupClient = supabaseAdmin || supabase
+
+  const [{ count: mktCount }, { count: clientCount }, { count: tableCount }, { data: _profileData }] = await Promise.all([
+    supabase.from('marketing_records').select('*', { count: 'exact', head: true }).eq('owner_id', uid),
+    supabase.from('Candidate_records').select('*', { count: 'exact', head: true }).eq('owner_id', uid),
+    supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }).eq('owner_id', uid),
+    supabase.from('profiles').select('full_name, email').eq('id', uid).single(),
   ])
 
+  // Count backup records: records where employee is assigned as backup for a specific candidate+technology
+  let backupCount = 0
+  const { data: backupCandidates } = await lookupClient
+    .from('Candidate_records')
+    .select('Candidate_name, technology')
+    .eq('backup_employee_id', uid)
+
+  if (backupCandidates && backupCandidates.length > 0) {
+    const normalizeKey = (s: string) => s.toLowerCase().trim()
+    const backupKeys = new Set<string>()
+    for (const c of backupCandidates) {
+      backupKeys.add(normalizeKey(c.Candidate_name) + '|' + normalizeKey(c.technology || ''))
+    }
+
+    const names = [...new Set(backupCandidates.map(c => c.Candidate_name))]
+    const { data: backupRecords } = await lookupClient
+      .from('marketing_records')
+      .select('id, name, technology, owner_id')
+      .in('name', names)
+      .neq('owner_id', uid)
+
+    if (backupRecords) {
+      const seenIds = new Set<string>()
+      for (const r of backupRecords) {
+        const key = normalizeKey(r.name) + '|' + normalizeKey(r.technology || '')
+        if (backupKeys.has(key) && !seenIds.has(r.id)) {
+          seenIds.add(r.id)
+          backupCount++
+        }
+      }
+    }
+  }
+
+  const totalMktCount = (mktCount ?? 0) + backupCount
+
   const stats = [
-    { label: 'My Marketing Records', value: mktCount ?? 0, icon: '📈', href: '/dashboard/my-marketing' },
+    { label: 'My Marketing Records', value: totalMktCount, icon: '📈', href: '/dashboard/my-marketing' },
     { label: 'My Client Records', value: clientCount ?? 0, icon: '🤝', href: '/dashboard/clients' },
     { label: 'My Custom Tables', value: tableCount ?? 0, icon: '🏗️', href: '/dashboard/tables' },
   ]
