@@ -90,14 +90,14 @@ export default async function MyMarketingPage() {
 
   // Backfill: auto-create missing Candidate_records for marketing records without matching candidates
   if (supabaseAdmin && mergedRecords.length > 0) {
-    const candidateNameSet = new Set((candidates || []).map(c => (c as any).Candidate_name?.toLowerCase().trim()).filter(Boolean))
+    const candidateKeySet = new Set((candidates || []).map(c => ((c as any).Candidate_name + '|' + ((c as any).technology || '')).toLowerCase().trim()).filter(Boolean))
     const seen = new Set<string>()
     const payloads: any[] = []
     const now = new Date().toISOString()
     for (const r of mergedRecords) {
-      const n = (r.name || '').toLowerCase().trim()
-      if (!n || candidateNameSet.has(n) || seen.has(n)) continue
-      seen.add(n)
+      const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
+      if (!key || candidateKeySet.has(key) || seen.has(key)) continue
+      seen.add(key)
       const backupName = (r as any).backup_employee_name
       let backupId: string | null = null
       if (backupName) {
@@ -177,9 +177,9 @@ export default async function MyMarketingPage() {
     }
   }
 
-  // Filter out records whose candidate status is Closed
-  const closedCandidateNames = new Set((candidates || []).filter((c: any) => c.status === 'Closed').map((c: any) => c.Candidate_name))
-  const activeMergedRecords = mergedRecords.filter(r => !closedCandidateNames.has(r.name))
+  // Filter out records whose candidate status is Closed (by name+technology)
+  const closedCandidateKeys = new Set((candidates || []).filter((c: any) => c.status === 'Closed').map((c: any) => (c.Candidate_name + '|' + (c.technology || '')).toLowerCase().trim()))
+  const activeMergedRecords = mergedRecords.filter(r => !closedCandidateKeys.has(((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()))
 
   const enrichedRecords = activeMergedRecords.map(r => {
     const lookupKey = normalize((r as any).name || '') + '|' + normalize((r as any).technology || '')
