@@ -49,14 +49,29 @@ export async function POST(req: NextRequest) {
       if (employee.joining_date) empPayload.joining_date = employee.joining_date
       else empPayload.joining_date = null
 
-      const { data: existing } = await serviceSupabase.from('employees').select('id').eq('user_id', user.id).maybeSingle()
+      const userEmail = (user.email || '').toLowerCase()
+      if (!userEmail) return NextResponse.json({ error: 'Employee update failed: no email associated with your account' }, { status: 400 })
 
-      if (existing) {
-        const { error: empError } = await serviceSupabase.from('employees').update(empPayload).eq('user_id', user.id)
+      let existingId: string | null = null
+      let foundByEmail = false
+      const { data: byUserId } = await serviceSupabase.from('employees').select('id').eq('user_id', user.id).maybeSingle()
+      if (byUserId) {
+        existingId = byUserId.id
+      } else {
+        const { data: byEmail } = await serviceSupabase.from('employees').select('id').ilike('email', userEmail).maybeSingle()
+        if (byEmail) {
+          existingId = byEmail.id
+          foundByEmail = true
+        }
+      }
+
+      if (existingId) {
+        if (foundByEmail) empPayload.user_id = user.id
+        const { error: empError } = await serviceSupabase.from('employees').update(empPayload).eq('id', existingId)
         if (empError) return NextResponse.json({ error: `Employee update failed: ${empError.message}` }, { status: 500 })
       } else {
         empPayload.user_id = user.id
-        empPayload.email = employee.email || user.email
+        empPayload.email = userEmail
         const { error: empError } = await serviceSupabase.from('employees').insert(empPayload)
         if (empError) return NextResponse.json({ error: `Employee update failed: ${empError.message}` }, { status: 500 })
       }
