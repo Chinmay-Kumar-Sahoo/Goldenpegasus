@@ -38,7 +38,7 @@ export default async function EmployeeClientsPage() {
 
   // Backfill: auto-create missing Candidate_records from marketing_records
   if (supabaseAdmin && uid) {
-    const existingNames = new Set(rawRecords.map(r => (r as any).Candidate_name?.toLowerCase().trim()).filter(Boolean))
+    const existingKeys = new Set(rawRecords.map(r => ((r as any).Candidate_name + '|' + ((r as any).technology || '')).toLowerCase().trim()).filter(Boolean))
     const { data: mktRecords } = await supabaseAdmin
       .from('marketing_records')
       .select('name, technology, owner_id, backup_employee_name')
@@ -50,9 +50,9 @@ export default async function EmployeeClientsPage() {
       const payloads: any[] = []
       const now = new Date().toISOString()
       for (const r of mktRecords as any[]) {
-        const n = (r.name || '').toLowerCase().trim()
-        if (!n || existingNames.has(n) || seen.has(n)) continue
-        seen.add(n)
+        const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
+        if (!key || existingKeys.has(key) || seen.has(key)) continue
+        seen.add(key)
         const backupName = r.backup_employee_name || null
         payloads.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || uid, status: 'Active', backup_employee_name: backupName, updated_at: now })
       }
