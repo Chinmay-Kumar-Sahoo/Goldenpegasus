@@ -174,21 +174,25 @@ export async function POST(req: NextRequest) {
           .select('id')
           .ilike('name', recordData.Candidate_name)
           .maybeSingle() as any
+        const mktPayload: any = { updated_at: new Date().toISOString() }
+        if (recordData.status !== undefined) mktPayload.status = recordData.status
+        if (recordData.notes !== undefined) mktPayload.notes = recordData.notes
+        if (recordData.technology !== undefined) mktPayload.technology = recordData.technology
+        if (selectedEmployeeId) mktPayload.owner_id = selectedEmployeeId
+        if (backupEmployeeId !== undefined) mktPayload.backup_employee_id = backupEmployeeId || null
+        if (backupName !== null) mktPayload.backup_employee_name = backupName
+        const [pResult, eResult] = await Promise.all([
+          supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId || effectiveOwnerId).maybeSingle(),
+          supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId || effectiveOwnerId).maybeSingle(),
+        ])
+        const empName = pResult.data?.full_name || eResult.data?.full_name || null
+        if (empName) mktPayload.employee_name = empName
         if (existingMkt) {
-          const mktPayload: any = { updated_at: new Date().toISOString() }
-          if (recordData.status !== undefined) mktPayload.status = recordData.status
-          if (recordData.notes !== undefined) mktPayload.notes = recordData.notes
-          if (recordData.technology !== undefined) mktPayload.technology = recordData.technology
-          if (selectedEmployeeId) mktPayload.owner_id = selectedEmployeeId
-          if (backupEmployeeId !== undefined) mktPayload.backup_employee_id = backupEmployeeId || null
-          if (backupName !== null) mktPayload.backup_employee_name = backupName
-          const [pResult, eResult] = await Promise.all([
-            supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId || effectiveOwnerId).maybeSingle(),
-            supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId || effectiveOwnerId).maybeSingle(),
-          ])
-          const empName = pResult.data?.full_name || eResult.data?.full_name || null
-          if (empName) mktPayload.employee_name = empName
           await (adminClient.from('marketing_records') as any).update(mktPayload).eq('id', existingMkt.id)
+        } else {
+          mktPayload.name = recordData.Candidate_name
+          mktPayload.date = new Date().toISOString().split('T')[0]
+          await (adminClient.from('marketing_records') as any).insert(mktPayload)
         }
       }
     }

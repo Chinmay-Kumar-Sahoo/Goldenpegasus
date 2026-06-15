@@ -112,6 +112,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ records: [], timing: Date.now() - startTime })
   }
 
+  // Auto-create missing Candidate_records for marketing records without a matching candidate
+  if (data.length > 0) {
+    const adminClient = getAdminClient()
+    if (adminClient) {
+      const missingPairs = new Map<string, { name: string; technology: string | null; owner_id: string | null }>()
+      for (const r of data) {
+        const n = (r.name || '').toLowerCase().trim()
+        if (!n || candidateStatusMap.has(n)) continue
+        const key = n + '|' + ((r.technology || '') + '').toLowerCase().trim()
+        if (!missingPairs.has(key)) {
+          missingPairs.set(key, { name: r.name, technology: r.technology || null, owner_id: r.owner_id || null })
+        }
+      }
+      if (missingPairs.size > 0) {
+        const now = new Date().toISOString()
+        const payloads: any[] = []
+        for (const [, p] of missingPairs) {
+          payloads.push({ Candidate_name: p.name, technology: p.technology, owner_id: p.owner_id, status: 'Active', updated_at: now })
+        }
+        const { data: created } = await (adminClient.from('Candidate_records') as any).insert(payloads).select()
+        if (created) {
+          for (const c of created as any[]) {
+            candidatesData.push(c)
+            candidateStatusMap.set((c.Candidate_name || '').toLowerCase().trim(), c.status || 'Active')
+          }
+        }
+      }
+    }
+  }
+
   const candidateBackupIds = Array.from(new Set(candidatesData.map((c: any) => c.backup_employee_id).filter(Boolean))) as string[]
   const candidateOwnerIds = Array.from(new Set(candidatesData.map((c: any) => c.owner_id).filter(Boolean))) as string[]
   const missingIds = Array.from(new Set([...candidateBackupIds, ...candidateOwnerIds])).filter(id => !ownerNames[id])
@@ -424,15 +454,18 @@ export async function POST(req: NextRequest) {
         .select('id')
         .ilike('Candidate_name', existingRecord.name)
         .maybeSingle() as any
+      const candPayload: any = { updated_at: new Date().toISOString() }
+      if (updatePayload.status !== undefined) candPayload.status = updatePayload.status
+      if (updatePayload.notes !== undefined) candPayload.notes = updatePayload.notes
+      if (updatePayload.technology !== undefined) candPayload.technology = updatePayload.technology
+      if (effectiveOwnerId) candPayload.owner_id = effectiveOwnerId
+      if (recordData.backup_employee_id !== undefined) candPayload.backup_employee_id = recordData.backup_employee_id || null
+      if (recordData.backup_employee_name !== undefined) candPayload.backup_employee_name = recordData.backup_employee_name || null
       if (existingCandidate) {
-        const candPayload: any = { updated_at: new Date().toISOString() }
-        if (updatePayload.status !== undefined) candPayload.status = updatePayload.status
-        if (updatePayload.notes !== undefined) candPayload.notes = updatePayload.notes
-        if (updatePayload.technology !== undefined) candPayload.technology = updatePayload.technology
-        if (effectiveOwnerId) candPayload.owner_id = effectiveOwnerId
-        if (recordData.backup_employee_id !== undefined) candPayload.backup_employee_id = recordData.backup_employee_id || null
-        if (recordData.backup_employee_name !== undefined) candPayload.backup_employee_name = recordData.backup_employee_name || null
         await (adminClient.from('Candidate_records') as any).update(candPayload).eq('id', existingCandidate.id)
+      } else {
+        candPayload.Candidate_name = existingRecord.name
+        await (adminClient.from('Candidate_records') as any).insert(candPayload)
       }
     }
 
