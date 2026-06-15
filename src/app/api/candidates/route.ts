@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-const CANDIDATE_FIELDS = 'id, Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology, linkedin_url, created_at, updated_at'
+const CANDIDATE_FIELDS = 'id, Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology, linkedin_url, Candidate_email, client_phone, address, notes, created_at, updated_at'
 const PROFILE_FIELDS = 'id, full_name, email'
 
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -163,7 +163,12 @@ export async function POST(req: NextRequest) {
   if (recordData.Candidate_email && !emailRe.test(recordData.Candidate_email)) {
     return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
   }
-  if (recordData.client_phone) recordData.client_phone = String(recordData.client_phone).replace(/\D/g, '')
+  if (recordData.client_phone) {
+    recordData.client_phone = String(recordData.client_phone).replace(/\D/g, '')
+    if (recordData.client_phone.length !== 10) {
+      return NextResponse.json({ error: 'Phone must be exactly 10 digits' }, { status: 400 })
+    }
+  }
 
   if (body.id) {
     const updateData: any = { ...recordData, updated_at: new Date().toISOString() }

@@ -219,7 +219,10 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     setError('')
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (form.Candidate_email && !emailRe.test(form.Candidate_email)) { setError('Invalid email format'); return }
-    if (form.client_phone && /\D/.test(form.client_phone)) { setError('Phone must contain only digits'); return }
+    if (form.client_phone) {
+      if (/\D/.test(form.client_phone)) { setError('Phone must contain only digits'); return }
+      if (form.client_phone.length !== 10) { setError('Phone must be exactly 10 digits'); return }
+    }
     setSaving(true)
     const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
     const payload = editing
