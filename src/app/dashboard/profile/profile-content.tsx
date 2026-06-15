@@ -16,6 +16,8 @@ interface Employee {
   joining_date: string
   company_id: string
   designation: string
+  created_at?: string
+  updated_at?: string
 }
 
 export default function ProfileContent({ initialProfile, initialEmployee }: { initialProfile?: Profile; initialEmployee?: Employee }) {
@@ -25,8 +27,13 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
-  const fieldsLocked = !!(initialEmployee?.employee_id)
-  const joiningDateLocked = !!(initialEmployee?.joining_date)
+  const hasSavedOnce = !!(
+    initialEmployee?.updated_at &&
+    initialEmployee?.created_at &&
+    new Date(initialEmployee.updated_at).getTime() !== new Date(initialEmployee.created_at).getTime()
+  )
+  const fieldsLocked = hasSavedOnce
+  const joiningDateLocked = hasSavedOnce
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()

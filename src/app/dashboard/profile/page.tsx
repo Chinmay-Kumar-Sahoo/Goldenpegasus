@@ -27,6 +27,8 @@ export default async function ProfilePage() {
     joining_date: employee.joining_date || '',
     company_id: employee.company_id || '',
     designation: employee.designation || '',
+    created_at: employee.created_at || undefined,
+    updated_at: employee.updated_at || undefined,
   } : undefined
 
   return <ProfileContent initialProfile={initialProfile} initialEmployee={initialEmployee} />
