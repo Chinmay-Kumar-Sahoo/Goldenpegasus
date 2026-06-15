@@ -417,6 +417,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Sync updated fields to matching Candidate_records
+    const adminClient = getAdminClient()
+    if (adminClient && existingRecord.name) {
+      const { data: existingCandidate } = await (adminClient.from('Candidate_records') as any)
+        .select('id')
+        .ilike('Candidate_name', existingRecord.name)
+        .maybeSingle() as any
+      if (existingCandidate) {
+        const candPayload: any = { updated_at: new Date().toISOString() }
+        if (updatePayload.status !== undefined) candPayload.status = updatePayload.status
+        if (updatePayload.notes !== undefined) candPayload.notes = updatePayload.notes
+        if (updatePayload.technology !== undefined) candPayload.technology = updatePayload.technology
+        if (effectiveOwnerId) candPayload.owner_id = effectiveOwnerId
+        if (recordData.backup_employee_id !== undefined) candPayload.backup_employee_id = recordData.backup_employee_id || null
+        if (recordData.backup_employee_name !== undefined) candPayload.backup_employee_name = recordData.backup_employee_name || null
+        await (adminClient.from('Candidate_records') as any).update(candPayload).eq('id', existingCandidate.id)
+      }
+    }
+
     await supabase.from('audit_logs').insert({
       action: 'updated', entity_type: 'marketing_record', entity_id: body.id,
       user_id: user.id, created_at: new Date().toISOString(),
@@ -455,18 +474,28 @@ export async function POST(req: NextRequest) {
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // If admin assigned a different employee, sync to Candidate_records (by name+technology)
-  if (isAdminUser && selectedEmployeeId && recordData.name) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-    if (serviceRoleKey) {
-      const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-      const q = adminClient.from('Candidate_records').update({ owner_id: selectedEmployeeId, updated_at: new Date().toISOString() }).ilike('Candidate_name', recordData.name)
-      const tech = recordData.technology
-      if (tech) {
-        await q.eq('technology', tech)
+  // Sync to Candidate_records (create or update matching record)
+  if (insertData.name) {
+    const adminClient = getAdminClient()
+    if (adminClient) {
+      const { data: existing } = await (adminClient.from('Candidate_records') as any)
+        .select('id')
+        .ilike('Candidate_name', insertData.name)
+        .maybeSingle() as any
+      const candPayload: any = {
+        Candidate_name: insertData.name,
+        technology: insertData.technology || null,
+        status: insertData.status || null,
+        notes: insertData.notes || null,
+        owner_id: effectiveOwnerId,
+        updated_at: new Date().toISOString(),
+      }
+      if (insertData.backup_employee_id !== undefined) candPayload.backup_employee_id = insertData.backup_employee_id || null
+      if (insertData.backup_employee_name !== undefined) candPayload.backup_employee_name = insertData.backup_employee_name || null
+      if (existing) {
+        await (adminClient.from('Candidate_records') as any).update(candPayload).eq('id', existing.id)
       } else {
-        await q.is('technology', null)
+        await (adminClient.from('Candidate_records') as any).insert(candPayload)
       }
     }
   }
@@ -492,8 +521,19 @@ export async function DELETE(req: NextRequest) {
   const adminClient = getAdminClient()
   if (!adminClient) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
 
-  const { error } = await adminClient.from('marketing_records').delete().eq('id', id)
+  // Fetch record name before deleting, for sync
+  const { data: record } = await (adminClient.from('marketing_records') as any).select('name').eq('id', id).single()
+
+  const { error } = await (adminClient.from('marketing_records') as any).delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Also delete from Candidate_records if no other marketing records reference this candidate
+  if (record?.name) {
+    const { data: remaining } = await (adminClient.from('marketing_records') as any).select('id').eq('name', record.name).limit(1)
+    if (!remaining || remaining.length === 0) {
+      await (adminClient.from('Candidate_records') as any).delete().ilike('Candidate_name', record.name)
+    }
+  }
 
   await adminClient.from('audit_logs').insert([{
     action: 'deleted', entity_type: 'marketing_record', entity_id: id,

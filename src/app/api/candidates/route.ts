@@ -166,6 +166,33 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Sync updated fields to matching marketing_records
+    if (recordData.Candidate_name) {
+      const adminClient = getAdminClient()
+      if (adminClient) {
+        const { data: existingMkt } = await (adminClient.from('marketing_records') as any)
+          .select('id')
+          .ilike('name', recordData.Candidate_name)
+          .maybeSingle() as any
+        if (existingMkt) {
+          const mktPayload: any = { updated_at: new Date().toISOString() }
+          if (recordData.status !== undefined) mktPayload.status = recordData.status
+          if (recordData.notes !== undefined) mktPayload.notes = recordData.notes
+          if (recordData.technology !== undefined) mktPayload.technology = recordData.technology
+          if (selectedEmployeeId) mktPayload.owner_id = selectedEmployeeId
+          if (backupEmployeeId !== undefined) mktPayload.backup_employee_id = backupEmployeeId || null
+          if (backupName !== null) mktPayload.backup_employee_name = backupName
+          const [pResult, eResult] = await Promise.all([
+            supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId || effectiveOwnerId).maybeSingle(),
+            supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId || effectiveOwnerId).maybeSingle(),
+          ])
+          const empName = pResult.data?.full_name || eResult.data?.full_name || null
+          if (empName) mktPayload.employee_name = empName
+          await (adminClient.from('marketing_records') as any).update(mktPayload).eq('id', existingMkt.id)
+        }
+      }
+    }
+
     await supabase.from('audit_logs').insert({
       action: 'updated', entity_type: 'candidate_record', entity_id: body.id,
       user_id: user.id, created_at: new Date().toISOString(),
@@ -186,6 +213,32 @@ export async function POST(req: NextRequest) {
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Sync to marketing_records
+  const adminClient = getAdminClient()
+  if (adminClient && recordData.Candidate_name) {
+    const { data: existingMkt } = await (adminClient.from('marketing_records') as any)
+      .select('id')
+      .ilike('name', recordData.Candidate_name)
+      .maybeSingle() as any
+    const mktPayload: any = {
+      name: recordData.Candidate_name,
+      technology: recordData.technology || null,
+      status: recordData.status || null,
+      notes: recordData.notes || null,
+      owner_id: effectiveOwnerId,
+      employee_name: (employee_name || null),
+      updated_at: new Date().toISOString(),
+    }
+    if (backupEmployeeId !== undefined) mktPayload.backup_employee_id = backupEmployeeId || null
+    if (backupName !== null) mktPayload.backup_employee_name = backupName
+    if (existingMkt) {
+      await (adminClient.from('marketing_records') as any).update(mktPayload).eq('id', existingMkt.id)
+    } else {
+      mktPayload.date = new Date().toISOString().split('T')[0]
+      await (adminClient.from('marketing_records') as any).insert(mktPayload)
+    }
+  }
+
   await supabase.from('audit_logs').insert({
     action: 'created', entity_type: 'candidate_record', entity_id: inserted?.id || '',
     user_id: user.id, created_at: new Date().toISOString(),
@@ -199,8 +252,23 @@ export async function DELETE(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await req.json()
+
+  // Fetch candidate name before deleting, for sync
+  const { data: candidate } = await supabase.from('Candidate_records').select('Candidate_name').eq('id', id).single()
+
   const { error } = await supabase.from('Candidate_records').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Also delete from marketing_records if no other Candidate_records reference this candidate
+  if (candidate?.Candidate_name) {
+    const adminClient = getAdminClient()
+    if (adminClient) {
+      const { data: remaining } = await (adminClient.from('Candidate_records') as any).select('id').ilike('Candidate_name', candidate.Candidate_name).limit(1)
+      if (!remaining || remaining.length === 0) {
+        await (adminClient.from('marketing_records') as any).delete().ilike('name', candidate.Candidate_name)
+      }
+    }
+  }
 
   await supabase.from('audit_logs').insert({
     action: 'deleted', entity_type: 'candidate_record', entity_id: id,
