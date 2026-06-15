@@ -29,39 +29,54 @@ export default async function DashboardPage() {
   ])
 
   // Count backup records: records where employee is assigned as backup for a specific candidate+technology
-  let backupCount = 0
+  const normalizeKey = (s: string) => s.toLowerCase().trim()
+  const backupIds = new Set<string>()
+
+  // Build backup name|technology key set from Candidate_records
   const { data: backupCandidates } = await lookupClient
     .from('Candidate_records')
     .select('Candidate_name, technology')
     .eq('backup_employee_id', uid)
 
   if (backupCandidates && backupCandidates.length > 0) {
-    const normalizeKey = (s: string) => s.toLowerCase().trim()
     const backupKeys = new Set<string>()
     for (const c of backupCandidates) {
       backupKeys.add(normalizeKey(c.Candidate_name) + '|' + normalizeKey(c.technology || ''))
     }
 
     const names = [...new Set(backupCandidates.map(c => c.Candidate_name))]
-    const { data: backupRecords } = await lookupClient
+
+    // 1) Match by Candidate_records → candidate name → marketing_records name
+    const { data: byName } = await lookupClient
       .from('marketing_records')
       .select('id, name, technology, owner_id')
       .in('name', names)
       .neq('owner_id', uid)
-
-    if (backupRecords) {
-      const seenIds = new Set<string>()
-      for (const r of backupRecords) {
+    if (byName) {
+      for (const r of byName) {
         const key = normalizeKey(r.name) + '|' + normalizeKey(r.technology || '')
-        if (backupKeys.has(key) && !seenIds.has(r.id)) {
-          seenIds.add(r.id)
-          backupCount++
+        if (backupKeys.has(key)) backupIds.add(r.id)
+      }
+    }
+
+    // 2) Fallback: match by backup_employee_name (handles case-mismatched names)
+    const myName = _profileData?.full_name
+    if (myName) {
+      const { data: byBackupName } = await lookupClient
+        .from('marketing_records')
+        .select('id, name, technology, owner_id')
+        .ilike('backup_employee_name', myName)
+        .neq('owner_id', uid)
+      if (byBackupName) {
+        for (const r of byBackupName) {
+          const key = normalizeKey(r.name) + '|' + normalizeKey(r.technology || '')
+          if (backupKeys.has(key)) backupIds.add(r.id)
         }
       }
     }
   }
 
-  const totalMktCount = (mktCount ?? 0) + backupCount
+  const totalMktCount = (mktCount ?? 0) + backupIds.size
 
   const stats = [
     { label: 'My Marketing Records', value: totalMktCount, icon: '📈', href: '/dashboard/my-marketing' },

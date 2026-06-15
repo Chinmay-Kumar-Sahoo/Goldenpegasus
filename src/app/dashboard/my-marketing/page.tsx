@@ -66,7 +66,27 @@ export default async function MyMarketingPage() {
   for (const r of (nameBackupRecords || [])) {
     if (!recordMap.has(r.id)) recordMap.set(r.id, { ...r, is_backup_record: r.owner_id !== uid })
   }
-  const mergedRecords = Array.from(recordMap.values())
+
+  // Build set of name|technology keys where user is explicitly assigned as backup employee
+  const normalizeKey = (s: string) => s.toLowerCase().trim()
+  const backupKeys = new Set<string>()
+  for (const c of (candidates || []) as any[]) {
+    if (c.backup_employee_id === uid) {
+      backupKeys.add(normalizeKey(c.Candidate_name) + '|' + normalizeKey(c.technology || ''))
+    }
+  }
+
+  // Remove backup records whose technology doesn't match the employee's backup assignment
+  for (const [id, record] of recordMap) {
+    if (record.owner_id !== uid) {
+      const key = normalizeKey((record as any).name || '') + '|' + normalizeKey((record as any).technology || '')
+      if (!backupKeys.has(key)) {
+        recordMap.delete(id)
+      }
+    }
+  }
+
+  let mergedRecords = Array.from(recordMap.values())
 
   // Backfill: auto-create missing Candidate_records for marketing records without matching candidates
   if (supabaseAdmin && mergedRecords.length > 0) {
@@ -104,25 +124,6 @@ export default async function MyMarketingPage() {
         }
       } else if (created) {
         candidates = [...(candidates || []), ...(created as any[])]
-      }
-    }
-  }
-
-  // Build set of name|technology keys where user is explicitly assigned as backup employee
-  const normalizeKey = (s: string) => s.toLowerCase().trim()
-  const backupKeys = new Set<string>()
-  for (const c of (candidates || []) as any[]) {
-    if (c.backup_employee_id === uid) {
-      backupKeys.add(normalizeKey(c.Candidate_name) + '|' + normalizeKey(c.technology || ''))
-    }
-  }
-
-  // Remove backup records whose technology doesn't match the employee's backup assignment
-  for (const [id, record] of recordMap) {
-    if (record.owner_id !== uid) {
-      const key = normalizeKey((record as any).name || '') + '|' + normalizeKey((record as any).technology || '')
-      if (!backupKeys.has(key)) {
-        recordMap.delete(id)
       }
     }
   }
