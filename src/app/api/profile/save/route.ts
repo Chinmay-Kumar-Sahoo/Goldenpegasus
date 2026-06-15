@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
     if (employee) {
       const contactDigits = employee.contact ? employee.contact.replace(/\D/g, '') : null
       const empPayload: Record<string, any> = {
-        user_id: user.id,
         employee_id: (employee.employee_id || '').replace(/\D/g, '') || (employee.designation === 'Administrator' ? `ADM-${Date.now()}` : `EMP-${Date.now()}`),
         full_name: profile.full_name,
         contact: contactDigits,
@@ -43,8 +42,6 @@ export async function POST(req: NextRequest) {
         designation: employee.designation || null,
         updated_at: new Date().toISOString(),
       }
-      if (employee.email !== undefined) empPayload.email = employee.email
-      else if (user.email) empPayload.email = user.email
 
       if (employee.date_of_birth) empPayload.date_of_birth = employee.date_of_birth
       else empPayload.date_of_birth = null
@@ -52,8 +49,17 @@ export async function POST(req: NextRequest) {
       if (employee.joining_date) empPayload.joining_date = employee.joining_date
       else empPayload.joining_date = null
 
-      const { error: empError } = await serviceSupabase.from('employees').upsert(empPayload, { onConflict: 'user_id' })
-      if (empError) return NextResponse.json({ error: `Employee update failed: ${empError.message}` }, { status: 500 })
+      const { data: existing } = await serviceSupabase.from('employees').select('id').eq('user_id', user.id).maybeSingle()
+
+      if (existing) {
+        const { error: empError } = await serviceSupabase.from('employees').update(empPayload).eq('user_id', user.id)
+        if (empError) return NextResponse.json({ error: `Employee update failed: ${empError.message}` }, { status: 500 })
+      } else {
+        empPayload.user_id = user.id
+        empPayload.email = employee.email || user.email
+        const { error: empError } = await serviceSupabase.from('employees').insert(empPayload)
+        if (empError) return NextResponse.json({ error: `Employee update failed: ${empError.message}` }, { status: 500 })
+      }
     }
 
     if (newPassword) {
