@@ -14,6 +14,7 @@ export default async function MyMarketingPage() {
   const supabaseAdmin = serviceRoleKey
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : null
+  const lookupClient = supabaseAdmin || supabase
 
   // Fetch employee options for the component
   const [empProfilesResult, empFromTableResult] = await Promise.all([
@@ -44,7 +45,7 @@ export default async function MyMarketingPage() {
   const [{ data: ownedRecords }, { data: backupRecords }] = await Promise.all([
     supabase.from('marketing_records').select('*').eq('owner_id', uid).order('created_at', { ascending: false }).limit(2000),
     backupCandidateNames.length > 0
-      ? supabase.from('marketing_records').select('*').in('name', backupCandidateNames).order('created_at', { ascending: false }).limit(2000)
+      ? lookupClient.from('marketing_records').select('*').in('name', backupCandidateNames).order('created_at', { ascending: false }).limit(2000)
       : Promise.resolve({ data: [] }),
   ])
 

@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   if (ownerFilter) {
     const [ownedResult, backupCandidatesResult] = await Promise.all([
       supabase.from('marketing_records').select(MARKETING_FIELDS).eq('owner_id', ownerFilter).order('created_at', { ascending: false }).limit(limitParam),
-      supabase.from('Candidate_records').select('Candidate_name').eq('backup_employee_id', ownerFilter),
+      lookupClient.from('Candidate_records').select('Candidate_name').eq('backup_employee_id', ownerFilter),
     ])
 
     const ownedRecords = ownedResult.data || []
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
     let backupRecords: any[] = []
     if (backupNames.length > 0) {
-      const { data: br } = await supabase
+      const { data: br } = await lookupClient
         .from('marketing_records')
         .select(MARKETING_FIELDS)
         .in('name', backupNames)

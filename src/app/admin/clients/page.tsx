@@ -1,13 +1,20 @@
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import ClientsTable from '@/components/ClientsTable'
 export const metadata = { title: 'All Marketing Profiles | Admin | GoldenPegasus' }
 export default async function AdminClientsPage() {
   const supabase = await createClient()
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  const lookupClient = serviceRoleKey
+    ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : supabase
+
   const [recordsResult, employeeProfiles, employeesFromTable] = await Promise.all([
-    supabase.from('Candidate_records').select('*').order('created_at', { ascending: false }).limit(2000),
-    supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
-    supabase.from('employees').select('user_id, full_name, email'),
+    lookupClient.from('Candidate_records').select('*').order('created_at', { ascending: false }).limit(2000),
+    lookupClient.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
+    lookupClient.from('employees').select('user_id, full_name, email'),
   ])
 
   const rawRecords = recordsResult.data
