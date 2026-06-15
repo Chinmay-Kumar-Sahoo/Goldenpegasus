@@ -11,9 +11,10 @@ export default async function AdminClientsPage() {
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : supabase
 
-  const [recordsResult, employeeProfiles, employeesFromTable] = await Promise.all([
+  const [recordsResult, employeeProfiles, allProfiles, employeesFromTable] = await Promise.all([
     lookupClient.from('Candidate_records').select('*').order('created_at', { ascending: false }).limit(2000),
     lookupClient.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
+    lookupClient.from('profiles').select('id, full_name, email'),
     lookupClient.from('employees').select('user_id, full_name, email'),
   ])
 
@@ -34,6 +35,12 @@ export default async function AdminClientsPage() {
   const ownerNames: Record<string, string> = {}
   for (const opt of employeeOptions) {
     ownerNames[opt.id] = opt.full_name
+  }
+  for (const p of (allProfiles?.data || [])) {
+    if (!ownerNames[p.id]) {
+      const emp = employeeMap.get(p.id)
+      ownerNames[p.id] = emp?.full_name || p.full_name || p.email || 'Unknown'
+    }
   }
 
   const records = (rawRecords || []).map(r => ({ ...r, employee_name: ownerNames[r.owner_id] || null, backup_employee_name: ((r as any).backup_employee_id ? ownerNames[(r as any).backup_employee_id] : null) || (r as any).backup_employee_name || null }))

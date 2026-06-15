@@ -17,8 +17,9 @@ export default async function MyMarketingPage() {
   const lookupClient = supabaseAdmin || supabase
 
   // Fetch employee options for the component
-  const [empProfilesResult, empFromTableResult] = await Promise.all([
+  const [empProfilesResult, allProfilesResult, empFromTableResult] = await Promise.all([
     supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
+    supabase.from('profiles').select('id, full_name, email'),
     supabase.from('employees').select('user_id, full_name, email'),
   ])
 

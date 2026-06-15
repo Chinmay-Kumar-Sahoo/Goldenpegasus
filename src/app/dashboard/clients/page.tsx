@@ -18,10 +18,11 @@ export default async function EmployeeClientsPage() {
     ? supabaseAdmin.from('Candidate_records').select('*').eq('backup_employee_id', uid).order('created_at', { ascending: false })
     : supabase.from('Candidate_records').select('*').eq('backup_employee_id', uid).order('created_at', { ascending: false })
 
-  const [ownedResult, backupResult, employeeProfiles, employeesFromTable] = await Promise.all([
+  const [ownedResult, backupResult, employeeProfiles, allProfilesResult, employeesFromTable] = await Promise.all([
     ownedQuery,
     backupQuery,
     supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
+    supabase.from('profiles').select('id, full_name, email'),
     supabase.from('employees').select('user_id, full_name, email'),
   ])
 
@@ -78,6 +79,12 @@ export default async function EmployeeClientsPage() {
   const ownerNames: Record<string, string> = {}
   for (const opt of employeeOptions) {
     ownerNames[opt.id] = opt.full_name
+  }
+  for (const p of (allProfilesResult?.data || [])) {
+    if (!ownerNames[p.id]) {
+      const emp = employeeMap.get(p.id)
+      ownerNames[p.id] = emp?.full_name || p.full_name || p.email || 'Unknown'
+    }
   }
 
   const records = (rawRecords || []).map(r => ({
