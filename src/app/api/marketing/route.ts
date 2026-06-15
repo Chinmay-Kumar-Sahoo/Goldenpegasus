@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   if (ownerFilter) {
     const [ownedResult, backupCandidatesResult] = await Promise.all([
       supabase.from('marketing_records').select(MARKETING_FIELDS).eq('owner_id', ownerFilter).order('created_at', { ascending: false }).limit(limitParam),
-      lookupClient.from('Candidate_records').select('Candidate_name').eq('backup_employee_id', ownerFilter),
+      lookupClient.from('Candidate_records').select('Candidate_name, technology').eq('backup_employee_id', ownerFilter),
     ])
 
     const ownedRecords = ownedResult.data || []
@@ -77,6 +77,24 @@ export async function GET(req: NextRequest) {
     for (const r of backupRecords) {
       if (!recordMap.has(r.id)) recordMap.set(r.id, { ...r, is_backup_record: r.owner_id !== ownerFilter })
     }
+
+    // Build set of name|technology keys where user is explicitly assigned as backup
+    const bkKey = (s: string) => s.toLowerCase().trim()
+    const backupTechKeys = new Set<string>()
+    for (const c of backupCandidates) {
+      backupTechKeys.add(bkKey(c.Candidate_name) + '|' + bkKey(c.technology || ''))
+    }
+
+    // Filter out backup records whose technology doesn't match the employee's backup assignment
+    for (const [id, record] of recordMap) {
+      if (record.owner_id !== ownerFilter) {
+        const key = bkKey((record as any).name || '') + '|' + bkKey((record as any).technology || '')
+        if (!backupTechKeys.has(key)) {
+          recordMap.delete(id)
+        }
+      }
+    }
+
     data = Array.from(recordMap.values())
   } else {
     const { data: allRecords, error } = await supabase

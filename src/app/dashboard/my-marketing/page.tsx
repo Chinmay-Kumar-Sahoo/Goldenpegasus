@@ -108,6 +108,25 @@ export default async function MyMarketingPage() {
     }
   }
 
+  // Build set of name|technology keys where user is explicitly assigned as backup employee
+  const normalizeKey = (s: string) => s.toLowerCase().trim()
+  const backupKeys = new Set<string>()
+  for (const c of (candidates || []) as any[]) {
+    if (c.backup_employee_id === uid) {
+      backupKeys.add(normalizeKey(c.Candidate_name) + '|' + normalizeKey(c.technology || ''))
+    }
+  }
+
+  // Remove backup records whose technology doesn't match the employee's backup assignment
+  for (const [id, record] of recordMap) {
+    if (record.owner_id !== uid) {
+      const key = normalizeKey((record as any).name || '') + '|' + normalizeKey((record as any).technology || '')
+      if (!backupKeys.has(key)) {
+        recordMap.delete(id)
+      }
+    }
+  }
+
   // Build owner names from all records
   const ownerIds = Array.from(new Set(mergedRecords.map(r => r.owner_id).filter(Boolean)))
   let ownerNames: Record<string, string> = {}
