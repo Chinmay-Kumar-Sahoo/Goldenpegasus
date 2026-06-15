@@ -68,8 +68,16 @@ export default async function MyMarketingPage() {
       payloads.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || uid, status: 'Active', updated_at: now })
     }
     if (payloads.length > 0) {
-      const { data: created } = await supabaseAdmin.from('Candidate_records').insert(payloads).select()
-      if (created) candidates = [...(candidates || []), ...(created as any[])]
+      const { data: created, error: insertErr } = await supabaseAdmin.from('Candidate_records').insert(payloads).select()
+      if (insertErr) {
+        // Try individual inserts as fallback
+        for (const p of payloads) {
+          const { data: single } = await supabaseAdmin.from('Candidate_records').insert(p).select()
+          if (single) candidates = [...(candidates || []), ...(single as any[])]
+        }
+      } else if (created) {
+        candidates = [...(candidates || []), ...(created as any[])]
+      }
     }
   }
 

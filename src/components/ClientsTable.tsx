@@ -121,16 +121,16 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const [showExportMenu, setShowExportMenu] = useState(false)
 
   const fetchingRef = useRef(false)
-  const fetchedRef = useRef(initialRecords.length > 0)
+  const fetchedRef = useRef(false)
   const toastRef = useRef(toast)
 
   useEffect(() => { currentUserIdRef.current = propUserId }, [propUserId])
   useEffect(() => { initialOwnerNamesRef.current = initialOwnerNames }, [initialOwnerNames])
 
-  const fetchRecords = useCallback(async () => {
+  const fetchRecords = useCallback(async (background = false) => {
     if (fetchingRef.current) return
     fetchingRef.current = true
-    setLoading(true)
+    if (!background) setLoading(true)
     try {
       const params = new URLSearchParams()
       if (!isAdmin && currentUserIdRef.current)
@@ -146,7 +146,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     } catch (err: any) {
       toastRef.current.error('Failed to load candidates')
     } finally {
-      setLoading(false)
+      if (!background) setLoading(false)
       fetchingRef.current = false
     }
   }, [isAdmin])
@@ -154,7 +154,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   useEffect(() => {
     if (!fetchedRef.current) {
       fetchedRef.current = true
-      fetchRecords()
+      fetchRecords(initialRecords.length > 0)
     }
   }, [fetchRecords])
 

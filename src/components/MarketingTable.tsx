@@ -262,7 +262,7 @@ export default function MarketingPage({
   const [pageSize, setPageSize] = useState<number>(50)
 
   const fetchingRef = useRef(false)
-  const fetchedRef = useRef(serverRecords.length > 0)
+  const fetchedRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => { currentUserIdRef.current = propUserId }, [propUserId])
@@ -275,13 +275,13 @@ export default function MarketingPage({
     setSelectedIds(prev => prev.size === filtered.length ? new Set() : new Set(filtered.map(r => r.id)))
   }
 
-  const fetchRecords = useCallback(async () => {
+  const fetchRecords = useCallback(async (background = false) => {
     if (fetchingRef.current) return
     abortRef.current?.abort()
     const abortController = new AbortController()
     abortRef.current = abortController
     fetchingRef.current = true
-    setLoading(true)
+    if (!background) setLoading(true)
     setError('')
     try {
       const params = new URLSearchParams()
@@ -307,7 +307,7 @@ export default function MarketingPage({
         setError(err.message || 'Failed to load records')
       }
     } finally {
-      setLoading(false)
+      if (!background) setLoading(false)
       fetchingRef.current = false
       if (abortRef.current === abortController) abortRef.current = null
     }
@@ -316,7 +316,7 @@ export default function MarketingPage({
   useEffect(() => {
     if (!fetchedRef.current) {
       fetchedRef.current = true
-      fetchRecords()
+      fetchRecords(serverRecords.length > 0)
     }
     return () => { abortRef.current?.abort() }
   }, [fetchRecords])
