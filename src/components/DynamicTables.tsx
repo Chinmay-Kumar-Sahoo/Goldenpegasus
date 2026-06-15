@@ -40,6 +40,10 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set())
+  const [showBulkRecordModal, setShowBulkRecordModal] = useState(false)
+  const [bulkRecordForm, setBulkRecordForm] = useState<Record<string, string>>({})
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   const api = async (url: string, options?: RequestInit) => {
     const res = await fetch(url, options)
@@ -193,6 +197,47 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
     } catch { toast.error('Failed to delete record') }
   }
 
+  const toggleSelectRecord = (id: string) => {
+    setSelectedRecordIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
+  const toggleSelectAllRecords = () => {
+    setSelectedRecordIds(prev => prev.size === records.length ? new Set() : new Set(records.map(r => r.id)))
+  }
+
+  const handleBulkUpdateRecords = async () => {
+    if (!activeTable) return
+    const updates = Object.fromEntries(Object.entries(bulkRecordForm).filter(([_, v]) => v !== ''))
+    if (Object.keys(updates).length === 0) { toast.error('No fields to update'); return }
+    setBulkSaving(true)
+    try {
+      await Promise.all(Array.from(selectedRecordIds).map(id =>
+        api('/api/tables', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'record', id, table_id: activeTable.id, data: updates }),
+        })
+      ))
+      toast.success(`Updated ${selectedRecordIds.size} records`)
+      setShowBulkRecordModal(false)
+      setSelectedRecordIds(new Set())
+      setBulkRecordForm({})
+      openTable(activeTable)
+    } catch { toast.error('Failed to bulk update') }
+    setBulkSaving(false)
+  }
+
+  const handleBulkDeleteRecords = async () => {
+    if (!confirm(`Delete ${selectedRecordIds.size} records?`)) return
+    try {
+      await Promise.all(Array.from(selectedRecordIds).map(id =>
+        api('/api/tables', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'record', id }) })
+      ))
+      toast.success(`Deleted ${selectedRecordIds.size} records`)
+      setSelectedRecordIds(new Set())
+      if (activeTable) openTable(activeTable)
+    } catch { toast.error('Failed to bulk delete') }
+  }
+
   const handleGrantPermission = async (userId: string, permission: string) => {
     if (!activeTable) return
     setPermissions(prev => {
@@ -323,37 +368,69 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-[#2a2a2a] sticky top-0 z-10 bg-[#111111]">
+                      {canEditData(activeTable) && (
+                        <th className="w-10 px-2 py-3">
+                          <input type="checkbox" checked={selectedRecordIds.size === records.length && records.length > 0} onChange={toggleSelectAllRecords}
+                            className="w-4 h-4 accent-[#22c55e] cursor-pointer" />
+                        </th>
+                      )}
                       {activeTable.schema_definition.map(f => (
                         <th key={f.name} className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide whitespace-nowrap">{f.label}</th>
                       ))}
                       <th className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">Added</th>
+                      {canEditData(activeTable) && (
+                        <th className="px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide text-right">Actions</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {recordsLoading ? (
                       Array.from({ length: 3 }).map((_, i) => (
                         <tr key={i} className="border-b border-[#1a1a1a]">
-                          {Array.from({ length: activeTable.schema_definition.length + 1 }).map((_, j) => (
+                          {Array.from({ length: activeTable.schema_definition.length + 2 }).map((_, j) => (
                             <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                           ))}
                         </tr>
                       ))
                     ) : records.length === 0 ? (
-                      <tr><td colSpan={activeTable.schema_definition.length + 1} className="px-4 py-12 text-center text-[#71717a] text-sm">No records yet.</td></tr>
+                      <tr><td colSpan={activeTable.schema_definition.length + 2} className="px-4 py-12 text-center text-[#71717a] text-sm">No records yet.</td></tr>
                     ) : (
                       records.map(rec => (
-                        <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
+                        <tr key={rec.id} className={`border-b border-[#1a1a1a] transition-colors ${selectedRecordIds.has(rec.id) ? 'bg-[#22c55e]/5' : 'hover:bg-[#1a1a1a]'}`}>
+                          {canEditData(activeTable) && (
+                            <td className="px-2 py-3">
+                              <input type="checkbox" checked={selectedRecordIds.has(rec.id)} onChange={() => toggleSelectRecord(rec.id)}
+                                className="w-4 h-4 accent-[#22c55e] cursor-pointer" />
+                            </td>
+                          )}
                           {activeTable.schema_definition.map(f => (
                             <td key={f.name} className="px-4 py-3 text-sm text-[#a1a1aa]">{String(rec.data[f.name] || '—')}</td>
                           ))}
                           <td className="px-4 py-3 text-xs text-[#71717a]">{formatDate(rec.created_at)}</td>
+                          {canEditData(activeTable) && (
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button onClick={() => openRecordModal(rec)} className="text-xs text-[#71717a] hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-[#2a2a2a]">✎ Edit</button>
+                                <button onClick={() => handleDeleteRecord(rec.id)} className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-[#2a2a2a]">✕</button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
               </div>
-              <div className="px-4 py-3 border-t border-[#2a2a2a] text-xs text-[#71717a]">{records.length} records</div>
+              <div className="px-4 py-3 border-t border-[#2a2a2a] flex items-center justify-between text-xs text-[#71717a]">
+                <span>{records.length} records</span>
+                {selectedRecordIds.size > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-white">{selectedRecordIds.size} selected</span>
+                    <button onClick={() => { setBulkRecordForm({}); setShowBulkRecordModal(true) }} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-3 py-1.5 rounded-lg transition-all">Bulk Edit</button>
+                    <button onClick={handleBulkDeleteRecords} className="border border-red-500/30 hover:bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg transition-all">Delete All</button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -391,17 +468,17 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                 <div className="space-y-3">
                   {fields.map((field, i) => (
                     <div key={i} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 space-y-2">
-                      <div className="flex gap-2">
-                        <input type="text" value={field.label} onChange={e => updateField(i, 'label', e.target.value)} placeholder="Field Label"
-                          className="flex-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#22c55e]/60" />
-                        <input type="text" value={field.name} onChange={e => updateField(i, 'name', e.target.value.toLowerCase().replace(/\s+/g, '_'))} placeholder="field_key"
-                          className="flex-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-[#22c55e]/60" />
+                      <div className="flex gap-2 items-start">
+                        <div className="flex-1 space-y-1">
+                          <input type="text" value={field.label} onChange={e => { const v = e.target.value; updateField(i, 'label', v); updateField(i, 'name', v.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || `field${i + 1}`) }} placeholder="Field Label"
+                            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#22c55e]/60" />
+                        </div>
                         <select value={field.type} onChange={e => updateField(i, 'type', e.target.value)}
                           className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none">
                           {FIELD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         {fields.length > 1 && (
-                          <button type="button" onClick={() => removeField(i)} className="text-[#71717a] hover:text-red-400 text-xs transition-colors">✕</button>
+                          <button type="button" onClick={() => removeField(i)} className="text-[#71717a] hover:text-red-400 text-xs transition-colors pt-1">✕</button>
                         )}
                       </div>
                       <label className="flex items-center gap-2 text-xs text-[#71717a] cursor-pointer">
@@ -451,6 +528,31 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Edit Records Modal */}
+      {showBulkRecordModal && activeTable && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-lg p-6">
+            <h2 className="text-lg font-bold text-white mb-1">Bulk Edit ({selectedRecordIds.size} records)</h2>
+            <p className="text-xs text-[#71717a] mb-5">Only filled fields will be updated.</p>
+            <div className="space-y-3">
+              {activeTable.schema_definition.map(f => (
+                <div key={f.name}>
+                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{f.label}</label>
+                  <input type={f.type === 'number' ? 'text' : f.type} value={bulkRecordForm[f.name] || ''} onChange={e => setBulkRecordForm({ ...bulkRecordForm, [f.name]: e.target.value })}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                </div>
+              ))}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowBulkRecordModal(false)} className="flex-1 border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white py-2.5 rounded-xl text-sm transition-all">Cancel</button>
+                <button type="button" onClick={handleBulkUpdateRecords} disabled={bulkSaving} className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold py-2.5 rounded-xl text-sm transition-all disabled:opacity-50">
+                  {bulkSaving ? 'Updating...' : 'Update All'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
