@@ -285,7 +285,7 @@ export default function MarketingPage({
     setError('')
     try {
       const params = new URLSearchParams()
-      if (!isAdmin && currentUserIdRef.current) params.set('owner_id', currentUserIdRef.current)
+      if (!isAdmin && !readOnly && currentUserIdRef.current) params.set('owner_id', currentUserIdRef.current)
       params.set('limit', '2000')
       const qs = params.toString()
       const url = `/api/marketing${qs ? '?' + qs : ''}`
@@ -311,7 +311,7 @@ export default function MarketingPage({
       fetchingRef.current = false
       if (abortRef.current === abortController) abortRef.current = null
     }
-  }, [isAdmin])
+  }, [isAdmin, readOnly])
 
   useEffect(() => {
     if (!fetchedRef.current) {

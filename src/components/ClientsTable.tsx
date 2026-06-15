@@ -133,7 +133,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     if (!background) setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (!isAdmin && currentUserIdRef.current)
+      if (!isAdmin && !readOnly && currentUserIdRef.current)
         params.set('owner_id', currentUserIdRef.current)
       const qs = params.toString()
       const url = `/api/candidates${qs ? '?' + qs : ''}`
@@ -149,7 +149,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
       if (!background) setLoading(false)
       fetchingRef.current = false
     }
-  }, [isAdmin])
+  }, [isAdmin, readOnly])
 
   useEffect(() => {
     if (!fetchedRef.current) {
