@@ -31,15 +31,17 @@ export async function POST(req: NextRequest) {
     .select('Candidate_name')
     .or(filters)
 
-  const existingNameSet = new Set((existingCandidates || []).map((c: any) => c.Candidate_name?.toLowerCase().trim()).filter(Boolean))
+  const existingKeySet = new Set((existingCandidates || []).map((c: any) => ((c.Candidate_name || '') + '|' + (c.technology || '')).toLowerCase().trim()).filter(Boolean))
   const seen = new Set<string>()
   const payloads: any[] = []
   const now = new Date().toISOString()
 
   for (const r of marketingRecords) {
     const n = (r.name || '').toLowerCase().trim()
-    if (!n || existingNameSet.has(n) || seen.has(n)) continue
-    seen.add(n)
+    if (!n) continue
+    const key = n + '|' + ((r.technology || '') + '').toLowerCase().trim()
+    if (existingKeySet.has(key) || seen.has(key)) continue
+    seen.add(key)
     payloads.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || null, status: 'Active', updated_at: now })
   }
 

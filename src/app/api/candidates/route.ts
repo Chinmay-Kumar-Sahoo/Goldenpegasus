@@ -64,8 +64,10 @@ export async function GET(req: NextRequest) {
       const now = new Date().toISOString()
       for (const m of marketingNames) {
         const n = (m.name || '').toLowerCase().trim()
-        if (!n || seen.has(n)) continue
-        seen.add(n)
+        if (!n) continue
+        const key = n + '|' + ((m.technology || '') + '').toLowerCase().trim()
+        if (seen.has(key)) continue
+        seen.add(key)
         payloads.push({ Candidate_name: m.name, technology: m.technology || null, owner_id: m.owner_id || null, status: 'Active', updated_at: now })
       }
       if (payloads.length > 0) {
@@ -77,16 +79,15 @@ export async function GET(req: NextRequest) {
     }
   } else if (supabaseAdmin && records.length > 0) {
     // Check if any marketing records for our owner are missing from Candidate_records
-    const existingNames = new Set(records.map(r => (r.Candidate_name || '').toLowerCase().trim()).filter(Boolean))
+    const existingKeys = new Set(records.map(r => ((r.Candidate_name || '') + '|' + (r.technology || '')).toLowerCase().trim()).filter(Boolean))
     let marketingQuery = (supabaseAdmin.from('marketing_records') as any).select('name, technology, owner_id').order('created_at', { ascending: false }).limit(200)
     if (ownerFilter) marketingQuery = marketingQuery.eq('owner_id', ownerFilter) as any
     const { data: marketingNames } = await marketingQuery
     if (marketingNames) {
       const missingCandidates = new Map<string, { name: string; technology: string | null; owner_id: string | null }>()
       for (const m of marketingNames) {
-        const n = (m.name || '').toLowerCase().trim()
-        if (!n || existingNames.has(n)) continue
-        const key = n + '|' + ((m.technology || '') + '').toLowerCase().trim()
+        const key = ((m.name || '') + '|' + (m.technology || '')).toLowerCase().trim()
+        if (!key || existingKeys.has(key)) continue
         if (!missingCandidates.has(key)) {
           missingCandidates.set(key, { name: m.name, technology: m.technology || null, owner_id: m.owner_id || null })
         }
@@ -229,10 +230,11 @@ export async function POST(req: NextRequest) {
     if (recordData.Candidate_name) {
       const adminClient = getAdminClient()
       if (adminClient) {
-        const { data: existingMkt } = await (adminClient.from('marketing_records') as any)
-          .select('id')
-          .ilike('name', recordData.Candidate_name)
-          .maybeSingle() as any
+        const mktTech = (recordData.technology || '').toLowerCase().trim()
+        const { data: existingMktRows } = await (adminClient.from('marketing_records') as any)
+          .select('id, technology')
+          .ilike('name', recordData.Candidate_name) as any
+        const existingMkt = (existingMktRows || []).find((m: any) => (m.technology || '').toLowerCase().trim() === mktTech) || null
         const mktPayload: any = { updated_at: new Date().toISOString() }
         if (recordData.status !== undefined) mktPayload.status = recordData.status
         if (recordData.notes !== undefined) mktPayload.notes = recordData.notes
@@ -269,6 +271,19 @@ export async function POST(req: NextRequest) {
     if (backupName) insertData.backup_employee_name = backupName
   }
 
+  // --- Dedup: skip if candidate with same name + technology already exists ---
+  if (insertData.Candidate_name) {
+    const techValue = (insertData.technology || '').toLowerCase().trim()
+    const { data: existingCands } = await supabase
+      .from('Candidate_records')
+      .select('id, technology')
+      .ilike('Candidate_name', insertData.Candidate_name)
+    const isDuplicate = existingCands?.some((r: any) => (r.technology || '').toLowerCase().trim() === techValue)
+    if (isDuplicate) {
+      return NextResponse.json({ success: true, skipped: true })
+    }
+  }
+
   const { data: inserted, error } = await supabase
     .from('Candidate_records')
     .insert(insertData)
@@ -279,10 +294,11 @@ export async function POST(req: NextRequest) {
   // Sync to marketing_records
   const adminClient = getAdminClient()
   if (adminClient && recordData.Candidate_name) {
-    const { data: existingMkt } = await (adminClient.from('marketing_records') as any)
-      .select('id')
-      .ilike('name', recordData.Candidate_name)
-      .maybeSingle() as any
+    const mktTech = (recordData.technology || '').toLowerCase().trim()
+    const { data: existingMktRows } = await (adminClient.from('marketing_records') as any)
+      .select('id, technology')
+      .ilike('name', recordData.Candidate_name) as any
+    const existingMkt = (existingMktRows || []).find((m: any) => (m.technology || '').toLowerCase().trim() === mktTech) || null
     const mktPayload: any = {
       name: recordData.Candidate_name,
       technology: recordData.technology || null,

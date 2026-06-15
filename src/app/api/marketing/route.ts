@@ -140,13 +140,15 @@ export async function GET(req: NextRequest) {
   const candidatesData = candidatesResult.data || []
   const reminderLogs = reminderResult.data || []
 
-  // Filter out records whose candidate status is Closed (normalised keys)
+  // Filter out records whose candidate status is Closed (by name+technology)
   const candidateStatusMap = new Map<string, string>()
   for (const c of candidatesData as any[]) {
-    if (c.Candidate_name && c.status) candidateStatusMap.set(c.Candidate_name.toLowerCase().trim(), c.status)
+    const key = ((c.Candidate_name || '') + '|' + (c.technology || '')).toLowerCase().trim()
+    if (key && c.status) candidateStatusMap.set(key, c.status)
   }
   data = data.filter(r => {
-    const status = candidateStatusMap.get((r.name || '').toLowerCase().trim())
+    const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
+    const status = candidateStatusMap.get(key)
     return !status || status !== 'Closed'
   })
   if (data.length === 0) {
@@ -159,9 +161,8 @@ export async function GET(req: NextRequest) {
     if (adminClient) {
       const missingPairs = new Map<string, { name: string; technology: string | null; owner_id: string | null }>()
       for (const r of data) {
-        const n = (r.name || '').toLowerCase().trim()
-        if (!n || candidateStatusMap.has(n)) continue
-        const key = n + '|' + ((r.technology || '') + '').toLowerCase().trim()
+        const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
+        if (!key || candidateStatusMap.has(key)) continue
         if (!missingPairs.has(key)) {
           missingPairs.set(key, { name: r.name, technology: r.technology || null, owner_id: r.owner_id || null })
         }
@@ -491,10 +492,11 @@ export async function POST(req: NextRequest) {
     // Sync updated fields to matching Candidate_records
     const adminClient = getAdminClient()
     if (adminClient && existingRecord.name) {
-      const { data: existingCandidate } = await (adminClient.from('Candidate_records') as any)
-        .select('id, backup_employee_id, backup_employee_name')
-        .ilike('Candidate_name', existingRecord.name)
-        .maybeSingle() as any
+      const candTech = (existingRecord.technology || '').toLowerCase().trim()
+      const { data: existingCandidates } = await (adminClient.from('Candidate_records') as any)
+        .select('id, backup_employee_id, backup_employee_name, technology')
+        .ilike('Candidate_name', existingRecord.name) as any
+      const existingCandidate = (existingCandidates || []).find((c: any) => (c.technology || '').toLowerCase().trim() === candTech) || null
       const candPayload: any = { updated_at: new Date().toISOString() }
       if (updatePayload.status !== undefined) candPayload.status = updatePayload.status
       if (updatePayload.notes !== undefined) candPayload.notes = updatePayload.notes
@@ -539,17 +541,15 @@ export async function POST(req: NextRequest) {
   delete insertData.selectedEmployeeId
   delete insertData.id
 
-  // --- Dedup: skip if ALL user-facing fields match an existing record (same owner_id) ---
+  // --- Dedup: skip if record with same name + technology already exists ---
   if (insertData.name) {
-    const dedupFields = ['name', 'technology', 'recruiter_email', 'implementation_partner']
-    const buildKey = (r: any) => dedupFields.map(f => ((r[f] ?? '') + '').toLowerCase().trim()).join('|||') + '|||' + (r.owner_id || '')
-    const incomingKey = buildKey(insertData)
+    const techValue = (insertData.technology || '').toLowerCase().trim()
     const { data: existing } = await supabase
       .from('marketing_records')
-      .select('id, name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, technology, owner_id')
+      .select('id, technology')
       .ilike('name', insertData.name)
-      .eq('owner_id', effectiveOwnerId)
-    if (existing?.some(r => buildKey(r) === incomingKey)) {
+    const isDuplicate = existing?.some(r => (r.technology || '').toLowerCase().trim() === techValue)
+    if (isDuplicate) {
       return NextResponse.json({ success: true, skipped: true })
     }
   }
@@ -565,10 +565,11 @@ export async function POST(req: NextRequest) {
   if (insertData.name) {
     const adminClient = getAdminClient()
     if (adminClient) {
-      const { data: existing } = await (adminClient.from('Candidate_records') as any)
-        .select('id, backup_employee_id, backup_employee_name')
-        .ilike('Candidate_name', insertData.name)
-        .maybeSingle() as any
+      const candTech = (insertData.technology || '').toLowerCase().trim()
+      const { data: existingCandidates } = await (adminClient.from('Candidate_records') as any)
+        .select('id, backup_employee_id, backup_employee_name, technology')
+        .ilike('Candidate_name', insertData.name) as any
+      const existing = (existingCandidates || []).find((c: any) => (c.technology || '').toLowerCase().trim() === candTech) || null
       const candPayload: any = {
         Candidate_name: insertData.name,
         technology: insertData.technology || null,
