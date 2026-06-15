@@ -48,6 +48,7 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
           profile: { full_name: profile.full_name },
           employee: {
             employee_id: employee.employee_id,
+            email: profile.email,
             contact: employee.contact,
             address: employee.address,
             date_of_birth: employee.date_of_birth,
@@ -96,8 +97,8 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Full Name</label>
-                  <input type="text" value={profile.full_name} onChange={e => setProfile({ ...profile, full_name: e.target.value })} required disabled={fieldsLocked}
-                    className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm ${fieldsLocked ? 'text-[#71717a] cursor-not-allowed' : 'text-white focus:outline-none focus:border-[#22c55e]/60'}`} />
+                  <input type="text" value={profile.full_name} disabled
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-[#71717a] cursor-not-allowed" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Email</label>

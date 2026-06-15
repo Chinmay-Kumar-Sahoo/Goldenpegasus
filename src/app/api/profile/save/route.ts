@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
         updated_at: new Date().toISOString(),
       }
       if (employee.email !== undefined) empPayload.email = employee.email
+      else if (user.email) empPayload.email = user.email
 
       if (employee.date_of_birth) empPayload.date_of_birth = employee.date_of_birth
       else empPayload.date_of_birth = null
