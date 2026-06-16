@@ -101,8 +101,17 @@ export async function POST(req: NextRequest) {
       const { data: table } = await supabase.from('dynamic_tables').select('schema_definition').eq('id', body.table_id).single()
       if (table?.schema_definition) {
         for (const field of table.schema_definition as any[]) {
-          if (field.type === 'text' && body.data[field.name] && !/^[a-zA-Z\s]*$/.test(body.data[field.name])) {
-            return NextResponse.json({ error: `${field.label} must only contain alphabetic characters` }, { status: 400 })
+          const val = body.data[field.name]
+          if (val) {
+            if (field.type === 'text' && !/^[a-zA-Z\s]*$/.test(val)) {
+              return NextResponse.json({ error: `${field.label} must only contain letters and spaces` }, { status: 400 })
+            }
+            if (field.type === 'number' && !/^\d*\.?\d*$/.test(val)) {
+              return NextResponse.json({ error: `${field.label} must be a valid number` }, { status: 400 })
+            }
+            if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(val)) {
+              return NextResponse.json({ error: `${field.label} must be a valid email address` }, { status: 400 })
+            }
           }
         }
       }

@@ -172,6 +172,25 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
 
   const handleSaveRecord = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setError('')
+    if (activeTable) {
+      for (const field of activeTable.schema_definition) {
+        const val = recordForm[field.name] || ''
+        if (field.required && !val.trim()) {
+          setError(`${field.label} is required`); setSaving(false); return
+        }
+        if (val) {
+          if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(val)) {
+            setError(`${field.label} must be a valid email address`); setSaving(false); return
+          }
+          if (field.type === 'text' && !/^[a-zA-Z\s]*$/.test(val)) {
+            setError(`${field.label} must only contain letters and spaces`); setSaving(false); return
+          }
+          if (field.type === 'number' && !/^\d*\.?\d*$/.test(val)) {
+            setError(`${field.label} must be a valid number`); setSaving(false); return
+          }
+        }
+      }
+    }
     try {
       await api('/api/tables', {
         method: 'POST',
