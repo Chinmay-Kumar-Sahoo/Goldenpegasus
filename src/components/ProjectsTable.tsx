@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
 
@@ -67,13 +67,41 @@ export default function ProjectsTable({
   const [sortField, setSortField] = useState('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [activeTextFilter, setActiveTextFilter] = useState<string | null>(null)
-  const [textFilters, setTextFilters] = useState<Record<string, string>>({})
+  const [textFilters, setTextFilters] = useState<Record<string, string[]>>({})
+  const [textFilterSearch, setTextFilterSearch] = useState('')
 
   const fetchedRef = useRef(false)
   const fetchingRef = useRef(false)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>()
   const textFilterRef = useRef<HTMLInputElement>(null)
   const toastRef = useRef(toast)
+
+  // Close filter dropdown on outside click
+  useEffect(() => {
+    if (!activeTextFilter) return
+    const handleClick = () => setActiveTextFilter(null)
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [activeTextFilter])
+
+  const uniqueValues = useMemo(() => {
+    const result: Record<string, string[]> = {}
+    for (const f of FILTER_FIELDS) {
+      const seen = new Set<string>()
+      const values: string[] = []
+      for (const rec of records) {
+        const val = rec.data?.[f]
+        if (val == null || val === '') continue
+        const key = String(val).trim().toLowerCase()
+        if (!seen.has(key)) {
+          seen.add(key)
+          values.push(String(val).trim())
+        }
+      }
+      result[f] = values.sort((a, b) => a.localeCompare(b))
+    }
+    return result
+  }, [records])
 
   const candidateMap = useMemo(() => {
     const map = new Map<string, string | null>()
@@ -181,6 +209,8 @@ export default function ProjectsTable({
     }
   }
 
+  const hasTextFilter = Object.values(textFilters).some(v => v.length > 0)
+
   const filtered = useMemo(() => {
     let result = [...records]
     const q = search.toLowerCase().trim()
@@ -190,10 +220,12 @@ export default function ProjectsTable({
         return Object.values(d).some(v => String(v || '').toLowerCase().includes(q))
       })
     }
-    for (const [field, val] of Object.entries(textFilters)) {
-      if (!val) continue
-      const fv = val.toLowerCase().trim()
-      result = result.filter(r => String(r.data?.[field] || '').toLowerCase().includes(fv))
+    for (const [field, selected] of Object.entries(textFilters)) {
+      if (selected.length === 0) continue
+      result = result.filter(r => {
+        const val = String(r.data?.[field] ?? '').trim().toLowerCase()
+        return selected.some(s => s.toLowerCase() === val)
+      })
     }
     const sf = sortField === 'created_at' ? 'created_at' : `data.${sortField}`
     result.sort((a, b) => {
@@ -239,6 +271,12 @@ export default function ProjectsTable({
             <input type="text" value={searchInput} onChange={e => handleSearchChange(e.target.value)} placeholder="Search all fields..." className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2 pl-9 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
             <svg className="absolute left-3 top-2.5 w-4 h-4 text-[#71717a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           </div>
+          {(searchInput || hasTextFilter) && (
+            <button onClick={() => { setTextFilters({}); setActiveTextFilter(null); setSearchInput(''); setSearch('') }}
+              className="text-xs text-[#71717a] hover:text-red-400 transition-colors px-2">
+              Clear all filters
+            </button>
+          )}
           <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0) }} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-xs text-white focus:outline-none">
             {PAGE_SIZES.map(s => <option key={s} value={s}>{s} / page</option>)}
           </select>
@@ -253,21 +291,75 @@ export default function ProjectsTable({
                     <span>Actions</span>
                   </div>
                 </th>
-                {FILTER_FIELDS.map(f => (
-                  <th key={f} className="px-4 py-3 text-left text-xs font-medium text-[#71717a] uppercase tracking-wider">
-                    <div className="flex flex-col gap-1">
-                      <button onClick={() => toggleSort(f)} className="flex items-center gap-1 hover:text-white transition-colors">
-                        <span>{FIELD_LABELS[f]}</span>
-                        <SortIcon field={f} />
-                      </button>
-                      {TEXT_FILTER_COLUMNS[FIELD_LABELS[f]] && (
-                        <div className="relative">
-                          <input type="text" value={textFilters[f] || ''} onChange={e => { setTextFilters(p => ({ ...p, [f]: e.target.value })); setPage(0) }} placeholder="Filter..." className="w-24 bg-[#1a1a1a] border border-[#2a2a2a] rounded px-2 py-0.5 text-[10px] text-white focus:outline-none focus:border-[#22c55e]/60" />
+                {FILTER_FIELDS.map(f => {
+                  const label = FIELD_LABELS[f]
+                  const textKey = TEXT_FILTER_COLUMNS[label]
+                  const textIsActive = textKey && activeTextFilter === f
+                  const textHasFilter = textKey && (textFilters[f]?.length ?? 0) > 0
+                  return (
+                    <th key={f} className="px-4 py-3 text-left text-xs font-medium text-[#71717a] uppercase tracking-wider whitespace-nowrap relative">
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => toggleSort(f)} className="flex items-center gap-1 hover:text-white transition-colors">
+                          <span>{label}</span>
+                          {sortField === f && (
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              {sortDir === 'asc' ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                              ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                              )}
+                            </svg>
+                          )}
+                        </button>
+                        {textKey && (
+                          <button onClick={(e) => { e.stopPropagation(); setActiveTextFilter(textIsActive ? null : f); setTextFilterSearch('') }}
+                            className={`p-0.5 rounded transition-colors ${textHasFilter ? 'text-[#22c55e]' : 'text-[#3a3a3a] hover:text-[#a1a1aa]'}`}>
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      {textKey && textIsActive && (
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl z-[9999] shadow-2xl min-w-[240px]" onClick={e => e.stopPropagation()}>
+                          <div className="p-3.5 space-y-2">
+                            <input type="text" value={textFilterSearch} placeholder={`Search ${label}...`} autoFocus
+                              onChange={e => setTextFilterSearch(e.target.value)}
+                              className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#22c55e]/60 placeholder-[#3a3a3a]" />
+                            <div className="max-h-48 overflow-y-auto space-y-1">
+                              {(uniqueValues[f] || []).filter(v => !textFilterSearch || v.toLowerCase().includes(textFilterSearch.toLowerCase())).map(v => {
+                                const checked = (textFilters[f] || []).includes(v)
+                                return (
+                                  <label key={v} className="flex items-center gap-2 px-2 py-1.5 hover:bg-[#2a2a2a] rounded-lg cursor-pointer transition-colors">
+                                    <input type="checkbox" checked={checked}
+                                      onChange={() => setTextFilters(p => {
+                                        const current = p[f] || [];
+                                        const next = checked ? current.filter(x => x !== v) : [...current, v];
+                                        return { ...p, [f]: next };
+                                      })}
+                                      className="accent-[#22c55e] cursor-pointer" />
+                                    <span className="text-xs text-white truncate">{v}</span>
+                                  </label>
+                                )
+                              })}
+                              {(uniqueValues[f] || []).length === 0 && <div className="text-xs text-[#71717a] px-2 py-1">No values available</div>}
+                            </div>
+                            <div className="flex gap-2 pt-1 border-t border-[#2a2a2a]">
+                              <button onClick={() => { setTextFilters(p => ({ ...p, [f]: uniqueValues[f] || [] })); setTextFilterSearch('') }}
+                                className="flex-1 text-center text-xs text-white bg-[#22c55e]/20 hover:bg-[#22c55e]/30 py-1.5 rounded-lg border border-[#22c55e]/40 transition-colors">
+                                Select All
+                              </button>
+                              <button onClick={() => { setTextFilters(p => ({ ...p, [f]: [] })); setTextFilterSearch('') }}
+                                className="flex-1 text-center text-xs text-[#71717a] hover:text-red-400 py-1.5 rounded-lg border border-[#2a2a2a] hover:border-red-400/30 transition-colors">
+                                Clear
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )}
-                    </div>
-                  </th>
-                ))}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
