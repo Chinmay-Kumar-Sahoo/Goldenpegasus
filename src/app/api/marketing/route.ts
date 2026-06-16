@@ -514,21 +514,9 @@ export async function POST(req: NextRequest) {
   delete insertData.selectedEmployeeId
   delete insertData.id
 
-  // --- Dedup: skip if record with same name + technology already exists (use admin client to bypass RLS) ---
-  if (insertData.name) {
-    const adminClient = getAdminClient()
-    if (adminClient) {
-      const techValue = (insertData.technology || '').toLowerCase().trim()
-      const { data: existing } = await (adminClient as any)
-        .from('marketing_records')
-        .select('id, technology')
-        .ilike('name', insertData.name)
-      const isDuplicate = (existing || []).some((r: any) => (r.technology || '').toLowerCase().trim() === techValue)
-      if (isDuplicate) {
-        return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
-      }
-    }
-  }
+  // Marketing records are a log of distinct activity — same name+technology
+  // can have many legitimate entries (different clients, dates, recruiters).
+  // No duplicate check here; Candidate_records handles uniqueness.
 
   const { data: inserted, error } = await supabase
     .from('marketing_records')
