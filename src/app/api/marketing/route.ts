@@ -531,7 +531,7 @@ export async function POST(req: NextRequest) {
     if (adminClient) {
       const candTech = (insertData.technology || '').toLowerCase().trim()
       const { data: existingCandidates } = await (adminClient.from('Candidate_records') as any)
-        .select('id, backup_employee_id, backup_employee_name, technology')
+        .select('id, owner_id, backup_employee_id, backup_employee_name, technology')
         .ilike('Candidate_name', insertData.name) as any
       const existing = (existingCandidates || []).find((c: any) => (c.technology || '').toLowerCase().trim() === candTech) || null
       const candPayload: any = {
@@ -539,27 +539,29 @@ export async function POST(req: NextRequest) {
         technology: insertData.technology || null,
         status: insertData.status || null,
         notes: insertData.notes || null,
-        owner_id: effectiveOwnerId,
         updated_at: new Date().toISOString(),
       }
       if (insertData.backup_employee_id !== undefined) candPayload.backup_employee_id = insertData.backup_employee_id || null
       if (insertData.backup_employee_name !== undefined) candPayload.backup_employee_name = insertData.backup_employee_name || null
-      // Preserve existing backup values if not provided in request
-      if (existing?.backup_employee_id && candPayload.backup_employee_id === undefined) {
-        candPayload.backup_employee_id = existing.backup_employee_id
-        candPayload.backup_employee_name = existing.backup_employee_name || candPayload.backup_employee_name
-      }
-      // For new candidates, try to resolve backup_employee_id from backup_employee_name
-      if (!existing && insertData.backup_employee_name && candPayload.backup_employee_id === undefined) {
-        const [pResult, eResult] = await Promise.all([
-            (adminClient.from('profiles') as any).select('id').ilike('full_name', insertData.backup_employee_name).maybeSingle(),
-            (adminClient.from('employees') as any).select('user_id').ilike('full_name', insertData.backup_employee_name).maybeSingle(),
-        ])
-        candPayload.backup_employee_id = pResult?.data?.id || eResult?.data?.user_id || null
-      }
       if (existing) {
+        // Preserve original owner — marketing record sync must not reassign candidate ownership
+        candPayload.owner_id = existing.owner_id
+        // Preserve existing backup values if not provided in this request
+        if (existing.backup_employee_id && candPayload.backup_employee_id === undefined) {
+          candPayload.backup_employee_id = existing.backup_employee_id
+          candPayload.backup_employee_name = existing.backup_employee_name || candPayload.backup_employee_name
+        }
         await (adminClient.from('Candidate_records') as any).update(candPayload).eq('id', existing.id)
       } else {
+        candPayload.owner_id = effectiveOwnerId
+        // For new candidates, try to resolve backup_employee_id from backup_employee_name
+        if (insertData.backup_employee_name && candPayload.backup_employee_id === undefined) {
+          const [pResult, eResult] = await Promise.all([
+              (adminClient.from('profiles') as any).select('id').ilike('full_name', insertData.backup_employee_name).maybeSingle(),
+              (adminClient.from('employees') as any).select('user_id').ilike('full_name', insertData.backup_employee_name).maybeSingle(),
+          ])
+          candPayload.backup_employee_id = pResult?.data?.id || eResult?.data?.user_id || null
+        }
         await (adminClient.from('Candidate_records') as any).insert(candPayload)
       }
     }
