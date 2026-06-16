@@ -36,6 +36,21 @@ export default async function EmployeeClientsPage() {
   }
   const rawRecords = Array.from(recordMap.values())
 
+  // Deduplicate by (Candidate_name, technology) — keep original (oldest) record per unique combination
+  {
+    const dedupMap = new Map<string, any>()
+    for (const r of rawRecords) {
+      const key = ((r.Candidate_name || '') + '|' + (r.technology || '')).toLowerCase().trim()
+      if (!key) { dedupMap.set(r.id, r); continue }
+      const existing = dedupMap.get(key)
+      if (!existing || (r.created_at || '') < (existing.created_at || '')) {
+        dedupMap.set(key, r)
+      }
+    }
+    rawRecords.length = 0
+    rawRecords.push(...Array.from(dedupMap.values()))
+  }
+
   // Resolve current user's full name for backup_employee_name matching
   let currentUserFullName: string | null = null
   if (uid) {
