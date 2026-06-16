@@ -155,34 +155,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ records: [], timing: Date.now() - startTime })
   }
 
-  // Auto-create missing Candidate_records for marketing records without a matching candidate
-  if (data.length > 0) {
-    const adminClient = getAdminClient()
-    if (adminClient) {
-      const missingPairs = new Map<string, { name: string; technology: string | null; owner_id: string | null }>()
-      for (const r of data) {
-        const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
-        if (!key || candidateStatusMap.has(key)) continue
-        if (!missingPairs.has(key)) {
-          missingPairs.set(key, { name: r.name, technology: r.technology || null, owner_id: r.owner_id || null })
-        }
-      }
-      if (missingPairs.size > 0) {
-        const now = new Date().toISOString()
-        const payloads: any[] = []
-        for (const [, p] of missingPairs) {
-          payloads.push({ Candidate_name: p.name, technology: p.technology, owner_id: p.owner_id, status: 'Active', updated_at: now })
-        }
-        const { data: created } = await (adminClient.from('Candidate_records') as any).insert(payloads).select()
-        if (created) {
-          for (const c of created as any[]) {
-            candidatesData.push(c)
-            candidateStatusMap.set((c.Candidate_name || '').toLowerCase().trim(), c.status || 'Active')
-          }
-        }
-      }
-    }
-  }
+  // Note: Candidate_records should be created by the dedicated sync endpoints, not as a side effect of viewing records
 
   const candidateBackupIds = Array.from(new Set(candidatesData.map((c: any) => c.backup_employee_id).filter(Boolean))) as string[]
   const candidateOwnerIds = Array.from(new Set(candidatesData.map((c: any) => c.owner_id).filter(Boolean))) as string[]

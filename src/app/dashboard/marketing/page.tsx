@@ -14,7 +14,7 @@ export default async function AllMarketingPage() {
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : supabase
 
-  const { data: rawRecords } = await supabase
+  const { data: rawRecords } = await lookupClient
     .from('marketing_records')
     .select('*')
     .order('created_at', { ascending: false })
