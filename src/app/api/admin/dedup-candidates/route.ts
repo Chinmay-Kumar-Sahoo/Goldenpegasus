@@ -41,32 +41,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 2. Dedup marketing_records by (name, technology) — keep original (oldest)
-  const { data: marketingRecords } = await adminClient
-    .from('marketing_records')
-    .select('id, name, technology, created_at')
-    .order('created_at', { ascending: true })
-    .limit(5000)
-
-  if (marketingRecords) {
-    const seen = new Map<string, string[]>()
-    for (const r of marketingRecords) {
-      const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
-      if (!key) continue
-      if (!seen.has(key)) seen.set(key, [])
-      seen.get(key)!.push(r.id)
-    }
-    const toDelete: string[] = []
-    for (const [, ids] of seen) {
-      if (ids.length > 1) toDelete.push(...ids.slice(1))
-    }
-    if (toDelete.length > 0) {
-      // Delete associated reminder logs first
-      await adminClient.from('marketing_reminder_logs').delete().in('marketing_record_id', toDelete)
-      const { error } = await adminClient.from('marketing_records').delete().in('id', toDelete)
-      if (!error) result.marketing_removed = toDelete.length
-    }
-  }
+  // Note: marketing_records are a log of distinct activity (different clients, dates, recruiters).
+  // Same name+technology can have many legitimate entries — NOT deduplicated here.
 
   return NextResponse.json({ message: 'Dedup complete', ...result })
 }
