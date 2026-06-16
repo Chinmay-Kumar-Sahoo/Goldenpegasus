@@ -514,21 +514,23 @@ export async function POST(req: NextRequest) {
   delete insertData.selectedEmployeeId
   delete insertData.id
 
-  // --- Dedup: block exact duplicates (all meaningful fields match for same name+technology+owner) ---
+  // --- Dedup: block exact duplicates (all meaningful fields match for same name+technology, any owner) ---
   if (insertData.name) {
-    const dupFields = ['recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'notes', 'interview_type', 'project_start_date', 'project_end_date', 'interview_date']
-    const norm = (v: any) => String(v ?? '').toLowerCase().trim()
-    const newKey = dupFields.map(f => norm(insertData[f])).join('|||')
-    const { data: existing } = await supabase
-      .from('marketing_records')
-      .select('id, ' + dupFields.join(', '))
-      .ilike('name', insertData.name)
-      .eq('owner_id', insertData.owner_id)
-    if (existing) {
-      const techMatch = (r: any) => norm(r.technology) === norm(insertData.technology)
-      const isDuplicate = (existing as any[]).some((r: any) => techMatch(r) && dupFields.map((f: string) => norm((r as any)[f])).join('|||') === newKey)
-      if (isDuplicate) {
-        return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
+    const adminClient = getAdminClient()
+    if (adminClient) {
+      const dupFields = ['recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'notes', 'interview_type', 'project_start_date', 'project_end_date', 'interview_date']
+      const norm = (v: any) => String(v ?? '').toLowerCase().trim()
+      const newKey = dupFields.map(f => norm(insertData[f])).join('|||')
+      const { data: existing } = await (adminClient as any)
+        .from('marketing_records')
+        .select('id, technology, ' + dupFields.join(', '))
+        .ilike('name', insertData.name)
+      if (existing) {
+        const techMatch = (r: any) => norm(r.technology) === norm(insertData.technology)
+        const isDuplicate = (existing as any[]).some((r: any) => techMatch(r) && dupFields.map((f: string) => norm((r as any)[f])).join('|||') === newKey)
+        if (isDuplicate) {
+          return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
+        }
       }
     }
   }
