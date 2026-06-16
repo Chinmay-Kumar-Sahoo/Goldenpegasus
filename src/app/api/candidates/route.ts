@@ -303,7 +303,8 @@ export async function DELETE(req: NextRequest) {
     : supabase
 
   // Fetch candidate name before deleting, for sync
-  const { data: candidate } = await deleteClient.from('Candidate_records').select('Candidate_name').eq('id', id).single()
+  const { data: candidate } = await deleteClient.from('Candidate_records').select('Candidate_name').eq('id', id).maybeSingle()
+  if (!candidate) return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
 
   const { error } = await deleteClient.from('Candidate_records').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

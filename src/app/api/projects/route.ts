@@ -119,7 +119,7 @@ function getAdminClientForAuth(): ReturnType<typeof createAdminClient> | null {
 }
 
 async function isAdminUser(supabase: any, userId: string): Promise<boolean> {
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single()
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
   return profile?.role === 'admin'
 }
 

@@ -131,7 +131,7 @@ export default function ProjectsTable({
   const candidateMap = useMemo(() => {
     const map = new Map<string, string | null>()
     for (const c of candidateOptions) {
-      if (!map.has(c.name.toLowerCase().trim())) map.set(c.name.toLowerCase().trim(), c.technology)
+      map.set((c.name + '|' + (c.technology || '')).toLowerCase().trim(), c.technology)
     }
     return map
   }, [candidateOptions])
@@ -191,10 +191,8 @@ export default function ProjectsTable({
     setShowModal(true)
   }
 
-  const handleCandidateChange = (candidateName: string) => {
-    const key = candidateName.toLowerCase().trim()
-    const tech = candidateMap.get(key) || ''
-    setForm(prev => ({ ...prev, candidate_name: candidateName, technology: tech }))
+  const handleCandidateChange = (candidateName: string, technology?: string | null) => {
+    setForm(prev => ({ ...prev, candidate_name: candidateName, technology: technology || '' }))
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -565,7 +563,7 @@ export default function ProjectsTable({
                       <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl z-50 max-h-48 overflow-y-auto shadow-2xl">
                         <div className="px-4 py-1.5 text-[10px] text-[#71717a] border-b border-[#2a2a2a]">{candidateOptions.length} candidate{candidateOptions.length !== 1 ? 's' : ''} available</div>
                         {candidateOptions.map(c => (
-                          <button key={c.name + '|' + (c.technology || '')} type="button" onClick={() => { handleCandidateChange(c.name); setShowCandidateDropdown(false) }}
+                          <button key={c.name + '|' + (c.technology || '')} type="button" onClick={() => { handleCandidateChange(c.name, c.technology); setShowCandidateDropdown(false) }}
                             className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors flex items-center justify-between">
                             <span>{c.name}</span>
                             {c.technology && <span className="text-[10px] text-[#71717a]">{c.technology}</span>}
