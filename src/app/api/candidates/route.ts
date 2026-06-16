@@ -198,7 +198,6 @@ export async function POST(req: NextRequest) {
           .ilike('name', recordData.Candidate_name) as any
         const existingMkt = (existingMktRows || []).find((m: any) => (m.technology || '').toLowerCase().trim() === mktTech) || null
         const mktPayload: any = { updated_at: new Date().toISOString() }
-        if (recordData.status !== undefined) mktPayload.status = recordData.status
         if (recordData.notes !== undefined) mktPayload.notes = recordData.notes
         if (recordData.technology !== undefined) mktPayload.technology = recordData.technology
         if (selectedEmployeeId) mktPayload.owner_id = selectedEmployeeId
@@ -267,7 +266,6 @@ export async function POST(req: NextRequest) {
     const mktPayload: any = {
       name: recordData.Candidate_name,
       technology: recordData.technology || null,
-      status: recordData.status || null,
       notes: recordData.notes || null,
       owner_id: effectiveOwnerId,
       employee_name: (employee_name || null),

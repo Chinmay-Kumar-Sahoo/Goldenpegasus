@@ -30,7 +30,6 @@ export async function POST(req: NextRequest) {
         for (const c of candidates) {
           if (c.Candidate_name) {
             const mktPayload: any = { updated_at: new Date().toISOString() }
-            if (updates.status !== undefined) mktPayload.status = updates.status
             if (updates.notes !== undefined) mktPayload.notes = updates.notes
             await (adminClient.from('marketing_records') as any).update(mktPayload).ilike('name', c.Candidate_name)
           }
