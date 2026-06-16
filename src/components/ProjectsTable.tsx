@@ -452,6 +452,7 @@ export default function ProjectsTable({
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setShowCandidateDropdown(false)} />
                       <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl z-50 max-h-48 overflow-y-auto shadow-2xl">
+                        <div className="px-4 py-1.5 text-[10px] text-[#71717a] border-b border-[#2a2a2a]">{candidateOptions.length} candidate{candidateOptions.length !== 1 ? 's' : ''} available</div>
                         {candidateOptions
                           .filter(c => !form.candidate_name || c.name.toLowerCase().includes(form.candidate_name.toLowerCase()))
                           .map(c => (
