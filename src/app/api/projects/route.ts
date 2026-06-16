@@ -121,6 +121,23 @@ export async function POST(req: NextRequest) {
   const { id, data: recordData } = body
   const tableId = body.table_id
 
+  // Validate candidate_name is in user's assigned candidates
+  const candidateName = (recordData?.candidate_name || '').trim()
+  if (!candidateName) return NextResponse.json({ error: 'Candidate Name is required' }, { status: 400 })
+  const lookupClient = getAdminClient() || supabase
+  const uid = user.id
+  const [{ data: asOwner }, { data: asBackup }] = await Promise.all([
+    lookupClient.from('Candidate_records').select('Candidate_name').eq('owner_id', uid),
+    lookupClient.from('Candidate_records').select('Candidate_name').eq('backup_employee_id', uid),
+  ])
+  const validNames = new Set([
+    ...(asOwner || []).map((c: any) => (c.Candidate_name || '').toLowerCase().trim()),
+    ...(asBackup || []).map((c: any) => (c.Candidate_name || '').toLowerCase().trim()),
+  ])
+  if (!validNames.has(candidateName.toLowerCase())) {
+    return NextResponse.json({ error: 'Candidate is not assigned to you' }, { status: 403 })
+  }
+
   let resolvedId = tableId || undefined
   if (!resolvedId) {
     const result = await getTableId(supabase, user.id)
