@@ -83,6 +83,7 @@ export default function ProjectsTable({
   const [textFilters, setTextFilters] = useState<Record<string, string[]>>({})
   const [textFilterSearch, setTextFilterSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showCandidateDropdown, setShowCandidateDropdown] = useState(false)
 
   const fetchedRef = useRef(false)
   const fetchingRef = useRef(false)
@@ -445,13 +446,27 @@ export default function ProjectsTable({
               <div>
                 <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Candidate Name *</label>
                 <div className="relative">
-                  <input type="text" value={form.candidate_name || ''} onChange={e => handleCandidateChange(e.target.value)} list="candidate-list" required placeholder="Type or select candidate..." autoComplete="off"
+                  <input type="text" value={form.candidate_name || ''} onChange={e => { handleCandidateChange(e.target.value); setShowCandidateDropdown(true) }} onFocus={() => setShowCandidateDropdown(true)} required placeholder="Type or select candidate..." autoComplete="off"
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
-                  <datalist id="candidate-list">
-                    {candidateOptions.map(c => (
-                      <option key={c.name + '|' + (c.technology || '')} value={c.name} />
-                    ))}
-                  </datalist>
+                  {showCandidateDropdown && candidateOptions.length > 0 && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowCandidateDropdown(false)} />
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl z-50 max-h-48 overflow-y-auto shadow-2xl">
+                        {candidateOptions
+                          .filter(c => !form.candidate_name || c.name.toLowerCase().includes(form.candidate_name.toLowerCase()))
+                          .map(c => (
+                            <button key={c.name + '|' + (c.technology || '')} type="button" onClick={() => { handleCandidateChange(c.name); setShowCandidateDropdown(false) }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors flex items-center justify-between">
+                              <span>{c.name}</span>
+                              {c.technology && <span className="text-[10px] text-[#71717a]">{c.technology}</span>}
+                            </button>
+                          ))}
+                        {candidateOptions.filter(c => !form.candidate_name || c.name.toLowerCase().includes(form.candidate_name.toLowerCase())).length === 0 && (
+                          <div className="px-4 py-3 text-xs text-[#71717a]">No matching candidates</div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
