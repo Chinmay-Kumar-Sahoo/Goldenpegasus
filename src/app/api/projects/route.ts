@@ -23,36 +23,49 @@ function getAdminClient() {
   return _adminClient
 }
 
-async function ensureProjectTable(supabase: any, userId: string): Promise<string | null> {
-  // Try lookup with authenticated client first
-  const { data: existing } = await (supabase.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
-  if (existing?.id) return existing.id
+async function getTableId(supabase: any, userId: string): Promise<{ id: string | null; error?: string }> {
+  // 1) Try admin client first — bypasses RLS, can see all rows
+  const adminClient = getAdminClient()
+  if (adminClient) {
+    const { data: found } = await (adminClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
+    if (found?.id) {
+      // Ensure owner_id is set so the regular user can access it
+      await (adminClient.from('dynamic_tables') as any).update({ owner_id: userId }).eq('id', found.id)
+      return { id: found.id }
+    }
+    const { data: created } = await (adminClient.from('dynamic_tables') as any).insert({
+      table_name: PROJECT_TABLE_NAME,
+      description: 'Employee project records',
+      schema_definition: PROJECT_SCHEMA,
+      is_global: false,
+      owner_id: userId,
+    }).select('id').single()
+    if (created?.id) return { id: created.id }
+    return { id: null, error: 'Admin client could not create table entry' }
+  }
 
-  // Not found — try creating with authenticated client (sets owner_id for RLS)
-  const { data: inserted } = await (supabase.from('dynamic_tables') as any).insert({
+  // 2) No admin client — try with regular authenticated client
+  const { data: existing, error: lookupErr } = await (supabase.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
+  if (existing?.id) return { id: existing.id }
+  if (lookupErr) return { id: null, error: `Lookup error: ${lookupErr.message}` }
+
+  // 3) Try INSERT (may fail if row exists but RLS hides it)
+  const { data: inserted, error: insertErr } = await (supabase.from('dynamic_tables') as any).insert({
     table_name: PROJECT_TABLE_NAME,
     description: 'Employee project records',
     schema_definition: PROJECT_SCHEMA,
     is_global: false,
     owner_id: userId,
   }).select('id').single()
-  if (inserted?.id) return inserted.id
+  if (inserted?.id) return { id: inserted.id }
 
-  // Fallback: try with admin client (bypasses RLS)
-  const adminClient = getAdminClient()
-  if (adminClient) {
-    const { data: existingAdmin } = await (adminClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
-    if (existingAdmin?.id) return existingAdmin.id
-    const { data: insertedAdmin } = await (adminClient.from('dynamic_tables') as any).insert({
-      table_name: PROJECT_TABLE_NAME,
-      description: 'Employee project records',
-      schema_definition: PROJECT_SCHEMA,
-      is_global: false,
-    }).select('id').single()
-    if (insertedAdmin?.id) return insertedAdmin.id
+  // 4) If unique violation (23505), the entry exists but is RLS-hidden
+  //    Try fetching the table name using raw table access
+  if (insertErr?.code === '23505') {
+    return { id: null, error: 'A project table entry already exists but is not accessible. Please ask an admin to run: UPDATE dynamic_tables SET owner_id = \'' + userId + '\' WHERE table_name = \'' + PROJECT_TABLE_NAME + '\';' }
   }
 
-  return null
+  return { id: null, error: insertErr ? `Insert error (${insertErr.code}): ${insertErr.message}` : 'Unknown error creating table entry' }
 }
 
 export async function GET(req: NextRequest) {
@@ -61,8 +74,13 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const tableId = searchParams.get('table_id') || await ensureProjectTable(supabase, user.id)
-  if (!tableId) return NextResponse.json({ error: 'Server error: cannot find or create project table' }, { status: 500 })
+  const tableId = searchParams.get('table_id')
+  let resolvedId = tableId || undefined
+  if (!resolvedId) {
+    const result = await getTableId(supabase, user.id)
+    if (!result.id) return NextResponse.json({ error: result.error || 'Cannot find or create project table' }, { status: 500 })
+    resolvedId = result.id
+  }
 
   const ownerFilter = searchParams.get('owner_id')
   const limitParam = Math.min(Number(searchParams.get('limit')) || 2000, 2000)
@@ -70,7 +88,7 @@ export async function GET(req: NextRequest) {
   const adminClient = getAdminClient()
   const lookupClient = adminClient || supabase
 
-  let query = lookupClient.from('dynamic_table_records').select('*').eq('table_id', tableId).order('created_at', { ascending: false }).limit(limitParam)
+  let query = lookupClient.from('dynamic_table_records').select('*').eq('table_id', resolvedId).order('created_at', { ascending: false }).limit(limitParam)
   if (ownerFilter) query = query.eq('owner_id', ownerFilter)
   const { data: records, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -101,8 +119,14 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { id, data: recordData } = body
-  const tableId = body.table_id || await ensureProjectTable(supabase, user.id)
-  if (!tableId) return NextResponse.json({ error: 'Server error: cannot find or create project table' }, { status: 500 })
+  const tableId = body.table_id
+
+  let resolvedId = tableId || undefined
+  if (!resolvedId) {
+    const result = await getTableId(supabase, user.id)
+    if (!result.id) return NextResponse.json({ error: result.error || 'Cannot find or create project table' }, { status: 500 })
+    resolvedId = result.id
+  }
 
   if (id) {
     const { error: updateErr } = await supabase.from('dynamic_table_records').update({ data: recordData, updated_at: new Date().toISOString() }).eq('id', id).eq('owner_id', user.id)
@@ -111,7 +135,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: inserted, error } = await supabase.from('dynamic_table_records').insert({
-    table_id: tableId,
+    table_id: resolvedId,
     owner_id: user.id,
     data: recordData,
   }).select('id').single()
