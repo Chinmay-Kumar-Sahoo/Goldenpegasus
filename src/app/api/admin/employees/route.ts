@@ -150,6 +150,10 @@ export async function DELETE(req: NextRequest) {
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(id)
     if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
 
+    // Clean up profiles and employees tables
+    await supabaseAdmin.from('profiles').delete().eq('id', id)
+    await supabaseAdmin.from('employees').delete().eq('user_id', id)
+
     await logAudit(supabase, auth.user.id, 'deleted', 'employee', id)
     return NextResponse.json({ success: true })
   } catch (error: any) {

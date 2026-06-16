@@ -138,13 +138,17 @@ export default function AdminEmployeesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this employee?')) return
     try {
-      await fetch('/api/admin/employees', {
+      const res = await fetch('/api/admin/employees', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       })
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error || 'Failed to delete') }
+      toast.success('Deleted')
       fetchEmployees()
-    } catch {}
+    } catch (err: any) {
+      toast.error(err.message)
+    }
   }
 
   const toggleSelect = (id: string) => {

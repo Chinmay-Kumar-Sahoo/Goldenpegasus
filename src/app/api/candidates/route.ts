@@ -295,10 +295,17 @@ export async function DELETE(req: NextRequest) {
 
   const { id } = await req.json()
 
-  // Fetch candidate name before deleting, for sync
-  const { data: candidate } = await supabase.from('Candidate_records').select('Candidate_name').eq('id', id).single()
+  // Use admin client to bypass RLS
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  const deleteClient = serviceRoleKey
+    ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : supabase
 
-  const { error } = await supabase.from('Candidate_records').delete().eq('id', id)
+  // Fetch candidate name before deleting, for sync
+  const { data: candidate } = await deleteClient.from('Candidate_records').select('Candidate_name').eq('id', id).single()
+
+  const { error } = await deleteClient.from('Candidate_records').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Also delete from marketing_records if no other Candidate_records reference this candidate
