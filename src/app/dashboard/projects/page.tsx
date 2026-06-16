@@ -6,6 +6,17 @@ export const metadata = { title: 'My Project Records | GoldenPegasus' }
 export const dynamic = 'force-dynamic'
 
 const PROJECT_TABLE_NAME = 'My Project Records'
+const PROJECT_SCHEMA = [
+  { name: 'candidate_name', label: 'Candidate Name', type: 'text', required: true },
+  { name: 'technology', label: 'Technology', type: 'text', required: false },
+  { name: 'created_date', label: 'Created Date', type: 'date', required: false },
+  { name: 'company_name', label: 'Company Name', type: 'text', required: false },
+  { name: 'project_status', label: 'Project Status', type: 'text', required: false },
+  { name: 'project_type', label: 'Project Type', type: 'text', required: false },
+  { name: 'project_rate', label: 'Project Rate', type: 'text', required: false },
+  { name: 'project_start_date', label: 'Project Start Date', type: 'date', required: false },
+  { name: 'project_end_date', label: 'Project End Date', type: 'date', required: false },
+] as const
 
 export default async function ProjectsPage() {
   const supabase = await createClient()
@@ -17,42 +28,52 @@ export default async function ProjectsPage() {
   const supabaseAdmin = serviceRoleKey
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : null
-  const lookupClient = supabaseAdmin || supabase
 
-  // Ensure the dynamic table entry exists
-  let { data: projectTable } = await lookupClient.from('dynamic_tables').select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
-  if (!projectTable && supabaseAdmin) {
-    const { data: created } = await supabaseAdmin.from('dynamic_tables').insert({
+  // Try to find or create the project table entry — use authenticated client first, admin as fallback
+  let tableId: string | null | undefined
+
+  // 1) Lookup with authenticated client
+  const { data: existing } = await (supabase.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
+  tableId = existing?.id
+
+  // 2) Not found — try insert with authenticated client (sets owner_id)
+  if (!tableId) {
+    const { data: inserted } = await (supabase.from('dynamic_tables') as any).insert({
       table_name: PROJECT_TABLE_NAME,
       description: 'Employee project records',
-      schema_definition: [
-        { name: 'candidate_name', label: 'Candidate Name', type: 'text', required: true },
-        { name: 'technology', label: 'Technology', type: 'text', required: false },
-        { name: 'created_date', label: 'Created Date', type: 'date', required: false },
-        { name: 'company_name', label: 'Company Name', type: 'text', required: false },
-        { name: 'project_status', label: 'Project Status', type: 'text', required: false },
-        { name: 'project_type', label: 'Project Type', type: 'text', required: false },
-        { name: 'project_rate', label: 'Project Rate', type: 'text', required: false },
-        { name: 'project_start_date', label: 'Project Start Date', type: 'date', required: false },
-        { name: 'project_end_date', label: 'Project End Date', type: 'date', required: false },
-      ],
+      schema_definition: PROJECT_SCHEMA,
       is_global: false,
+      owner_id: uid,
     }).select('id').single()
-    projectTable = created
+    tableId = inserted?.id
   }
-  const tableId = projectTable?.id
+
+  // 3) Fallback to admin client
+  if (!tableId && supabaseAdmin) {
+    const { data: adminExisting } = await (supabaseAdmin.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
+    tableId = adminExisting?.id
+    if (!tableId) {
+      const { data: adminInserted } = await (supabaseAdmin.from('dynamic_tables') as any).insert({
+        table_name: PROJECT_TABLE_NAME,
+        description: 'Employee project records',
+        schema_definition: PROJECT_SCHEMA,
+        is_global: false,
+      }).select('id').single()
+      tableId = adminInserted?.id
+    }
+  }
 
   // Fetch project records for this user
   let records: any[] = []
   if (tableId) {
-    const { data } = await lookupClient.from('dynamic_table_records').select('*').eq('table_id', tableId).eq('owner_id', uid).order('created_at', { ascending: false }).limit(2000)
+    const { data } = await supabase.from('dynamic_table_records').select('*').eq('table_id', tableId).eq('owner_id', uid).order('created_at', { ascending: false }).limit(2000)
     records = data || []
   }
 
   // Fetch candidate options for this user (from Candidate_records where owner or backup)
   let candidateOptions: Array<{ name: string; technology: string | null }> = []
   if (uid) {
-    const { data: candidates } = await lookupClient.from('Candidate_records').select('Candidate_name, technology').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+    const { data: candidates } = await supabase.from('Candidate_records').select('Candidate_name, technology').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
     if (candidates) {
       const seen = new Set<string>()
       for (const c of candidates) {

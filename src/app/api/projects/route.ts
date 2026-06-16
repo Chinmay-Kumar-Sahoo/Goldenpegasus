@@ -23,20 +23,36 @@ function getAdminClient() {
   return _adminClient
 }
 
-async function ensureProjectTable(supabase: any): Promise<string | null> {
-  const adminClient = getAdminClient()
-  const client = adminClient || supabase
-  const { data: existing } = await client.from('dynamic_tables').select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
-  if (existing) return existing.id
-  if (!adminClient) return null
-  const { data: inserted, error } = await (adminClient.from('dynamic_tables') as any).insert({
+async function ensureProjectTable(supabase: any, userId: string): Promise<string | null> {
+  // Try lookup with authenticated client first
+  const { data: existing } = await (supabase.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
+  if (existing?.id) return existing.id
+
+  // Not found — try creating with authenticated client (sets owner_id for RLS)
+  const { data: inserted } = await (supabase.from('dynamic_tables') as any).insert({
     table_name: PROJECT_TABLE_NAME,
     description: 'Employee project records',
     schema_definition: PROJECT_SCHEMA,
     is_global: false,
-  }).select('id').single() as any
-  if (error || !inserted) return null
-  return inserted.id
+    owner_id: userId,
+  }).select('id').single()
+  if (inserted?.id) return inserted.id
+
+  // Fallback: try with admin client (bypasses RLS)
+  const adminClient = getAdminClient()
+  if (adminClient) {
+    const { data: existingAdmin } = await (adminClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
+    if (existingAdmin?.id) return existingAdmin.id
+    const { data: insertedAdmin } = await (adminClient.from('dynamic_tables') as any).insert({
+      table_name: PROJECT_TABLE_NAME,
+      description: 'Employee project records',
+      schema_definition: PROJECT_SCHEMA,
+      is_global: false,
+    }).select('id').single()
+    if (insertedAdmin?.id) return insertedAdmin.id
+  }
+
+  return null
 }
 
 export async function GET(req: NextRequest) {
@@ -45,7 +61,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const tableId = searchParams.get('table_id') || await ensureProjectTable(supabase)
+  const tableId = searchParams.get('table_id') || await ensureProjectTable(supabase, user.id)
   if (!tableId) return NextResponse.json({ error: 'Server error: cannot find or create project table' }, { status: 500 })
 
   const ownerFilter = searchParams.get('owner_id')
@@ -85,7 +101,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { id, data: recordData } = body
-  const tableId = body.table_id || await ensureProjectTable(supabase)
+  const tableId = body.table_id || await ensureProjectTable(supabase, user.id)
   if (!tableId) return NextResponse.json({ error: 'Server error: cannot find or create project table' }, { status: 500 })
 
   if (id) {
