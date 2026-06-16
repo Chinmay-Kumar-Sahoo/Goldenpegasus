@@ -233,16 +233,19 @@ export async function POST(req: NextRequest) {
     if (backupName) insertData.backup_employee_name = backupName
   }
 
-  // --- Dedup: skip if candidate with same name + technology already exists ---
+  // --- Dedup: skip if candidate with same name + technology already exists (use admin client to bypass RLS) ---
   if (insertData.Candidate_name) {
-    const techValue = (insertData.technology || '').toLowerCase().trim()
-    const { data: existingCands } = await supabase
-      .from('Candidate_records')
-      .select('id, technology')
-      .ilike('Candidate_name', insertData.Candidate_name)
-    const isDuplicate = existingCands?.some((r: any) => (r.technology || '').toLowerCase().trim() === techValue)
-    if (isDuplicate) {
-      return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
+    const adminClient = getAdminClient()
+    if (adminClient) {
+      const techValue = (insertData.technology || '').toLowerCase().trim()
+      const { data: existingCands } = await (adminClient as any)
+        .from('Candidate_records')
+        .select('id, technology')
+        .ilike('Candidate_name', insertData.Candidate_name)
+      const isDuplicate = (existingCands || []).some((r: any) => (r.technology || '').toLowerCase().trim() === techValue)
+      if (isDuplicate) {
+        return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
+      }
     }
   }
 
