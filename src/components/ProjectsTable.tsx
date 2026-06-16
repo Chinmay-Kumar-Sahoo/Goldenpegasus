@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
 
@@ -60,17 +60,25 @@ export default function ProjectsTable({
   tableId,
   initialRecords = [],
   candidateOptions = [],
+  isAdmin = false,
+  readOnly = false,
+  title = 'My Project Records',
 }: {
   currentUserId?: string | null
   tableId?: string | null
   initialRecords?: ProjectRecord[]
   candidateOptions?: CandidateOption[]
+  isAdmin?: boolean
+  readOnly?: boolean
+  title?: string
 }) {
   const [records, setRecords] = useState<ProjectRecord[]>(initialRecords)
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [showBulkModal, setShowBulkModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({})
+  const [bulkForm, setBulkForm] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
@@ -90,6 +98,8 @@ export default function ProjectsTable({
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>()
   const textFilterRef = useRef<HTMLInputElement>(null)
   const toastRef = useRef(toast)
+
+  const showOwnerColumn = isAdmin || readOnly
 
   // Close filter dropdown on outside click
   useEffect(() => {
@@ -132,7 +142,7 @@ export default function ProjectsTable({
     if (!background) setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (currentUserId) params.set('owner_id', currentUserId)
+      if (!readOnly && !isAdmin && currentUserId) params.set('owner_id', currentUserId)
       if (tableId) params.set('table_id', tableId)
       const qs = params.toString()
       const res = await fetch(`/api/projects${qs ? '?' + qs : ''}`)
@@ -146,7 +156,7 @@ export default function ProjectsTable({
       fetchingRef.current = false
       if (!background) setLoading(false)
     }
-  }, [currentUserId, tableId])
+  }, [currentUserId, tableId, readOnly, isAdmin])
 
   useEffect(() => {
     if (!fetchedRef.current) {
@@ -210,6 +220,68 @@ export default function ProjectsTable({
       setError(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleBulkSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const updates: Record<string, string> = {}
+    for (const [key, val] of Object.entries(bulkForm)) {
+      if (val.trim()) updates[key] = val.trim()
+    }
+    if (Object.keys(updates).length === 0) { setError('Fill at least one field'); return }
+
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch('/api/projects/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds), updates }),
+      })
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error || 'Failed to bulk update') }
+      toastRef.current.success('Records updated')
+      setShowBulkModal(false)
+      setSelectedIds(new Set())
+      setBulkForm({})
+      fetchRecords(true)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteSingle = async (id: string) => {
+    if (!confirm('Delete this project record?')) return
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error || 'Failed to delete') }
+      toastRef.current.success('Deleted')
+      fetchRecords(true)
+    } catch (err: any) {
+      toastRef.current.error(err.message)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Delete ${selectedIds.size} selected records?`)) return
+    try {
+      const res = await fetch('/api/projects/batch', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      })
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error || 'Failed to delete') }
+      toastRef.current.success(`Deleted ${selectedIds.size} records`)
+      setSelectedIds(new Set())
+      fetchRecords(true)
+    } catch (err: any) {
+      toastRef.current.error(err.message)
     }
   }
 
@@ -285,10 +357,14 @@ export default function ProjectsTable({
     return String(value)
   }
 
+  const subtitle = isAdmin ? 'View and manage all employee project records' : readOnly ? 'View all project records' : 'Track your project assignments'
+
   return (
     <div>
-      <PageHeader title="My Project Records" subtitle="Track your project assignments">
-        <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-lg text-sm transition-all">+ Add Project</button>
+      <PageHeader title={title} subtitle={subtitle}>
+        {!readOnly && (
+          <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-lg text-sm transition-all">+ Add Project</button>
+        )}
       </PageHeader>
 
       <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl overflow-hidden">
@@ -308,7 +384,7 @@ export default function ProjectsTable({
           </select>
         </div>
 
-        {selectedIds.size > 0 && (
+        {selectedIds.size > 0 && !readOnly && (
           <div className="flex items-center gap-3 bg-[#1a1a1a] border-b border-[#2a2a2a] px-4 py-2.5">
             <span className="text-sm text-[#a1a1aa]">{selectedIds.size} selected</span>
             <button onClick={() => {
@@ -316,7 +392,11 @@ export default function ProjectsTable({
                 const rec = records.find(r => r.id === Array.from(selectedIds)[0]) || sorted.find(r => r.id === Array.from(selectedIds)[0])
                 if (rec) { openModal(rec); setSelectedIds(new Set()); return }
               }
+              setBulkForm({}); setError(''); setShowBulkModal(true)
             }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
+            {isAdmin && (
+              <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>
+            )}
             <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
           </div>
         )}
@@ -324,10 +404,28 @@ export default function ProjectsTable({
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a2a]">
-                <th className="text-left px-2 py-3 w-10">
-                  <input type="checkbox" checked={selectedIds.size === sorted.length && sorted.length > 0} onChange={toggleSelectAll}
-                    className="accent-[#22c55e] cursor-pointer" />
-                </th>
+                {!readOnly && (
+                  <th className="text-left px-2 py-3 w-10">
+                    <input type="checkbox" checked={selectedIds.size === sorted.length && sorted.length > 0} onChange={toggleSelectAll}
+                      className="accent-[#22c55e] cursor-pointer" />
+                  </th>
+                )}
+                {showOwnerColumn && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[#71717a] uppercase tracking-wider whitespace-nowrap">
+                    <button onClick={() => toggleSort('employee_name')} className="flex items-center gap-1 hover:text-white transition-colors">
+                      <span>Employee</span>
+                      {sortField === 'employee_name' && (
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          {sortDir === 'asc' ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          )}
+                        </svg>
+                      )}
+                    </button>
+                  </th>
+                )}
                 {FILTER_FIELDS.map(f => {
                   const label = FIELD_LABELS[f]
                   const textKey = TEXT_FILTER_COLUMNS[label]
@@ -397,30 +495,40 @@ export default function ProjectsTable({
                     </th>
                   )
                 })}
-                <th className="px-4 py-3 text-left text-xs font-medium text-[#71717a] uppercase tracking-wider w-16"><span>Actions</span></th>
+                {!readOnly && <th className="px-4 py-3 text-left text-xs font-medium text-[#71717a] uppercase tracking-wider w-16"><span>Actions</span></th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    <td className="px-4 py-4" colSpan={FILTER_FIELDS.length + 2}><div className="skeleton h-4 w-full" /></td>
+                    <td className="px-4 py-4" colSpan={FILTER_FIELDS.length + (showOwnerColumn ? 1 : 0) + (readOnly ? 0 : 2)}><div className="skeleton h-4 w-full" /></td>
                   </tr>
                 ))
               ) : paged.length === 0 ? (
-                <tr><td colSpan={FILTER_FIELDS.length + 2} className="px-4 py-12 text-center text-[#71717a] text-sm">No project records yet.</td></tr>
+                <tr><td colSpan={FILTER_FIELDS.length + (showOwnerColumn ? 1 : 0) + (readOnly ? 0 : 2)} className="px-4 py-12 text-center text-[#71717a] text-sm">No project records yet.</td></tr>
               ) : (
                 paged.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                    <td className="px-2 py-3">
-                      <input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" />
-                    </td>
+                    {!readOnly && (
+                      <td className="px-2 py-3">
+                        <input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" />
+                      </td>
+                    )}
+                    {showOwnerColumn && (
+                      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.employee_name || '—'}</td>
+                    )}
                     {FILTER_FIELDS.map(f => (
                       <td key={f} className="px-4 py-3 text-sm text-[#a1a1aa]">{renderFieldValue(f, rec.data?.[f])}</td>
                     ))}
-                    <td className="px-4 py-3 text-xs text-[#71717a]">
-                      <button onClick={() => openModal(rec)} className="hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-[#2a2a2a]" title="Edit">✎</button>
-                    </td>
+                    {!readOnly && (
+                      <td className="px-4 py-3 text-xs text-[#71717a] flex gap-1">
+                        <button onClick={() => openModal(rec)} className="hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-[#2a2a2a]" title="Edit">✎</button>
+                        {isAdmin && (
+                          <button onClick={() => handleDeleteSingle(rec.id)} className="hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-[#2a2a2a]" title="Delete">✕</button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -480,8 +588,8 @@ export default function ProjectsTable({
 
               <div>
                 <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Created Date</label>
-                <input type="date" value={form.created_date || ''} onChange={e => setForm(p => ({ ...p, created_date: e.target.value }))}
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                <input type="date" value={form.created_date || ''} disabled
+                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-[#71717a] focus:outline-none cursor-not-allowed opacity-70" />
               </div>
 
               <div>
@@ -532,6 +640,62 @@ export default function ProjectsTable({
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white py-2.5 rounded-xl text-sm transition-all">Cancel</button>
                 <button type="submit" disabled={saving} className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold py-2.5 rounded-xl text-sm transition-all disabled:opacity-50">{saving ? 'Saving...' : (editingId ? 'Update' : 'Create')}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-bold text-white mb-2">Bulk Edit ({selectedIds.size} records)</h2>
+            <p className="text-xs text-[#71717a] mb-6">Only filled fields will be updated.</p>
+            <form onSubmit={handleBulkSave} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Company Name</label>
+                <input type="text" value={bulkForm.company_name || ''} onChange={e => setBulkForm(p => ({ ...p, company_name: e.target.value }))} placeholder="Leave blank to keep current"
+                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Status</label>
+                  <select value={bulkForm.project_status || ''} onChange={e => setBulkForm(p => ({ ...p, project_status: e.target.value }))}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                    <option value="">No change</option>
+                    {PROJECT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Type</label>
+                  <select value={bulkForm.project_type || ''} onChange={e => setBulkForm(p => ({ ...p, project_type: e.target.value }))}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                    <option value="">No change</option>
+                    {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Rate</label>
+                <input type="text" value={bulkForm.project_rate || ''} onChange={e => setBulkForm(p => ({ ...p, project_rate: e.target.value }))} placeholder="Leave blank to keep current"
+                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Start Date</label>
+                  <input type="date" value={bulkForm.project_start_date || ''} onChange={e => setBulkForm(p => ({ ...p, project_start_date: e.target.value }))}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project End Date</label>
+                  <input type="date" value={bulkForm.project_end_date || ''} onChange={e => setBulkForm(p => ({ ...p, project_end_date: e.target.value }))}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                </div>
+              </div>
+              {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowBulkModal(false)} className="flex-1 border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white py-2.5 rounded-xl text-sm transition-all">Cancel</button>
+                <button type="submit" disabled={saving} className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold py-2.5 rounded-xl text-sm transition-all disabled:opacity-50">{saving ? 'Saving...' : 'Update All'}</button>
               </div>
             </form>
           </div>

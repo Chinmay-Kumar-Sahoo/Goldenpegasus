@@ -112,6 +112,17 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ records: enriched })
 }
 
+function getAdminClientForAuth(): ReturnType<typeof createAdminClient> | null {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  if (!key) return null
+  return createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, { auth: { autoRefreshToken: false, persistSession: false } })
+}
+
+async function isAdminUser(supabase: any, userId: string): Promise<boolean> {
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single()
+  return profile?.role === 'admin'
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -121,21 +132,23 @@ export async function POST(req: NextRequest) {
   const { id, data: recordData } = body
   const tableId = body.table_id
 
-  // Validate candidate_name is in user's assigned candidates
+  // Validate candidate_name — admin can assign any, employee only their assigned
   const candidateName = (recordData?.candidate_name || '').trim()
   if (!candidateName) return NextResponse.json({ error: 'Candidate Name is required' }, { status: 400 })
-  const lookupClient = getAdminClient() || supabase
-  const uid = user.id
-  const [{ data: asOwner }, { data: asBackup }] = await Promise.all([
-    lookupClient.from('Candidate_records').select('Candidate_name').eq('owner_id', uid),
-    lookupClient.from('Candidate_records').select('Candidate_name').eq('backup_employee_id', uid),
-  ])
-  const validNames = new Set([
-    ...(asOwner || []).map((c: any) => (c.Candidate_name || '').toLowerCase().trim()),
-    ...(asBackup || []).map((c: any) => (c.Candidate_name || '').toLowerCase().trim()),
-  ])
-  if (!validNames.has(candidateName.toLowerCase())) {
-    return NextResponse.json({ error: 'Candidate is not assigned to you' }, { status: 403 })
+  const isAdmin = await isAdminUser(supabase, user.id)
+  if (!isAdmin) {
+    const lookupClient = getAdminClient() || supabase
+    const [{ data: asOwner }, { data: asBackup }] = await Promise.all([
+      lookupClient.from('Candidate_records').select('Candidate_name').eq('owner_id', user.id),
+      lookupClient.from('Candidate_records').select('Candidate_name').eq('backup_employee_id', user.id),
+    ])
+    const validNames = new Set([
+      ...(asOwner || []).map((c: any) => (c.Candidate_name || '').toLowerCase().trim()),
+      ...(asBackup || []).map((c: any) => (c.Candidate_name || '').toLowerCase().trim()),
+    ])
+    if (!validNames.has(candidateName.toLowerCase())) {
+      return NextResponse.json({ error: 'Candidate is not assigned to you' }, { status: 403 })
+    }
   }
 
   let resolvedId = tableId || undefined
@@ -168,7 +181,10 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json()
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
-  const { error } = await supabase.from('dynamic_table_records').delete().eq('id', id).eq('owner_id', user.id)
+  const isAdmin = await isAdminUser(supabase, user.id)
+  let query = supabase.from('dynamic_table_records').delete().eq('id', id)
+  if (!isAdmin) query = query.eq('owner_id', user.id)
+  const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }

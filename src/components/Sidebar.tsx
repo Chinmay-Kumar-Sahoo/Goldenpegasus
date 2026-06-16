@@ -23,6 +23,7 @@ const adminNav: NavItem[] = [
   { label: 'Employees', href: '/admin/employees', icon: '👥' },
   { label: 'All Marketing Records', href: '/admin/marketing', icon: '📈' },
   { label: 'All Marketing Profiles', href: '/admin/clients', icon: '🤝' },
+  { label: 'All Project Records', href: '/admin/projects', icon: '🗂️' },
   { label: 'Dynamic Tables', href: '/admin/tables', icon: '🏗️' },
   { label: 'Audit Log History', href: '/admin/audit', icon: '📋' },
   { label: 'Register Admin', href: '/admin/register', icon: '➕' },
@@ -36,6 +37,7 @@ const employeeNav: NavItem[] = [
   { label: 'My Marketing Records', href: '/dashboard/my-marketing', icon: '📈' },
   { label: 'All Marketing Profiles', href: '/dashboard/all-marketing-profiles', icon: '🤝' },
   { label: 'My Marketing Profile', href: '/dashboard/clients', icon: '👤' },
+  { label: 'All Project Records', href: '/dashboard/all-projects', icon: '🗂️' },
   { label: 'My Project Records', href: '/dashboard/projects', icon: '📋' },
   { label: 'Custom Tables', href: '/dashboard/tables', icon: '🏗️' },
 ]
