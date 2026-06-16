@@ -16,11 +16,11 @@ export async function POST(req: NextRequest) {
 
   const result = { candidates_removed: 0, marketing_removed: 0 }
 
-  // 1. Dedup Candidate_records by (Candidate_name, technology) — keep most recent
+  // 1. Dedup Candidate_records by (Candidate_name, technology) — keep original (oldest)
   const { data: candidateRecords } = await adminClient
     .from('Candidate_records')
     .select('id, Candidate_name, technology, created_at')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
     .limit(5000)
 
   if (candidateRecords) {
@@ -41,11 +41,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 2. Dedup marketing_records by (name, technology) — keep most recent
+  // 2. Dedup marketing_records by (name, technology) — keep original (oldest)
   const { data: marketingRecords } = await adminClient
     .from('marketing_records')
     .select('id, name, technology, created_at')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
     .limit(5000)
 
   if (marketingRecords) {
