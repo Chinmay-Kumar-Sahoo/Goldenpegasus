@@ -57,10 +57,12 @@ const TEXT_FILTER_COLUMNS: Record<string, string> = {
 
 export default function ProjectsTable({
   currentUserId,
+  tableId,
   initialRecords = [],
   candidateOptions = [],
 }: {
   currentUserId?: string | null
+  tableId?: string | null
   initialRecords?: ProjectRecord[]
   candidateOptions?: CandidateOption[]
 }) {
@@ -130,6 +132,7 @@ export default function ProjectsTable({
     try {
       const params = new URLSearchParams()
       if (currentUserId) params.set('owner_id', currentUserId)
+      if (tableId) params.set('table_id', tableId)
       const qs = params.toString()
       const res = await fetch(`/api/projects${qs ? '?' + qs : ''}`)
       if (!res.ok) throw new Error('Failed to load')
@@ -142,7 +145,7 @@ export default function ProjectsTable({
       fetchingRef.current = false
       if (!background) setLoading(false)
     }
-  }, [currentUserId])
+  }, [currentUserId, tableId])
 
   useEffect(() => {
     if (!fetchedRef.current) {
@@ -196,7 +199,7 @@ export default function ProjectsTable({
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editingId, data: form }),
+        body: JSON.stringify({ id: editingId, data: form, table_id: tableId }),
       })
       if (!res.ok) { const j = await res.json(); throw new Error(j.error || 'Failed to save') }
       toastRef.current.success(editingId ? 'Updated' : 'Created')

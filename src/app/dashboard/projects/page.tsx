@@ -67,6 +67,7 @@ export default async function ProjectsPage() {
   return (
     <ProjectsTable
       currentUserId={uid}
+      tableId={tableId}
       initialRecords={records}
       candidateOptions={candidateOptions}
     />

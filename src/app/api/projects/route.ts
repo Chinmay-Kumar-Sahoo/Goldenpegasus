@@ -44,10 +44,10 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const tableId = await ensureProjectTable(supabase)
+  const { searchParams } = new URL(req.url)
+  const tableId = searchParams.get('table_id') || await ensureProjectTable(supabase)
   if (!tableId) return NextResponse.json({ error: 'Server error: cannot find or create project table' }, { status: 500 })
 
-  const { searchParams } = new URL(req.url)
   const ownerFilter = searchParams.get('owner_id')
   const limitParam = Math.min(Number(searchParams.get('limit')) || 2000, 2000)
 
@@ -83,11 +83,10 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const tableId = await ensureProjectTable(supabase)
-  if (!tableId) return NextResponse.json({ error: 'Server error: cannot find or create project table' }, { status: 500 })
-
   const body = await req.json()
   const { id, data: recordData } = body
+  const tableId = body.table_id || await ensureProjectTable(supabase)
+  if (!tableId) return NextResponse.json({ error: 'Server error: cannot find or create project table' }, { status: 500 })
 
   if (id) {
     const { error: updateErr } = await supabase.from('dynamic_table_records').update({ data: recordData, updated_at: new Date().toISOString() }).eq('id', id).eq('owner_id', user.id)
