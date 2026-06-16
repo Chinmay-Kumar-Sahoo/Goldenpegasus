@@ -79,11 +79,6 @@ export default async function ProjectsPage() {
       lookupClient.from('Candidate_records').select('Candidate_name, technology').eq('backup_employee_id', uid),
     ])
     const all = [...(asOwner || []), ...(asBackup || [])]
-    if (all.length === 0) {
-      // Fallback: try without filtering (let RLS decide)
-      const { data: fallback } = await lookupClient.from('Candidate_records').select('Candidate_name, technology').limit(50)
-      if (fallback) all.push(...fallback)
-    }
     const seen = new Set<string>()
     for (const c of all) {
       const key = ((c.Candidate_name || '') + '|' + (c.technology || '')).toLowerCase().trim()
