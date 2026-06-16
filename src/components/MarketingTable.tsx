@@ -316,7 +316,7 @@ export default function MarketingPage({
   useEffect(() => {
     if (!fetchedRef.current) {
       fetchedRef.current = true
-      fetchRecords(serverRecords.length > 0)
+      if (serverRecords.length === 0) fetchRecords()
     }
     return () => { abortRef.current?.abort() }
   }, [fetchRecords])

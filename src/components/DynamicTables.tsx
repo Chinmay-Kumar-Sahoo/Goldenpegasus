@@ -160,9 +160,15 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
 
   const openRecordModal = (rec?: TableRecord) => {
     if (!activeTable) return
+    const sanitizeVal = (val: string, type: string) => {
+      if (type === 'text') return val.replace(/[^a-zA-Z\s]/g, '')
+      if (type === 'number') return val.replace(/[^0-9.]/g, '')
+      if (type === 'email') return val.replace(/\s/g, '')
+      return val
+    }
     if (rec) {
       setEditingRecord(rec)
-      setRecordForm(Object.fromEntries(activeTable.schema_definition.map(f => [f.name, String(rec.data[f.name] || '')])))
+      setRecordForm(Object.fromEntries(activeTable.schema_definition.map(f => [f.name, sanitizeVal(String(rec.data[f.name] || ''), f.type)])))
     } else {
       setEditingRecord(null)
       setRecordForm(Object.fromEntries(activeTable.schema_definition.map(f => [f.name, ''])))
@@ -422,9 +428,16 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                                 className="w-4 h-4 accent-[#22c55e] cursor-pointer" />
                             </td>
                           )}
-                          {activeTable.schema_definition.map(f => (
-                            <td key={f.name} className="px-4 py-3 text-sm text-[#a1a1aa]">{String(rec.data[f.name] || '—')}</td>
-                          ))}
+                          {activeTable.schema_definition.map(f => {
+                            const displayVal = (() => {
+                              const v = String(rec.data[f.name] || '')
+                              if (!v) return '—'
+                              if (f.type === 'text') return v.replace(/[^a-zA-Z\s]/g, '')
+                              if (f.type === 'email') return v.replace(/\s/g, '')
+                              return v
+                            })()
+                            return <td key={f.name} className="px-4 py-3 text-sm text-[#a1a1aa]">{displayVal}</td>
+                          })}
                           <td className="px-4 py-3 text-xs text-[#71717a]">{formatDate(rec.created_at)}</td>
                           {canEditData(activeTable) && (
                             <td className="px-4 py-3 text-right">

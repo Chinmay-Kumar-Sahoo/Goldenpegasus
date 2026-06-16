@@ -21,14 +21,27 @@ export default async function DashboardPage() {
     : null
   const lookupClient = supabaseAdmin || supabase
 
-  const [{ count: mktCount }, { count: clientCount }, { count: tableCount }, { data: _profileData }] = await Promise.all([
+  const [{ count: mktCount }, { count: tableCount }, { data: _profileData }, { data: projectTable }] = await Promise.all([
     supabase.from('marketing_records').select('*', { count: 'exact', head: true }).eq('owner_id', uid),
-    supabase.from('Candidate_records').select('*', { count: 'exact', head: true }).eq('owner_id', uid),
     supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }).eq('owner_id', uid),
     supabase.from('profiles').select('full_name, email').eq('id', uid).single(),
+    lookupClient.from('dynamic_tables').select('id').eq('table_name', 'My Project Records').maybeSingle(),
   ])
+  let projectCount = 0
+  if (projectTable?.id) {
+    const { count } = await lookupClient.from('dynamic_table_records').select('*', { count: 'exact', head: true }).eq('table_id', projectTable.id).eq('owner_id', uid)
+    projectCount = count ?? 0
+  }
 
-  // Count backup records: records where employee is assigned as backup for a specific candidate+technology
+  // Count Candidate_records where user is owner OR backup (matches My Marketing Profile)
+  const { data: clientCandidates, count: clientCount } = await lookupClient
+    .from('Candidate_records')
+    .select('*', { count: 'exact', head: false })
+    .or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+  const clientDedup = new Set((clientCandidates || []).map((c: any) => ((c.Candidate_name || '') + '|' + (c.technology || '')).toLowerCase().trim()).filter(Boolean))
+  const clientDedupCount = clientDedup.size
+
+  // Count backup marketing records: records where employee is assigned as backup for a specific candidate+technology
   const normalizeKey = (s: string) => s.toLowerCase().trim()
   const backupIds = new Set<string>()
 
@@ -80,7 +93,8 @@ export default async function DashboardPage() {
 
   const stats = [
     { label: 'My Marketing Records', value: totalMktCount, icon: '📈', href: '/dashboard/my-marketing' },
-    { label: 'My Client Records', value: clientCount ?? 0, icon: '🤝', href: '/dashboard/clients' },
+    { label: 'My Client Records', value: clientDedupCount, icon: '🤝', href: '/dashboard/clients' },
+    { label: 'My Project Records', value: projectCount, icon: '📋', href: '/dashboard/projects' },
     { label: 'My Custom Tables', value: tableCount ?? 0, icon: '🏗️', href: '/dashboard/tables' },
   ]
 
@@ -91,7 +105,7 @@ export default async function DashboardPage() {
         subtitle="Your personal data dashboard"
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {stats.map((stat) => (
           <Link key={stat.label} href={stat.href}
             className="bg-[#111111] border border-[#2a2a2a] rounded-2xl p-5 hover:border-[#22c55e]/30 hover:bg-[#1a1a1a] transition-all duration-200">
@@ -111,6 +125,7 @@ export default async function DashboardPage() {
             { label: 'View All Marketing Data', href: '/dashboard/marketing', icon: '📊' },
             { label: 'Add Marketing Record', href: '/dashboard/my-marketing?action=new', icon: '➕' },
             { label: 'Add Client Record', href: '/dashboard/clients?action=new', icon: '🤝' },
+            { label: 'Add Project Record', href: '/dashboard/projects?action=new', icon: '📋' },
             { label: 'Create Custom Table', href: '/dashboard/tables?action=new', icon: '🏗️' },
           ].map(action => (
             <Link key={action.label} href={action.href}

@@ -1,5 +1,14 @@
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+
+let _adminClient: ReturnType<typeof createAdminClient> | null = null
+function getAdminClient() {
+  if (_adminClient) return _adminClient
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+  if (key) _adminClient = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, { auth: { autoRefreshToken: false, persistSession: false } })
+  return _adminClient
+}
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -50,12 +59,45 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const body = await req.json()
+  const action = body.action || 'table'
+
+  if (action === 'cleanup') {
+    const adminClient = getAdminClient()
+    if (!adminClient) return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+    const { data: tables } = await (adminClient.from('dynamic_tables') as any).select('id, schema_definition')
+    if (!tables) return NextResponse.json({ success: true, cleaned: 0 })
+    let totalCleaned = 0
+    for (const table of tables) {
+      const schema = (table.schema_definition || []) as any[]
+      const { data: records } = await (adminClient.from('dynamic_table_records') as any).select('id, data').eq('table_id', table.id)
+      if (!records) continue
+      for (const rec of records) {
+        let changed = false
+        const newData = { ...rec.data as Record<string, any> }
+        for (const field of schema) {
+          const val = newData[field.name]
+          if (!val || typeof val !== 'string') continue
+          if (field.type === 'text') {
+            const cleaned = val.replace(/[^a-zA-Z\s]/g, '')
+            if (cleaned !== val) { newData[field.name] = cleaned; changed = true }
+          } else if (field.type === 'email') {
+            const cleaned = val.replace(/\s/g, '')
+            if (cleaned !== val) { newData[field.name] = cleaned; changed = true }
+          }
+        }
+        if (changed) {
+          await (adminClient.from('dynamic_table_records') as any).update({ data: newData, updated_at: new Date().toISOString() }).eq('id', rec.id)
+          totalCleaned++
+        }
+      }
+    }
+    return NextResponse.json({ success: true, cleaned: totalCleaned })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const body = await req.json()
-  const action = body.action || 'table'
 
   if (action === 'update_table') {
     const { data: existing } = await supabase

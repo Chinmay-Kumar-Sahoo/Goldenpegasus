@@ -471,7 +471,7 @@ export async function POST(req: NextRequest) {
         .ilike('Candidate_name', existingRecord.name) as any
       const existingCandidate = (existingCandidates || []).find((c: any) => (c.technology || '').toLowerCase().trim() === candTech) || null
       const candPayload: any = { updated_at: new Date().toISOString() }
-      if (updatePayload.status !== undefined) candPayload.status = updatePayload.status
+      // Do NOT sync marketing status (Telephone Call etc.) to Candidate_records
       if (updatePayload.notes !== undefined) candPayload.notes = updatePayload.notes
       if (updatePayload.technology !== undefined) candPayload.technology = updatePayload.technology
       if (effectiveOwnerId) candPayload.owner_id = effectiveOwnerId
@@ -554,7 +554,7 @@ export async function POST(req: NextRequest) {
       const candPayload: any = {
         Candidate_name: insertData.name,
         technology: insertData.technology || null,
-        status: insertData.status || null,
+        status: 'Active',
         notes: insertData.notes || null,
         updated_at: new Date().toISOString(),
       }

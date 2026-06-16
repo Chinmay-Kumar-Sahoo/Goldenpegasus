@@ -154,7 +154,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   useEffect(() => {
     if (!fetchedRef.current) {
       fetchedRef.current = true
-      fetchRecords(initialRecords.length > 0)
+      if (initialRecords.length === 0) fetchRecords()
     }
   }, [fetchRecords])
 

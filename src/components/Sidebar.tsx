@@ -36,6 +36,7 @@ const employeeNav: NavItem[] = [
   { label: 'My Marketing Records', href: '/dashboard/my-marketing', icon: '📈' },
   { label: 'All Marketing Profiles', href: '/dashboard/all-marketing-profiles', icon: '🤝' },
   { label: 'My Marketing Profile', href: '/dashboard/clients', icon: '👤' },
+  { label: 'My Project Records', href: '/dashboard/projects', icon: '📋' },
   { label: 'Custom Tables', href: '/dashboard/tables', icon: '🏗️' },
 ]
 

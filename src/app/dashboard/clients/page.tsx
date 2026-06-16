@@ -62,6 +62,7 @@ export default async function EmployeeClientsPage() {
   }
 
   // Backfill: auto-create missing Candidate_records from marketing_records
+  const normalizeKey = (s: string) => s.toLowerCase().trim()
   if (supabaseAdmin && uid) {
     const existingNames = new Set(rawRecords.map(r => (r as any).Candidate_name?.toLowerCase().trim()).filter(Boolean))
     const { data: mktRecords } = await supabaseAdmin
@@ -75,7 +76,7 @@ export default async function EmployeeClientsPage() {
       const payloads: any[] = []
       const now = new Date().toISOString()
       for (const r of mktRecords as any[]) {
-        const n = (r.name || '').toLowerCase().trim()
+        const n = normalizeKey(r.name || '')
         if (!n || existingNames.has(n) || seen.has(n)) continue
         seen.add(n)
         const backupName = r.backup_employee_name || null
@@ -89,7 +90,11 @@ export default async function EmployeeClientsPage() {
 
     // Also backfill from marketing_records where user is the backup employee
     if (currentUserFullName) {
-      const existingKeys = new Set(rawRecords.map(r => ((r as any).Candidate_name || '') + '|' + ((r as any).technology || '')).map((k: string) => k.toLowerCase().trim()).filter(Boolean))
+      const existingByKey = new Map<string, any>()
+      for (const r of rawRecords) {
+        const key = normalizeKey((r as any).Candidate_name || '') + '|' + normalizeKey((r as any).technology || '')
+        if (key) existingByKey.set(key, r)
+      }
       const { data: backupMktRecords } = await supabaseAdmin
         .from('marketing_records')
         .select('name, technology, owner_id, backup_employee_name')
@@ -99,16 +104,36 @@ export default async function EmployeeClientsPage() {
         .limit(200)
       if (backupMktRecords) {
         const seen = new Set<string>()
-        const payloads: any[] = []
+        const inserts: any[] = []
+        const updates: { id: string; data: any }[] = []
         const now = new Date().toISOString()
         for (const r of backupMktRecords as any[]) {
-          const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
-          if (!key || existingKeys.has(key) || seen.has(key)) continue
+          const key = normalizeKey((r.name || '') + '|' + normalizeKey(r.technology || ''))
+          if (!key || seen.has(key)) continue
           seen.add(key)
-          payloads.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || uid, status: 'Active', backup_employee_id: uid, backup_employee_name: currentUserFullName, updated_at: now })
+          const existing = existingByKey.get(key)
+          if (existing) {
+            if (!existing.backup_employee_id || existing.backup_employee_id !== uid) {
+              updates.push({ id: existing.id, data: { backup_employee_id: uid, backup_employee_name: currentUserFullName, updated_at: now } })
+            }
+          } else {
+            inserts.push({ Candidate_name: r.name, technology: r.technology || null, owner_id: r.owner_id || uid, status: 'Active', backup_employee_id: uid, backup_employee_name: currentUserFullName, updated_at: now })
+          }
         }
-        if (payloads.length > 0) {
-          const { data: created } = await supabaseAdmin.from('Candidate_records').insert(payloads).select()
+        if (updates.length > 0) {
+          for (const u of updates) {
+            await supabaseAdmin.from('Candidate_records').update(u.data).eq('id', u.id)
+            const found = rawRecords.find(r => r.id === u.id)
+            if (found) {
+              Object.assign(found, u.data)
+            } else {
+              const { data: fetched } = await supabaseAdmin.from('Candidate_records').select('*').eq('id', u.id).single()
+              if (fetched) rawRecords.push(fetched as any)
+            }
+          }
+        }
+        if (inserts.length > 0) {
+          const { data: created } = await supabaseAdmin.from('Candidate_records').insert(inserts).select()
           if (created) rawRecords.push(...(created as any[]))
         }
       }
