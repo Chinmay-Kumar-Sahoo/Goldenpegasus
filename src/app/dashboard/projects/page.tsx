@@ -71,9 +71,11 @@ export default async function ProjectsPage() {
   }
 
   // Fetch candidate options for this user (from Candidate_records where owner or backup)
+  const lookupClient = supabaseAdmin || supabase
   let candidateOptions: Array<{ name: string; technology: string | null }> = []
   if (uid) {
-    const { data: candidates } = await supabase.from('Candidate_records').select('Candidate_name, technology').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+    const { data: candidates, error: candidatesErr } = await lookupClient.from('Candidate_records').select('Candidate_name, technology').or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+    if (candidatesErr) console.error('Failed to fetch candidates:', candidatesErr.message)
     if (candidates) {
       const seen = new Set<string>()
       for (const c of candidates) {
