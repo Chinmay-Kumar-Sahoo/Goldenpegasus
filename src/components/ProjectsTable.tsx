@@ -36,6 +36,17 @@ const PROJECT_TYPES = ['Full-time', 'Part-time', 'Contract', 'C2H', 'C2C']
 
 const PAGE_SIZES = [25, 50, 100] as const
 
+function wordScore(val: string | null | undefined, q: string): number {
+  const v = (val ?? '').toLowerCase()
+  if (!v || !q) return 0
+  const words = v.split(/[\s\-_./@]+/)
+  if (words.some(w => w === q)) return 3
+  if (words.some(w => w.startsWith(q))) return 2
+  if (words.some(w => w.includes(q))) return 1
+  if (v.includes(q)) return 1
+  return 0
+}
+
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'candidate_name',
   'Technology': 'technology',
@@ -69,6 +80,7 @@ export default function ProjectsTable({
   const [activeTextFilter, setActiveTextFilter] = useState<string | null>(null)
   const [textFilters, setTextFilters] = useState<Record<string, string[]>>({})
   const [textFilterSearch, setTextFilterSearch] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const fetchedRef = useRef(false)
   const fetchingRef = useRef(false)
@@ -174,6 +186,10 @@ export default function ProjectsTable({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.candidate_name?.trim()) { setError('Candidate Name is required'); return }
+    if (!editingId) {
+      const dup = records.some(r => String(r.data?.candidate_name ?? '').toLowerCase().trim() === form.candidate_name.toLowerCase().trim())
+      if (dup) { setError('A project record for this candidate already exists'); return }
+    }
     setSaving(true)
     setError('')
     try {
@@ -193,41 +209,45 @@ export default function ProjectsTable({
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this project record?')) return
-    try {
-      const res = await fetch('/api/projects', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
-      if (!res.ok) throw new Error('Failed to delete')
-      toastRef.current.success('Deleted')
-      fetchRecords(true)
-    } catch {
-      toastRef.current.error('Failed to delete')
-    }
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => prev.size === sorted.length ? new Set() : new Set(sorted.map(r => r.id)))
   }
 
   const hasTextFilter = Object.values(textFilters).some(v => v.length > 0)
 
+  const query = search.trim().toLowerCase()
+
   const filtered = useMemo(() => {
-    let result = [...records]
-    const q = search.toLowerCase().trim()
-    if (q) {
-      result = result.filter(r => {
-        const d = r.data || {}
-        return Object.values(d).some(v => String(v || '').toLowerCase().includes(q))
-      })
-    }
-    for (const [field, selected] of Object.entries(textFilters)) {
-      if (selected.length === 0) continue
-      result = result.filter(r => {
+    const hasSearch = !!query
+    if (!hasSearch && !hasTextFilter) return records
+    return records.filter(r => {
+      for (const [field, selected] of Object.entries(textFilters)) {
+        if (selected.length === 0) continue
         const val = String(r.data?.[field] ?? '').trim().toLowerCase()
-        return selected.some(s => s.toLowerCase() === val)
+        if (!selected.some(s => s.toLowerCase() === val)) return false
+      }
+      if (!hasSearch) return true
+      const d = r.data || {}
+      return Object.keys(d).some(k => wordScore(String(d[k] ?? ''), query) > 0)
+    })
+  }, [records, query, textFilters, hasTextFilter])
+
+  const sorted = useMemo(() => {
+    let result: ProjectRecord[]
+    if (query) {
+      const scored = filtered.map(r => {
+        const d = r.data || {}
+        const score = Math.max(...Object.keys(d).map(k => wordScore(String(d[k] ?? ''), query)))
+        return { rec: r, score }
       })
+      scored.sort((a, b) => b.score - a.score)
+      result = scored.map(x => x.rec)
+    } else {
+      result = [...filtered]
     }
-    const sf = sortField === 'created_at' ? 'created_at' : `data.${sortField}`
     result.sort((a, b) => {
       let av: string, bv: string
       if (sortField === 'created_at') { av = a.created_at; bv = b.created_at }
@@ -236,19 +256,21 @@ export default function ProjectsTable({
       return sortDir === 'asc' ? cmp : -cmp
     })
     return result
-  }, [records, search, textFilters, sortField, sortDir])
+  }, [filtered, query, sortField, sortDir])
 
-  const totalPages = Math.ceil(filtered.length / pageSize)
-  const paged = filtered.slice(page * pageSize, (page + 1) * pageSize)
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
+  const paged = useMemo(() => {
+    const start = page * pageSize
+    return sorted.slice(start, start + pageSize)
+  }, [sorted, page, pageSize])
+
+  useEffect(() => {
+    if (page >= totalPages && totalPages > 0) setPage(0)
+  }, [page, totalPages])
 
   const toggleSort = (field: string) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('asc') }
-  }
-
-  const SortIcon = ({ field }: { field: string }) => {
-    if (sortField !== field) return <span className="text-[#3a3a3a] ml-1">↕</span>
-    return <span className="text-[#22c55e] ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
   const renderFieldValue = (field: string, value: any) => {
@@ -282,14 +304,25 @@ export default function ProjectsTable({
           </select>
         </div>
 
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 bg-[#1a1a1a] border-b border-[#2a2a2a] px-4 py-2.5">
+            <span className="text-sm text-[#a1a1aa]">{selectedIds.size} selected</span>
+            <button onClick={() => {
+              if (selectedIds.size === 1) {
+                const rec = records.find(r => r.id === Array.from(selectedIds)[0]) || sorted.find(r => r.id === Array.from(selectedIds)[0])
+                if (rec) { openModal(rec); setSelectedIds(new Set()); return }
+              }
+            }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a2a]">
-                <th className="px-4 py-3 text-left text-xs font-medium text-[#71717a] uppercase tracking-wider">
-                  <div className="flex items-center gap-1">
-                    <span>Actions</span>
-                  </div>
+                <th className="text-left px-2 py-3 w-10">
+                  <input type="checkbox" checked={selectedIds.size === sorted.length && sorted.length > 0} onChange={toggleSelectAll}
+                    className="accent-[#22c55e] cursor-pointer" />
                 </th>
                 {FILTER_FIELDS.map(f => {
                   const label = FIELD_LABELS[f]
@@ -360,29 +393,30 @@ export default function ProjectsTable({
                     </th>
                   )
                 })}
+                <th className="px-4 py-3 text-left text-xs font-medium text-[#71717a] uppercase tracking-wider w-16"><span>Actions</span></th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    <td className="px-4 py-4" colSpan={FILTER_FIELDS.length + 1}><div className="skeleton h-4 w-full" /></td>
+                    <td className="px-4 py-4" colSpan={FILTER_FIELDS.length + 2}><div className="skeleton h-4 w-full" /></td>
                   </tr>
                 ))
               ) : paged.length === 0 ? (
-                <tr><td colSpan={FILTER_FIELDS.length + 1} className="px-4 py-12 text-center text-[#71717a] text-sm">No project records yet.</td></tr>
+                <tr><td colSpan={FILTER_FIELDS.length + 2} className="px-4 py-12 text-center text-[#71717a] text-sm">No project records yet.</td></tr>
               ) : (
                 paged.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                    <td className="px-4 py-3 text-xs text-[#71717a]">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => openModal(rec)} className="hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-[#2a2a2a]">✎</button>
-                        <button onClick={() => handleDelete(rec.id)} className="hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-[#2a2a2a]">✕</button>
-                      </div>
+                    <td className="px-2 py-3">
+                      <input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" />
                     </td>
                     {FILTER_FIELDS.map(f => (
                       <td key={f} className="px-4 py-3 text-sm text-[#a1a1aa]">{renderFieldValue(f, rec.data?.[f])}</td>
                     ))}
+                    <td className="px-4 py-3 text-xs text-[#71717a]">
+                      <button onClick={() => openModal(rec)} className="hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-[#2a2a2a]" title="Edit">✎</button>
+                    </td>
                   </tr>
                 ))
               )}
