@@ -511,13 +511,20 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
               {activeTable.schema_definition.map(field => (
                 <div key={field.name}>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}{field.required && ' *'}</label>
-                  {field.type === 'textarea' ? (
-                    <textarea value={recordForm[field.name] || ''} onChange={e => setRecordForm({ ...recordForm, [field.name]: e.target.value })} required={field.required} rows={3}
-                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-none" />
-                  ) : (
-                    <input type={field.type} value={recordForm[field.name] || ''} onChange={e => setRecordForm({ ...recordForm, [field.name]: e.target.value })} required={field.required}
+                  {(() => {
+                    const sanitize = (val: string) => {
+                      if (field.type === 'text') return val.replace(/[^a-zA-Z\s]/g, '')
+                      if (field.type === 'number') return val.replace(/[^0-9.]/g, '')
+                      if (field.type === 'email') return val.replace(/\s/g, '')
+                      return val
+                    }
+                    if (field.type === 'textarea') {
+                      return <textarea value={recordForm[field.name] || ''} onChange={e => setRecordForm({ ...recordForm, [field.name]: e.target.value })} required={field.required} rows={3}
+                        className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-none" />
+                    }
+                    return <input type={field.type === 'number' ? 'text' : field.type} value={recordForm[field.name] || ''} onChange={e => setRecordForm({ ...recordForm, [field.name]: sanitize(e.target.value) })} required={field.required}
                       className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
-                  )}
+                  })()}
                 </div>
               ))}
               {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
@@ -542,7 +549,7 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
               {activeTable.schema_definition.map(f => (
                 <div key={f.name}>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{f.label}</label>
-                   <input type={f.type === 'number' ? 'text' : f.type} value={bulkRecordForm[f.name] || ''} onChange={e => setBulkRecordForm({ ...bulkRecordForm, [f.name]: e.target.value })}
+                   <input type={f.type === 'number' ? 'text' : f.type} value={bulkRecordForm[f.name] || ''} onChange={e => { const sanitize = (val: string) => { if (f.type === 'text') return val.replace(/[^a-zA-Z\s]/g, ''); if (f.type === 'number') return val.replace(/[^0-9.]/g, ''); if (f.type === 'email') return val.replace(/\s/g, ''); return val }; setBulkRecordForm({ ...bulkRecordForm, [f.name]: sanitize(e.target.value) }) }}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 </div>
               ))}
