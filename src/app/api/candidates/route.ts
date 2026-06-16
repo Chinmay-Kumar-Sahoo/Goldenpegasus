@@ -51,6 +51,20 @@ export async function GET(req: NextRequest) {
     records = data || []
   }
 
+  // Deduplicate by (Candidate_name, technology) — keep most recent record per unique combination
+  {
+    const dedupMap = new Map<string, any>()
+    for (const r of records) {
+      const key = ((r.Candidate_name || '') + '|' + (r.technology || '')).toLowerCase().trim()
+      if (!key) { dedupMap.set(r.id, r); continue }
+      const existing = dedupMap.get(key)
+      if (!existing || (r.created_at || '') > (existing.created_at || '')) {
+        dedupMap.set(key, r)
+      }
+    }
+    records = Array.from(dedupMap.values())
+  }
+
   // Resolve current user's full name for backup employee matching
   let currentUserFullName: string | null = null
   if (ownerFilter) {
