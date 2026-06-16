@@ -106,20 +106,6 @@ export async function GET(req: NextRequest) {
     data = allRecords || []
   }
 
-  // Deduplicate by (name, technology) — keep original (oldest) record per unique combination
-  {
-    const dedupMap = new Map<string, any>()
-    for (const r of data) {
-      const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
-      if (!key) { dedupMap.set(r.id, r); continue }
-      const existing = dedupMap.get(key)
-      if (!existing || (r.created_at || '') < (existing.created_at || '')) {
-        dedupMap.set(key, r)
-      }
-    }
-    data = Array.from(dedupMap.values())
-  }
-
   if (data.length === 0) {
     return NextResponse.json({ records: [], timing: Date.now() - startTime })
   }
