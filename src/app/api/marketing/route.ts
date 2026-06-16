@@ -550,7 +550,7 @@ export async function POST(req: NextRequest) {
       .ilike('name', insertData.name)
     const isDuplicate = existing?.some(r => (r.technology || '').toLowerCase().trim() === techValue)
     if (isDuplicate) {
-      return NextResponse.json({ success: true, skipped: true })
+      return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
     }
   }
 

@@ -343,7 +343,7 @@ export async function POST(req: NextRequest) {
       .ilike('Candidate_name', insertData.Candidate_name)
     const isDuplicate = existingCands?.some((r: any) => (r.technology || '').toLowerCase().trim() === techValue)
     if (isDuplicate) {
-      return NextResponse.json({ success: true, skipped: true })
+      return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
     }
   }
 

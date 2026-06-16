@@ -448,18 +448,14 @@ export default function MarketingPage({
       })
       const json = await res.json()
       if (!res.ok) { throw new Error(json.error || 'Failed to save record') }
-      if (json.skipped) {
-        toast.success('Record already exists — duplicate skipped')
-      } else {
-        toast.success(editing ? 'Record updated successfully' : 'Record added successfully')
-      }
+      toast.success(editing ? 'Record updated successfully' : 'Record added successfully')
       setSaving(false)
       setShowModal(false)
       fetchRecords()
     } catch (err: any) {
       setError(err.message)
       setSaving(false)
-      toast.error('Failed to save record')
+      toast.error(err.message || 'Failed to save record')
     }
   }
 

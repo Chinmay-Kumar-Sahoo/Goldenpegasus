@@ -243,7 +243,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     } catch (err: any) {
       setError(err.message)
       setSaving(false)
-      toast.error('Failed to save candidate')
+      toast.error(err.message || 'Failed to save candidate')
     }
   }
 
