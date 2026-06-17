@@ -15,12 +15,15 @@ export default async function AllMarketingProfilesPage() {
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : supabase
 
-  const [recordsResult, employeeProfiles, allProfiles, employeesFromTable] = await Promise.all([
+  const [recordsResult, employeeProfiles, allProfiles, employeesFromTable, adminProfiles] = await Promise.all([
     lookupClient.from('Candidate_records').select('*').order('created_at', { ascending: false }).limit(2000),
     lookupClient.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
     lookupClient.from('profiles').select('id, full_name, email'),
     lookupClient.from('employees').select('user_id, full_name, email'),
+    lookupClient.from('profiles').select('id').eq('role', 'admin'),
   ])
+
+  const adminIds = new Set((adminProfiles?.data || []).map((p: any) => p.id))
 
   const rawRecords = recordsResult.data
 
@@ -46,7 +49,7 @@ export default async function AllMarketingProfilesPage() {
   })
   const profileIds = new Set((employeeProfiles.data || []).map((p: any) => p.id))
   for (const e of ((employeesFromTable?.data || []) as any[])) {
-    if (e.user_id && !profileIds.has(e.user_id)) {
+    if (e.user_id && !profileIds.has(e.user_id) && !adminIds.has(e.user_id)) {
       employeeOptions.push({ id: e.user_id, full_name: e.full_name || e.email || 'Unknown' })
     }
   }

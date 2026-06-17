@@ -17,11 +17,14 @@ export default async function MyMarketingPage() {
   const lookupClient = supabaseAdmin || supabase
 
   // Fetch employee options for the component
-  const [empProfilesResult, allProfilesResult, empFromTableResult] = await Promise.all([
+  const [empProfilesResult, allProfilesResult, empFromTableResult, adminProfiles] = await Promise.all([
     supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
     supabase.from('profiles').select('id, full_name, email'),
     supabase.from('employees').select('user_id, full_name, email'),
+    supabase.from('profiles').select('id').eq('role', 'admin'),
   ])
+
+  const adminIds = new Set((adminProfiles?.data || []).map((p: any) => p.id))
 
   const empMap = new Map(((empFromTableResult?.data || []) as any[]).map((e: any) => [e.user_id, e]))
   const profileIds = new Set((empProfilesResult.data || []).map((p: any) => p.id))
@@ -30,7 +33,7 @@ export default async function MyMarketingPage() {
     return { id: p.id, full_name: emp?.full_name || p.full_name || p.email || 'Unknown' }
   })
   for (const e of ((empFromTableResult?.data || []) as any[])) {
-    if (e.user_id && !profileIds.has(e.user_id)) {
+    if (e.user_id && !profileIds.has(e.user_id) && !adminIds.has(e.user_id)) {
       employeeOptions.push({ id: e.user_id, full_name: e.full_name || e.email || 'Unknown' })
     }
   }

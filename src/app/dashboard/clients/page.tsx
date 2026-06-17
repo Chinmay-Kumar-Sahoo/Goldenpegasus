@@ -18,13 +18,16 @@ export default async function EmployeeClientsPage() {
     ? supabaseAdmin.from('Candidate_records').select('*').eq('backup_employee_id', uid).order('created_at', { ascending: false })
     : supabase.from('Candidate_records').select('*').eq('backup_employee_id', uid).order('created_at', { ascending: false })
 
-  const [ownedResult, backupResult, employeeProfiles, allProfilesResult, employeesFromTable] = await Promise.all([
+  const [ownedResult, backupResult, employeeProfiles, allProfilesResult, employeesFromTable, adminProfiles] = await Promise.all([
     ownedQuery,
     backupQuery,
     supabase.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
     supabase.from('profiles').select('id, full_name, email'),
     supabase.from('employees').select('user_id, full_name, email'),
+    supabase.from('profiles').select('id').eq('role', 'admin'),
   ])
+
+  const adminIds = new Set((adminProfiles?.data || []).map((p: any) => p.id))
 
   const recordMap = new Map<string, any>()
   for (const r of (ownedResult.data || [])) recordMap.set(r.id, r)
@@ -148,7 +151,7 @@ export default async function EmployeeClientsPage() {
   })
   const profileIds = new Set((employeeProfiles.data || []).map((p: any) => p.id))
   for (const e of ((employeesFromTable?.data || []) as any[])) {
-    if (e.user_id && !profileIds.has(e.user_id)) {
+    if (e.user_id && !profileIds.has(e.user_id) && !adminIds.has(e.user_id)) {
       employeeOptions.push({ id: e.user_id, full_name: e.full_name || e.email || 'Unknown' })
     }
   }
