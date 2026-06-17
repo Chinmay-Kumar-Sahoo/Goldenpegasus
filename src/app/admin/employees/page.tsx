@@ -422,7 +422,7 @@ export default function AdminEmployeesPage() {
                 { label: 'Full Name', name: 'full_name', type: 'text', placeholder: 'John Doe' },
                 { label: 'Email', name: 'email', type: 'email', placeholder: 'john@example.com' },
               ].map(field => {
-                const isEmailReadonly = field.name === 'email' && editing && !canEditEmail(editing)
+                const isEmailReadonly = !!(field.name === 'email' && editing && !canEditEmail(editing))
                 return (
                   <div key={field.name}>
                     <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
