@@ -59,16 +59,17 @@ function wordScore(val: string | null | undefined, q: string): number {
 }
 
 const TableRow = memo(function TableRow({
-  rec, readOnly, selectedIds, toggleSelect
+  rec, readOnly, selectedIds, toggleSelect, onEdit
 }: {
   rec: CandidateRecord
   readOnly: boolean
   selectedIds: Set<string>
   toggleSelect: (id: string) => void
+  onEdit?: () => void
 }) {
   return (
-    <tr className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-      {!readOnly && <td className="px-2 py-3"><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>}
+    <tr className={`border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors ${!readOnly ? 'cursor-pointer' : ''}`} onClick={() => onEdit?.()}>
+      {!readOnly && <td className="px-2 py-3" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>}
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.Candidate_name}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.technology || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
@@ -605,7 +606,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                 <tr><td colSpan={readOnly ? 8 : 9} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 paginated.map(rec => (
-                  <TableRow key={rec.id} rec={rec} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} />
+                  <TableRow key={rec.id} rec={rec} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} onEdit={readOnly ? undefined : () => openModal(rec)} />
                 ))
               )}
             </tbody>
