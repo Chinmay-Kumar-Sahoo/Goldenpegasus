@@ -428,8 +428,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Admin can edit employee_name on existing records
-    if (isAdminUser && employeeName) {
+    // Admin can edit employee_name on existing records — only when explicitly selecting an employee
+    if (isAdminUser && selectedEmployeeId && employeeName) {
       updatePayload.employee_name = employeeName
       if (effectiveOwnerId) {
         updatePayload.owner_id = effectiveOwnerId
