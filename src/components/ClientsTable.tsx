@@ -73,6 +73,7 @@ const TableRow = memo(function TableRow({
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.technology || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{`${(rec as any).country_code || ''}${rec.client_phone || ''}` || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.address || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.employee_name || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.backup_employee_name || '—'}</td>
       <td className="px-4 py-3">
@@ -310,8 +311,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Primary Employee', 'Backup Employee', 'Notes']
-    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email, r.client_phone, r.employee_name, r.backup_employee_name, r.notes])
+    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Notes']
+    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email, r.client_phone, r.address || '', r.employee_name, r.backup_employee_name, r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -324,8 +325,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Primary Employee', 'Backup Employee', 'Notes']
-    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email || '', r.client_phone || '', r.employee_name || '', r.backup_employee_name || '', r.notes || ''])
+    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Notes']
+    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email || '', r.client_phone || '', r.address || '', r.employee_name || '', r.backup_employee_name || '', r.notes || ''])
 
     autoTable(doc, {
       head: [headers],
@@ -508,7 +509,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Primary Employee', 'Backup Employee', 'Status'].map(h => {
+                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Status'].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -595,13 +596,13 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: readOnly ? 7 : 8 }).map((_, j) => (
+                    {Array.from({ length: readOnly ? 8 : 9 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={readOnly ? 7 : 8} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                <tr><td colSpan={readOnly ? 8 : 9} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 paginated.map(rec => (
                   <TableRow key={rec.id} rec={rec} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} />
@@ -700,14 +701,13 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
               {[
                 { label: 'Candidate Name *', name: 'Candidate_name', type: 'text', required: true },
                 { label: 'Technology', name: 'technology', type: 'text' },
-                { label: 'Address', name: 'address', type: 'text' },
               ].map(field => (
                 <div key={field.name}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
                   <input type={field.type} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} required={field.required}
                     disabled={!!editing && !isAdmin}
                     className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`} />
-                  {field.name === 'Candidate_name' && !!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can edit candidate details</p>}
+                  {field.name === 'Candidate_name' && !!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can edit candidate name</p>}
                 </div>
               ))}
               <div>
@@ -727,6 +727,11 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                   <input type="text" inputMode="numeric" value={form.client_phone} onChange={e => setForm({ ...form, client_phone: e.target.value })}
                     className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Address</label>
+                <input type="text" value={form.address || ''} onChange={e => setForm({ ...form, address: e.target.value })}
+                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Status *</label>

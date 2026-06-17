@@ -144,6 +144,7 @@ export async function POST(req: NextRequest) {
       if (recordData.Candidate_email !== undefined) updateData.Candidate_email = recordData.Candidate_email
       if (recordData.client_phone !== undefined) updateData.client_phone = recordData.client_phone
       if (recordData.country_code !== undefined) updateData.country_code = recordData.country_code
+      if (recordData.address !== undefined) updateData.address = recordData.address
     }
 
     const { error } = await supabase
