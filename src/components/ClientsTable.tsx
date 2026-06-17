@@ -489,17 +489,15 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
       {!readOnly && selectedIds.size > 0 && (
         <div className="mb-4 flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5">
           <span className="text-sm text-[#a1a1aa]">{selectedIds.size} selected</span>
-          {isAdmin && <>
-            <button onClick={() => {
-              if (selectedIds.size === 1) {
-                const id = Array.from(selectedIds)[0]
-                const rec = records.find(r => r.id === id) || sorted.find(r => r.id === id)
-                if (rec) { openModal(rec); setSelectedIds(new Set()); return }
-              }
-              setBulkForm({ status: '', address: '' }); setShowBulkModal(true)
-            }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
-            <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>
-          </>}
+          <button onClick={() => {
+            if (selectedIds.size === 1) {
+              const id = Array.from(selectedIds)[0]
+              const rec = records.find(r => r.id === id) || sorted.find(r => r.id === id)
+              if (rec) { openModal(rec); setSelectedIds(new Set()); return }
+            }
+            setBulkForm({ status: '', address: '' }); setShowBulkModal(true)
+          }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
+          {isAdmin && <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>}
           <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
         </div>
       )}
@@ -766,10 +764,10 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
             <h2 className="text-lg font-bold text-white mb-1">Bulk Edit ({selectedIds.size} records)</h2>
             <p className="text-xs text-[#71717a] mb-5">Only filled fields will be updated.</p>
             <div className="space-y-3">
-              {[
-                { label: 'Status', name: 'status', type: 'select', options: ['', 'Active', 'In-active', 'Closed'] },
-                { label: 'Address', name: 'address', type: 'text' },
-              ].map(f => (
+              {(isAdmin
+                ? [{ label: 'Status', name: 'status', type: 'select', options: ['', 'Active', 'In-active', 'Closed'] }, { label: 'Address', name: 'address', type: 'text' }]
+                : [{ label: 'Address', name: 'address', type: 'text' }]
+              ).map(f => (
                 <div key={f.name}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{f.label}</label>
                   {f.type === 'select' ? (
