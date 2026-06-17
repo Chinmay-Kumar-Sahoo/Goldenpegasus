@@ -343,50 +343,6 @@ export async function PUT(req: NextRequest) {
 
     for (const item of (inserted || [])) insertedList.push(item)
 
-    // --- Update Candidate_records with backup owner info (keyed by name|technology) ---
-    if (supabaseAdmin) {
-      const candidateUpdates = new Map<string, { backupName?: string }>()
-      for (const r of insertRecords) {
-        if (r.backup_employee_name && r.name) {
-          const key = normalize(r.name) + '|' + normalize(r.technology || '')
-          const existing = candidateUpdates.get(key) || {}
-          if (r.backup_employee_name) existing.backupName = r.backup_employee_name
-          candidateUpdates.set(key, existing)
-        }
-      }
-      if (candidateUpdates.size > 0) {
-        const allBackupNames = [...new Set(Array.from(candidateUpdates.values()).map(b => b.backupName).filter(Boolean))] as string[]
-        let backupNameToId = new Map<string, string>()
-        if (allBackupNames.length > 0) {
-          const [bpResult, beResult] = await Promise.all([
-            supabaseAdmin.from('profiles').select('id, full_name').in('full_name', allBackupNames),
-            supabaseAdmin.from('employees').select('user_id, full_name').in('full_name', allBackupNames),
-          ])
-          for (const p of (bpResult.data || [])) if (p.full_name) backupNameToId.set(normalize(p.full_name), p.id)
-          for (const e of (beResult.data || [])) if (e.full_name) backupNameToId.set(normalize(e.full_name), e.user_id)
-        }
-        for (const [key, update] of candidateUpdates) {
-          const [namePart, techPart] = key.split('|')
-          const candidatePayload: any = {}
-          if (update.backupName) {
-            const userId = backupNameToId.get(normalize(update.backupName))
-            if (userId) {
-              candidatePayload.backup_employee_id = userId
-              candidatePayload.backup_employee_name = denormalize(update.backupName)
-            }
-          }
-          if (Object.keys(candidatePayload).length > 0) {
-            const q = supabaseAdmin.from('Candidate_records').update(candidatePayload).ilike('Candidate_name', namePart)
-            if (techPart) {
-              await q.eq('technology', denormalize(techPart))
-            } else {
-              await q.is('technology', null)
-            }
-          }
-        }
-      }
-    }
-
     // --- Audit log ---
     if (insertedList.length > 0) {
       const auditClient = supabaseAdmin || supabase

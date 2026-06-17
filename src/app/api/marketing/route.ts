@@ -438,66 +438,6 @@ export async function POST(req: NextRequest) {
       .eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // If admin changed owner, sync to Candidate_records and related marketing records (by name+technology)
-    if (isAdminUser && effectiveOwnerId && effectiveOwnerId !== existingRecord.owner_id) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-      if (serviceRoleKey) {
-        const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-        // Update specific Candidate_records row (name + technology)
-        const candQ = adminClient.from('Candidate_records').update({ owner_id: effectiveOwnerId, updated_at: new Date().toISOString() }).ilike('Candidate_name', existingRecord.name)
-        if (existingRecord.technology) {
-          await candQ.eq('technology', existingRecord.technology)
-        } else {
-          await candQ.is('technology', null)
-        }
-
-        // Update marketing records with matching name + technology
-        const mktQ = adminClient.from('marketing_records').update({ owner_id: effectiveOwnerId, employee_name: employeeName, updated_at: new Date().toISOString() }).eq('name', existingRecord.name)
-        if (existingRecord.technology) {
-          await mktQ.eq('technology', existingRecord.technology)
-        } else {
-          await mktQ.is('technology', null)
-        }
-      }
-    }
-
-    // Sync updated fields to matching Candidate_records
-    const adminClient = getAdminClient()
-    if (adminClient && existingRecord.name) {
-      const candTech = (existingRecord.technology || '').toLowerCase().trim()
-      const { data: existingCandidates } = await (adminClient.from('Candidate_records') as any)
-        .select('id, backup_employee_id, backup_employee_name, technology')
-        .ilike('Candidate_name', existingRecord.name) as any
-      const existingCandidate = (existingCandidates || []).find((c: any) => (c.technology || '').toLowerCase().trim() === candTech) || null
-      const candPayload: any = { updated_at: new Date().toISOString() }
-      // Do NOT sync marketing status (Telephone Call etc.) to Candidate_records
-      if (updatePayload.notes !== undefined) candPayload.notes = updatePayload.notes
-      if (updatePayload.technology !== undefined) candPayload.technology = updatePayload.technology
-      if (effectiveOwnerId) candPayload.owner_id = effectiveOwnerId
-      if (recordData.backup_employee_id !== undefined) candPayload.backup_employee_id = recordData.backup_employee_id || null
-      if (recordData.backup_employee_name !== undefined) candPayload.backup_employee_name = recordData.backup_employee_name || null
-      // Preserve existing backup values if not provided in request
-      if (existingCandidate?.backup_employee_id && candPayload.backup_employee_id === undefined) {
-        candPayload.backup_employee_id = existingCandidate.backup_employee_id
-        candPayload.backup_employee_name = existingCandidate.backup_employee_name || candPayload.backup_employee_name
-      }
-      if (existingCandidate) {
-        await (adminClient.from('Candidate_records') as any).update(candPayload).eq('id', existingCandidate.id)
-      } else {
-        candPayload.Candidate_name = existingRecord.name
-        // Try to resolve backup_employee_id from backup_employee_name for new records
-        if (existingRecord.backup_employee_name && candPayload.backup_employee_id === undefined) {
-          const [pResult, eResult] = await Promise.all([
-            (adminClient.from('profiles') as any).select('id').ilike('full_name', existingRecord.backup_employee_name).maybeSingle(),
-            (adminClient.from('employees') as any).select('user_id').ilike('full_name', existingRecord.backup_employee_name).maybeSingle(),
-          ])
-          candPayload.backup_employee_id = pResult?.data?.id || eResult?.data?.user_id || null
-        }
-        await (adminClient.from('Candidate_records') as any).insert(candPayload)
-      }
-    }
-
     await supabase.from('audit_logs').insert({
       action: 'updated', entity_type: 'marketing_record', entity_id: body.id,
       user_id: user.id, created_at: new Date().toISOString(),
@@ -542,48 +482,6 @@ export async function POST(req: NextRequest) {
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Sync to Candidate_records (create or update matching record)
-  if (insertData.name) {
-    const adminClient = getAdminClient()
-    if (adminClient) {
-      const candTech = (insertData.technology || '').toLowerCase().trim()
-      const { data: existingCandidates } = await (adminClient.from('Candidate_records') as any)
-        .select('id, owner_id, backup_employee_id, backup_employee_name, technology')
-        .ilike('Candidate_name', insertData.name) as any
-      const existing = (existingCandidates || []).find((c: any) => (c.technology || '').toLowerCase().trim() === candTech) || null
-      const candPayload: any = {
-        Candidate_name: insertData.name,
-        technology: insertData.technology || null,
-        status: 'Active',
-        notes: insertData.notes || null,
-        updated_at: new Date().toISOString(),
-      }
-      if (insertData.backup_employee_id !== undefined) candPayload.backup_employee_id = insertData.backup_employee_id || null
-      if (insertData.backup_employee_name !== undefined) candPayload.backup_employee_name = insertData.backup_employee_name || null
-      if (existing) {
-        // Preserve original owner — marketing record sync must not reassign candidate ownership
-        candPayload.owner_id = existing.owner_id
-        // Preserve existing backup values if not provided in this request
-        if (existing.backup_employee_id && candPayload.backup_employee_id === undefined) {
-          candPayload.backup_employee_id = existing.backup_employee_id
-          candPayload.backup_employee_name = existing.backup_employee_name || candPayload.backup_employee_name
-        }
-        await (adminClient.from('Candidate_records') as any).update(candPayload).eq('id', existing.id)
-      } else {
-        candPayload.owner_id = effectiveOwnerId
-        // For new candidates, try to resolve backup_employee_id from backup_employee_name
-        if (insertData.backup_employee_name && candPayload.backup_employee_id === undefined) {
-          const [pResult, eResult] = await Promise.all([
-              (adminClient.from('profiles') as any).select('id').ilike('full_name', insertData.backup_employee_name).maybeSingle(),
-              (adminClient.from('employees') as any).select('user_id').ilike('full_name', insertData.backup_employee_name).maybeSingle(),
-          ])
-          candPayload.backup_employee_id = pResult?.data?.id || eResult?.data?.user_id || null
-        }
-        await (adminClient.from('Candidate_records') as any).insert(candPayload)
-      }
-    }
-  }
-
   await supabase.from('audit_logs').insert({
     action: 'created', entity_type: 'marketing_record', entity_id: inserted?.id || '',
     user_id: user.id, created_at: new Date().toISOString(),
@@ -605,19 +503,8 @@ export async function DELETE(req: NextRequest) {
   const adminClient = getAdminClient()
   if (!adminClient) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
 
-  // Fetch record name before deleting, for sync
-  const { data: record } = await (adminClient.from('marketing_records') as any).select('name').eq('id', id).single()
-
   const { error } = await (adminClient.from('marketing_records') as any).delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Also delete from Candidate_records if no other marketing records reference this candidate
-  if (record?.name) {
-    const { data: remaining } = await (adminClient.from('marketing_records') as any).select('id').eq('name', record.name).limit(1)
-    if (!remaining || remaining.length === 0) {
-      await (adminClient.from('Candidate_records') as any).delete().ilike('Candidate_name', record.name)
-    }
-  }
 
   await adminClient.from('audit_logs').insert([{
     action: 'deleted', entity_type: 'marketing_record', entity_id: id,
