@@ -451,7 +451,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <PageHeader title={isAdmin || readOnly ? 'All Marketing Profiles' : 'My Marketing Profile'} subtitle={readOnly ? 'Read-only view of all marketing profiles' : 'Manage Marketing Profiles'}>
+      <PageHeader title={isAdmin || readOnly ? 'All Candidate Profiles' : 'My Candidate Profile'} subtitle={readOnly ? 'Read-only view of all candidate profiles' : 'Manage Candidate Profiles'}>
         {!readOnly && <button onClick={() => openModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">+ Add Candidate</button>}
         <div ref={exportMenuRef} className="relative">
           <button onClick={() => setShowExportMenu(v => !v)} className="border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white px-4 py-2 rounded-xl text-sm transition-all">
@@ -697,18 +697,27 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                 </select>
                 {!!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can change backup employee</p>}
               </div>
-              {[
-                { label: 'Candidate Name *', name: 'Candidate_name', type: 'text', required: true },
-                { label: 'Technology', name: 'technology', type: 'text' },
-              ].map(field => (
-                <div key={field.name}>
-                  <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
-                  <input type={field.type} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} required={field.required}
-                    disabled={!!editing}
-                    className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${!!editing ? 'opacity-50 cursor-not-allowed' : ''}`} />
-                  {field.name === 'Candidate_name' && !!editing && <p className="text-[10px] text-[#71717a] mt-1">Candidate name cannot be changed</p>}
-                </div>
-              ))}
+              <div>
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Candidate Name *</label>
+                <input type="text" value={form.Candidate_name || ''} onChange={e => setForm({ ...form, Candidate_name: e.target.value })} required
+                  disabled={!!editing}
+                  className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${!!editing ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                {!!editing && <p className="text-[10px] text-[#71717a] mt-1">Candidate name cannot be changed</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Candidate Name *</label>
+                <input type="text" value={form.Candidate_name || ''} onChange={e => setForm({ ...form, Candidate_name: e.target.value })} required
+                  disabled={!!editing}
+                  className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${!!editing ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                {!!editing && <p className="text-[10px] text-[#71717a] mt-1">Candidate name cannot be changed</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Technology</label>
+                <input type="text" value={form.technology || ''} onChange={e => setForm({ ...form, technology: e.target.value })}
+                  disabled={!!editing && !isAdmin}
+                  className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                {!!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can change technology</p>}
+              </div>
               <div>
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Email</label>
                 <input type="email" value={form.Candidate_email || ''} onChange={e => setForm({ ...form, Candidate_email: e.target.value })}

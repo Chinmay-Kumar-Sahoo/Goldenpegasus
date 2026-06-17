@@ -1,7 +1,7 @@
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import ClientsTable from '@/components/ClientsTable'
-export const metadata = { title: 'All Marketing Profiles | Admin | GoldenPegasus' }
+export const metadata = { title: 'All Candidate Profiles | Admin | GoldenPegasus' }
 export default async function AdminClientsPage() {
   const supabase = await createClient()
 

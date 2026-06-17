@@ -137,9 +137,8 @@ export async function POST(req: NextRequest) {
     const updateData: any = { updated_at: new Date().toISOString() }
     if (isAdminUser) {
       Object.assign(updateData, recordData)
-      // Admin cannot change candidate name or technology
+      // Admin cannot change candidate name
       delete updateData.Candidate_name
-      delete updateData.technology
       if (selectedEmployeeId) updateData.owner_id = selectedEmployeeId
       if (backupEmployeeId !== undefined) updateData.backup_employee_id = backupEmployeeId || null
       if (backupName !== null) updateData.backup_employee_name = backupName

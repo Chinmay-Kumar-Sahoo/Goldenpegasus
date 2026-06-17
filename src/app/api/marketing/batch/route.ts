@@ -173,19 +173,19 @@ export async function PUT(req: NextRequest) {
       continue
     }
 
-    // --- Step 1: Check Candidate Name exists in All Marketing Profiles ---
+    // --- Step 1: Check Candidate Name exists in All Candidate Profiles ---
     const nameKey = normalize(name)
 
     // First, check if the candidate exists at all (regardless of owner)
     if (!allCandidateNameSet.has(nameKey)) {
-      issues.push(`Candidate "${name}" does not exist in All Marketing Profiles`)
+      issues.push(`Candidate "${name}" does not exist in All Candidate Profiles`)
       errors.push({ name, issues })
       continue
     }
 
     // Next, for non-admin, check if the candidate is assigned to the current user
     if (!isAdmin && !accessibleNameSet.has(nameKey)) {
-      issues.push(`Candidate "${name}" exists in All Marketing Profiles but is not assigned to you. Please contact an admin to assign this candidate.`)
+      issues.push(`Candidate "${name}" exists in All Candidate Profiles but is not assigned to you. Please contact an admin to assign this candidate.`)
       errors.push({ name, issues })
       continue
     }

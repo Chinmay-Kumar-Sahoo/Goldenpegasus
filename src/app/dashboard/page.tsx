@@ -33,7 +33,7 @@ export default async function DashboardPage() {
     projectCount = count ?? 0
   }
 
-  // Count Candidate_records where user is owner OR backup (matches My Marketing Profile), excluding Closed
+  // Count Candidate_records where user is owner OR backup (matches My Candidate Profile), excluding Closed
   const { data: clientCandidates, count: clientCount } = await lookupClient
     .from('Candidate_records')
     .select('*', { count: 'exact', head: false })
