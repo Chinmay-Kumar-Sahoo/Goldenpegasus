@@ -2,7 +2,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
-const MARKETING_FIELDS = 'id, owner_id, name, date, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, status, technology, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, employee_name, backup_employee_name, created_at, updated_at'
+const MARKETING_FIELDS = 'id, owner_id, name, date, date_locked, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, status, technology, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, employee_name, backup_employee_name, created_at, updated_at'
 const CANDIDATE_FIELDS = 'Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology'
 
 let _adminClient: ReturnType<typeof createAdminClient> | null = null
@@ -374,7 +374,7 @@ export async function POST(req: NextRequest) {
     // --- EDITING EXISTING RECORD ---
       const { data: existingRecord } = await supabase
         .from('marketing_records')
-        .select('owner_id, name, technology, backup_employee_name')
+        .select('owner_id, name, technology, backup_employee_name, date, date_locked')
         .eq('id', body.id)
         .single()
 
@@ -413,6 +413,19 @@ export async function POST(req: NextRequest) {
     // Normalize company name fields on edit
     if (updatePayload.organization_name) updatePayload.organization_name = normalizeCompanyName(updatePayload.organization_name)
     if (updatePayload.implementation_partner) updatePayload.implementation_partner = normalizeCompanyName(updatePayload.implementation_partner)
+
+    // Date: editable only once
+    if (existingRecord.date_locked) {
+      delete updatePayload.date
+    } else if (updatePayload.date !== undefined) {
+      const submitted = updatePayload.date || null
+      const current = existingRecord.date || null
+      if (submitted !== current) {
+        updatePayload.date_locked = true
+      } else {
+        delete updatePayload.date
+      }
+    }
 
     // Admin can edit employee_name on existing records
     if (isAdminUser && employeeName) {

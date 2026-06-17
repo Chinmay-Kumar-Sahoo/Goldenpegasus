@@ -1,0 +1,1 @@
+ALTER TABLE public.marketing_records ADD COLUMN IF NOT EXISTS date_locked boolean NOT NULL DEFAULT false;

@@ -31,6 +31,7 @@ interface MarketingRecord {
   employee_name?: string | null
   backup_employee_name?: string | null
   last_reminder_sent_at?: string | null
+  date_locked?: boolean
 }
 
 type MarketingImportField =
@@ -1285,7 +1286,7 @@ export default function MarketingPage({
                 { label: 'Comments', name: 'notes', type: 'textarea', span: 2 },
               ].map(field => {
                 const locked = field.name === 'date'
-                  ? false
+                  ? !!(editing?.date_locked)
                   : (!!editing && (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]))
                 return (
                 <div key={field.name} className={field.span === 2 ? 'col-span-2' : ''}>
