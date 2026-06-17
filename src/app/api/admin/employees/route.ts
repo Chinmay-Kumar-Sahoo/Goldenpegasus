@@ -82,7 +82,14 @@ export async function POST(req: NextRequest) {
       if (newEmail && !EMAIL_RE.test(newEmail)) return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
 
       // Check if this employee was created by admin
-      const { data: existingEmp } = await supabaseAdmin.from('employees').select('created_by_admin, email').eq('user_id', body.id).maybeSingle()
+      const { data: existingEmp } = await supabaseAdmin.from('employees').select('created_by_admin, email, employee_id').eq('user_id', body.id).maybeSingle()
+
+      // Duplicate employee_id check
+      const sanitizedEmpId = String(body.employee_id || '').replace(/\D/g, '')
+      if (sanitizedEmpId && existingEmp && existingEmp.employee_id !== sanitizedEmpId) {
+        const { data: dupEmp } = await supabaseAdmin.from('employees').select('id').eq('employee_id', sanitizedEmpId).maybeSingle()
+        if (dupEmp) return NextResponse.json({ error: 'Employee ID already exists. Please use a different ID.' }, { status: 409 })
+      }
 
       const updateData: Record<string, any> = {}
       for (const [key, val] of Object.entries(body)) {
@@ -132,6 +139,13 @@ export async function POST(req: NextRequest) {
 
     const email = body.email.trim().toLowerCase()
     const contactDigits = (body.contact || '').replace(/\D/g, '')
+    const sanitizedNewEmpId = (body.employee_id || '').replace(/\D/g, '')
+
+    // Duplicate employee_id check on create
+    if (sanitizedNewEmpId) {
+      const { data: dupEmp } = await supabaseAdmin.from('employees').select('id').eq('employee_id', sanitizedNewEmpId).maybeSingle()
+      if (dupEmp) return NextResponse.json({ error: 'Employee ID already exists. Please use a different ID.' }, { status: 409 })
+    }
 
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -140,7 +154,7 @@ export async function POST(req: NextRequest) {
       user_metadata: {
         full_name: body.full_name,
         role: 'employee',
-        employee_id: (body.employee_id || '').replace(/\D/g, ''),
+        employee_id: sanitizedNewEmpId,
         contact: contactDigits,
         country_code: body.country_code || '+1',
         designation: body.designation || '',
