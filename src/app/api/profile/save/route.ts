@@ -31,7 +31,11 @@ export async function POST(req: NextRequest) {
     const { error: profError } = await serviceSupabase.from('profiles').update({ full_name: profile.full_name, updated_at: new Date().toISOString() }).eq('id', user.id)
     if (profError) return NextResponse.json({ error: `Profile update failed: ${profError.message}` }, { status: 500 })
 
-    if (employee) {
+    // Skip employee table for admin users — admins use admin_profiles instead
+    const { data: userProfile } = await serviceSupabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    const isAdmin = userProfile?.role === 'admin'
+
+    if (employee && !isAdmin) {
       const contactDigits = employee.contact ? employee.contact.replace(/\D/g, '') : null
       const empPayload: Record<string, any> = {
         employee_id: (employee.employee_id || '').replace(/\D/g, '') || (employee.designation === 'Administrator' ? `ADM-${Date.now()}` : `EMP-${Date.now()}`),
