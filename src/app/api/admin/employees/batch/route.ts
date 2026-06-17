@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
   for (const [key, val] of Object.entries(rawUpdates)) {
     if ((key === 'joining_date' || key === 'date_of_birth') && !val) continue
     if (key === 'contact') { updates.contact = String(val || '').replace(/\D/g, ''); continue }
+    if (key === 'country_code') { updates.country_code = val; continue }
     updates[key] = val
   }
 

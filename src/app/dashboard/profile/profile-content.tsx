@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import PageHeader from '@/components/PageHeader'
+import { COUNTRY_CODES } from '@/lib/countryCodes'
 
 interface Profile {
   full_name: string
@@ -11,6 +12,7 @@ interface Profile {
 interface Employee {
   employee_id: string
   contact: string
+  country_code: string
   address: string
   date_of_birth: string
   joining_date: string
@@ -22,7 +24,7 @@ interface Employee {
 
 export default function ProfileContent({ initialProfile, initialEmployee }: { initialProfile?: Profile; initialEmployee?: Employee }) {
   const [profile, setProfile] = useState<Profile>(initialProfile || { full_name: '', email: '' })
-  const [employee, setEmployee] = useState<Employee>(initialEmployee || { employee_id: '', contact: '', address: '', date_of_birth: '', joining_date: '', company_id: '', designation: '' })
+  const [employee, setEmployee] = useState<Employee>(initialEmployee || { employee_id: '', contact: '', country_code: '+1', address: '', date_of_birth: '', joining_date: '', company_id: '', designation: '' })
   const [loading, setLoading] = useState(!initialProfile)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
@@ -45,8 +47,9 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
     const safetyTimer = setTimeout(() => { setSaving(false); setError('Save timed out after 15 seconds. Please try again.') }, 15000)
 
     try {
-      if (employee.contact && /\D/.test(employee.contact)) {
-        clearTimeout(safetyTimer); setError('Contact must contain only digits'); setSaving(false); return
+      const contactDigits = employee.contact.replace(/\D/g, '')
+      if (employee.contact && contactDigits.length !== 10) {
+        clearTimeout(safetyTimer); setError('Contact must be exactly 10 digits'); setSaving(false); return
       }
       const res = await fetch('/api/profile/save', {
         method: 'POST',
@@ -56,7 +59,8 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
           employee: {
             employee_id: employee.employee_id,
             email: profile.email,
-            contact: employee.contact,
+            contact: contactDigits,
+            country_code: employee.country_code,
             address: employee.address,
             date_of_birth: employee.date_of_birth,
             joining_date: employee.joining_date,
@@ -121,12 +125,34 @@ export default function ProfileContent({ initialProfile, initialEmployee }: { in
                 {[
                   { label: 'Employee ID', name: 'employee_id', type: 'text', inputMode: 'numeric', placeholder: 'e.g. 1001' },
                   { label: 'Designation', name: 'designation', type: 'text', placeholder: 'Software Engineer' },
-                  { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric', placeholder: '+1 234 567 8900' },
+                  { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric', placeholder: '10-digit number', isContact: true },
                   { label: 'Company ID', name: 'company_id', type: 'text', placeholder: 'GPEG-123' },
                   { label: 'Date of Birth', name: 'date_of_birth', type: 'date', placeholder: '' },
                   { label: 'Joining Date', name: 'joining_date', type: 'date', placeholder: '' },
                 ].map(field => {
                   const isLocked = field.name === 'joining_date' ? joiningDateLocked : fieldsLocked
+                  if ((field as any).isContact) {
+                    const contactLocked = fieldsLocked
+                    return (
+                      <div key={field.name} className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Contact</label>
+                        <div className="flex gap-2">
+                          <select value={employee.country_code} onChange={e => setEmployee({ ...employee, country_code: e.target.value })}
+                            disabled={contactLocked}
+                            className={`w-[140px] shrink-0 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm ${contactLocked ? 'text-[#71717a] cursor-not-allowed' : 'text-white focus:outline-none focus:border-[#22c55e]/60'}`}>
+                            {COUNTRY_CODES.map(cc => (
+                              <option key={`${cc.code}-${cc.country}`} value={cc.code}>{cc.label}</option>
+                            ))}
+                          </select>
+                          <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={employee.contact} onChange={e => setEmployee({ ...employee, contact: e.target.value.replace(/\D/g, '') })} placeholder={field.placeholder} disabled={contactLocked}
+                            className={`flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm ${contactLocked ? 'text-[#71717a] cursor-not-allowed' : 'text-white focus:outline-none focus:border-[#22c55e]/60'}`} />
+                        </div>
+                        {contactLocked && (
+                          <p className="text-[10px] text-yellow-400 mt-1">Contact can only be set once. Contact your admin to change it.</p>
+                        )}
+                      </div>
+                    )
+                  }
                   return (
                   <div key={field.name}>
                     <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>

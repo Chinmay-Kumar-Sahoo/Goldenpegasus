@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import PageHeader from '@/components/PageHeader'
 import { formatDate } from '@/lib/format'
+import { COUNTRY_CODES } from '@/lib/countryCodes'
 import toast from 'react-hot-toast'
 
 interface Employee {
@@ -11,17 +12,20 @@ interface Employee {
   full_name: string
   email: string
   contact: string | null
+  country_code: string | null
   designation: string | null
   joining_date: string | null
   role: string
   email_confirmed_at: string | null
   created_at: string
+  created_by_admin: boolean | null
 }
 
 interface FormData {
   employee_id: string
   full_name: string
   email: string
+  country_code: string
   contact: string
   designation: string
   joining_date: string
@@ -47,7 +51,7 @@ export default function AdminEmployeesPage() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Employee | null>(null)
   const [search, setSearch] = useState('')
-  const [form, setForm] = useState<FormData>({ employee_id: '', full_name: '', email: '', contact: '', designation: '', joining_date: '', password: '' })
+  const [form, setForm] = useState<FormData>({ employee_id: '', full_name: '', email: '', country_code: '+1', contact: '', designation: '', joining_date: '', password: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -57,7 +61,7 @@ export default function AdminEmployeesPage() {
   })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showBulkModal, setShowBulkModal] = useState(false)
-  const [bulkForm, setBulkForm] = useState({ designation: '', contact: '' })
+  const [bulkForm, setBulkForm] = useState({ designation: '', contact: '', country_code: '' })
   const [bulkSaving, setBulkSaving] = useState(false)
 
   const dateFilterRef = useRef<HTMLTableSectionElement>(null)
@@ -92,10 +96,10 @@ export default function AdminEmployeesPage() {
   const openModal = (emp?: Employee) => {
     if (emp) {
       setEditing(emp)
-      setForm({ employee_id: emp.employee_id || '', full_name: emp.full_name, email: emp.email, contact: emp.contact || '', designation: emp.designation || '', joining_date: emp.joining_date || '', password: '' })
+      setForm({ employee_id: emp.employee_id || '', full_name: emp.full_name, email: emp.email, country_code: emp.country_code || '+1', contact: emp.contact || '', designation: emp.designation || '', joining_date: emp.joining_date || '', password: '' })
     } else {
       setEditing(null)
-      setForm({ employee_id: '', full_name: '', email: '', contact: '', designation: '', joining_date: '', password: '' })
+      setForm({ employee_id: '', full_name: '', email: '', country_code: '+1', contact: '', designation: '', joining_date: '', password: '' })
     }
     setError('')
     setSuccessMessage('')
@@ -108,14 +112,15 @@ export default function AdminEmployeesPage() {
     setSuccessMessage('')
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (form.email && !emailRe.test(form.email)) { setError('Invalid email format'); return }
-    if (form.contact && /\D/.test(form.contact)) { setError('Contact must contain only digits'); return }
+    const contactDigits = form.contact.replace(/\D/g, '')
+    if (form.contact && contactDigits.length !== 10) { setError('Contact must be exactly 10 digits'); return }
     setSaving(true)
     let saveError: string | null = null
     try {
       const res = await fetch('/api/admin/employees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editing ? { ...form, id: editing.id } : form),
+        body: JSON.stringify(editing ? { ...form, contact: contactDigits, id: editing.id } : { ...form, contact: contactDigits }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -159,7 +164,7 @@ export default function AdminEmployeesPage() {
   }
 
   const handleBulkUpdate = async () => {
-    if (bulkForm.contact && /\D/.test(bulkForm.contact)) { toast.error('Contact must contain only digits'); return }
+    if (bulkForm.contact && bulkForm.contact.replace(/\D/g, '').length !== 10) { toast.error('Contact must be exactly 10 digits'); return }
     const updates = Object.fromEntries(Object.entries(bulkForm).filter(([_, v]) => v !== ''))
     if (Object.keys(updates).length === 0) { toast.error('No fields to update'); return }
     setBulkSaving(true)
@@ -173,7 +178,7 @@ export default function AdminEmployeesPage() {
       toast.success(`Updated ${selectedIds.size} employees`)
       setShowBulkModal(false)
       setSelectedIds(new Set())
-      setBulkForm({ designation: '', contact: '' })
+      setBulkForm({ designation: '', contact: '', country_code: '' })
       fetchEmployees()
     } catch {
       toast.error('Failed to bulk update')
@@ -249,6 +254,11 @@ export default function AdminEmployeesPage() {
     return scored.map(x => x.emp)
   }, [filtered, query])
 
+  const canEditEmail = (emp: Employee | null): boolean => {
+    if (!emp) return true
+    return emp.created_by_admin === true
+  }
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <PageHeader title="Employee Management" subtitle="Manage all employee records">
@@ -293,7 +303,7 @@ export default function AdminEmployeesPage() {
               const emp = employees.find(e => e.id === id) || sorted.find(e => e.id === id)
               if (emp) { openModal(emp); setSelectedIds(new Set()); return }
             }
-            setBulkForm({ designation: '', contact: '' }); setShowBulkModal(true)
+            setBulkForm({ designation: '', contact: '', country_code: '' }); setShowBulkModal(true)
           }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
           <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>
           <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
@@ -384,7 +394,7 @@ export default function AdminEmployeesPage() {
                     <td className="px-4 py-3 text-sm text-[#22c55e] font-mono">{emp.employee_id || '—'}</td>
                     <td className="px-4 py-3 text-sm text-white font-medium">{emp.full_name}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.email}</td>
-                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.contact || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.country_code ? `${emp.country_code} ` : ''}{emp.contact || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{emp.designation || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{formatDate(emp.joining_date)}</td>
                     <td className="px-4 py-3">
@@ -411,7 +421,35 @@ export default function AdminEmployeesPage() {
                 { label: 'Employee ID', name: 'employee_id', type: 'text', inputMode: 'numeric', placeholder: 'e.g. 1001' },
                 { label: 'Full Name', name: 'full_name', type: 'text', placeholder: 'John Doe' },
                 { label: 'Email', name: 'email', type: 'email', placeholder: 'john@example.com' },
-                { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric', placeholder: '+1 234 567 8900' },
+              ].map(field => {
+                const isEmailReadonly = field.name === 'email' && editing && !canEditEmail(editing)
+                return (
+                  <div key={field.name}>
+                    <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
+                    <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={form[field.name as keyof FormData]} onChange={e => setForm({ ...form, [field.name]: field.name === 'employee_id' ? e.target.value.replace(/\D/g, '') : e.target.value })} placeholder={field.placeholder}
+                      required={['employee_id', 'full_name', 'email'].includes(field.name) || (!editing && field.name === 'password')}
+                      readOnly={isEmailReadonly}
+                      className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60 transition-all ${isEmailReadonly ? 'text-[#71717a] cursor-not-allowed' : ''}`} />
+                    {field.name === 'email' && editing && !canEditEmail(editing) && (
+                      <p className="text-[10px] text-yellow-400 mt-1">Email can only be changed for admin-created employees.</p>
+                    )}
+                  </div>
+                )
+              })}
+              <div>
+                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Contact</label>
+                <div className="flex gap-2">
+                  <select value={form.country_code} onChange={e => setForm({ ...form, country_code: e.target.value })}
+                    className="w-[140px] shrink-0 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 transition-all">
+                    {COUNTRY_CODES.map(cc => (
+                      <option key={`${cc.code}-${cc.country}`} value={cc.code}>{cc.label}</option>
+                    ))}
+                  </select>
+                  <input type="text" inputMode="numeric" value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value.replace(/\D/g, '') })} placeholder="10-digit number"
+                    className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#22c55e]/60 transition-all" />
+                </div>
+              </div>
+              {[
                 { label: 'Designation', name: 'designation', type: 'text', placeholder: 'Software Engineer' },
                 { label: 'Joining Date', name: 'joining_date' as const, type: 'date', placeholder: '' },
                 ...(editing ? [] : [{ label: 'Password', name: 'password' as const, type: 'password' as const, placeholder: 'Min. 8 characters' }]),
@@ -444,14 +482,29 @@ export default function AdminEmployeesPage() {
             <div className="space-y-3">
               {[
                 { label: 'Designation', name: 'designation', type: 'text' },
-                { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric' },
+                { label: 'Country Code', name: 'country_code', type: 'select' },
               ].map(f => (
                 <div key={f.name}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{f.label}</label>
-                  <input type={f.type} inputMode={(f as any).inputMode || 'text'} value={bulkForm[f.name as keyof typeof bulkForm]} onChange={e => setBulkForm({ ...bulkForm, [f.name]: e.target.value })}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                  {f.type === 'select' ? (
+                    <select value={bulkForm.country_code} onChange={e => setBulkForm({ ...bulkForm, country_code: e.target.value })}
+                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                      <option value="">— No change —</option>
+                      {COUNTRY_CODES.map(cc => (
+                        <option key={`${cc.code}-${cc.country}`} value={cc.code}>{cc.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input type={f.type} value={bulkForm[f.name as keyof typeof bulkForm]} onChange={e => setBulkForm({ ...bulkForm, [f.name]: e.target.value })}
+                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                  )}
                 </div>
               ))}
+              <div>
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Contact</label>
+                <input type="text" inputMode="numeric" value={bulkForm.contact} onChange={e => setBulkForm({ ...bulkForm, contact: e.target.value.replace(/\D/g, '') })}
+                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+              </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowBulkModal(false)} className="flex-1 border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white py-2.5 rounded-xl text-sm transition-all">Cancel</button>
                 <button type="button" onClick={handleBulkUpdate} disabled={bulkSaving} className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold py-2.5 rounded-xl text-sm transition-all disabled:opacity-50">

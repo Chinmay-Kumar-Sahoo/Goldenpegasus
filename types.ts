@@ -193,7 +193,9 @@ export type Database = {
           address: string | null
           company_id: string | null
           contact: string | null
+          country_code: string | null
           created_at: string | null
+          created_by_admin: boolean | null
           date_of_birth: string | null
           designation: string | null
           email: string
@@ -208,7 +210,9 @@ export type Database = {
           address?: string | null
           company_id?: string | null
           contact?: string | null
+          country_code?: string | null
           created_at?: string | null
+          created_by_admin?: boolean | null
           date_of_birth?: string | null
           designation?: string | null
           email: string
@@ -223,7 +227,9 @@ export type Database = {
           address?: string | null
           company_id?: string | null
           contact?: string | null
+          country_code?: string | null
           created_at?: string | null
+          created_by_admin?: boolean | null
           date_of_birth?: string | null
           designation?: string | null
           email?: string

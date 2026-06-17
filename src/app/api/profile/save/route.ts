@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
         employee_id: (employee.employee_id || '').replace(/\D/g, '') || (employee.designation === 'Administrator' ? `ADM-${Date.now()}` : `EMP-${Date.now()}`),
         full_name: profile.full_name,
         contact: contactDigits,
+        country_code: employee.country_code || '+1',
         address: employee.address || null,
         company_id: employee.company_id || null,
         designation: employee.designation || null,

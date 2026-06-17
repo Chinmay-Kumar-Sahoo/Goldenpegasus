@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import PageHeader from '@/components/PageHeader'
+import { COUNTRY_CODES } from '@/lib/countryCodes'
 
 interface Profile {
   full_name: string
@@ -11,6 +12,7 @@ interface Profile {
 interface Employee {
   employee_id: string
   contact: string
+  country_code: string
   address: string
   date_of_birth: string
   joining_date: string
@@ -20,7 +22,7 @@ interface Employee {
 
 export default function AdminProfileContent({ initialProfile, initialEmployee }: { initialProfile?: Profile; initialEmployee?: Employee }) {
   const [profile, setProfile] = useState<Profile>(initialProfile || { full_name: '', email: '' })
-  const [employee, setEmployee] = useState<Employee>(initialEmployee || { employee_id: '', contact: '', address: '', date_of_birth: '', joining_date: '', company_id: '', designation: '' })
+  const [employee, setEmployee] = useState<Employee>(initialEmployee || { employee_id: '', contact: '', country_code: '+1', address: '', date_of_birth: '', joining_date: '', company_id: '', designation: '' })
   const [loading, setLoading] = useState(!initialProfile)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
@@ -38,8 +40,9 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
     const safetyTimer = setTimeout(() => { setSaving(false); setError('Save timed out after 15 seconds. Please try again.') }, 15000)
 
     try {
-      if (employee.contact && /\D/.test(employee.contact)) {
-        clearTimeout(safetyTimer); setError('Contact must contain only digits'); setSaving(false); return
+      const contactDigits = employee.contact.replace(/\D/g, '')
+      if (employee.contact && contactDigits.length !== 10) {
+        clearTimeout(safetyTimer); setError('Contact must be exactly 10 digits'); setSaving(false); return
       }
       if (newPassword && newPassword !== confirmPassword) {
         clearTimeout(safetyTimer); setError('Passwords do not match.'); setSaving(false); return
@@ -56,7 +59,8 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
           employee: {
             employee_id: employee.employee_id,
             email: profile.email,
-            contact: employee.contact,
+            contact: contactDigits,
+            country_code: employee.country_code,
             address: employee.address,
             date_of_birth: employee.date_of_birth,
             joining_date: employee.joining_date,
@@ -123,17 +127,36 @@ export default function AdminProfileContent({ initialProfile, initialEmployee }:
                 {[
                   { label: 'Admin ID', name: 'employee_id', type: 'text', inputMode: 'numeric', placeholder: 'e.g. 1001' },
                   { label: 'Designation', name: 'designation', type: 'text', placeholder: 'Administrator' },
-                  { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric', placeholder: '+1 234 567 8900' },
+                  { label: 'Contact', name: 'contact', type: 'text', inputMode: 'numeric', placeholder: '10-digit number', isContact: true },
                   { label: 'Company ID', name: 'company_id', type: 'text', placeholder: 'GPEG-123' },
                   { label: 'Date of Birth', name: 'date_of_birth', type: 'date', placeholder: '' },
                   { label: 'Joining Date', name: 'joining_date', type: 'date', placeholder: '' },
-                ].map(field => (
-                  <div key={field.name}>
-                    <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
-                    <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: field.name === 'employee_id' ? e.target.value.replace(/\D/g, '') : e.target.value })} placeholder={field.placeholder}
-                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
-                  </div>
-                ))}
+                ].map(field => {
+                  if ((field as any).isContact) {
+                    return (
+                      <div key={field.name} className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Contact</label>
+                        <div className="flex gap-2">
+                          <select value={employee.country_code} onChange={e => setEmployee({ ...employee, country_code: e.target.value })}
+                            className="w-[140px] shrink-0 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                            {COUNTRY_CODES.map(cc => (
+                              <option key={`${cc.code}-${cc.country}`} value={cc.code}>{cc.label}</option>
+                            ))}
+                          </select>
+                          <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={employee.contact} onChange={e => setEmployee({ ...employee, contact: e.target.value.replace(/\D/g, '') })} placeholder={field.placeholder}
+                            className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                        </div>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={field.name}>
+                      <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{field.label}</label>
+                      <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={employee[field.name as keyof Employee] || ''} onChange={e => setEmployee({ ...employee, [field.name]: field.name === 'employee_id' ? e.target.value.replace(/\D/g, '') : e.target.value })} placeholder={field.placeholder}
+                        className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                    </div>
+                  )
+                })}
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Address</label>
                   <textarea value={employee.address} onChange={e => setEmployee({ ...employee, address: e.target.value })} rows={2} placeholder="123 Main St, City, State"

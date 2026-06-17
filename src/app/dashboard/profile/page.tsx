@@ -22,6 +22,7 @@ export default async function ProfilePage() {
   const initialEmployee = employee ? {
     employee_id: employee.employee_id || '',
     contact: employee.contact || '',
+    country_code: employee.country_code || '+1',
     address: employee.address || '',
     date_of_birth: employee.date_of_birth || '',
     joining_date: employee.joining_date || '',

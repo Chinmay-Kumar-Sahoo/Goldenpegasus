@@ -41,9 +41,11 @@ export async function GET() {
         email_confirmed_at: p.email_confirmed_at,
         employee_id: emp?.employee_id || null,
         contact: emp?.contact || null,
+        country_code: emp?.country_code || null,
         designation: emp?.designation || null,
         joining_date: emp?.joining_date ?? null,
         created_at: p.created_at,
+        created_by_admin: emp?.created_by_admin || null,
       }
     })
 
@@ -75,10 +77,12 @@ export async function POST(req: NextRequest) {
     )
 
     if (body.id) {
-      if (body.email) {
-        const emailCheck = String(body.email).trim().toLowerCase()
-        if (!EMAIL_RE.test(emailCheck)) return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
-      }
+      // Editing an existing employee
+      const newEmail = String(body.email || '').trim().toLowerCase()
+      if (newEmail && !EMAIL_RE.test(newEmail)) return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+
+      // Check if this employee was created by admin
+      const { data: existingEmp } = await supabaseAdmin.from('employees').select('created_by_admin, email').eq('user_id', body.id).maybeSingle()
 
       const updateData: Record<string, any> = {}
       for (const [key, val] of Object.entries(body)) {
@@ -86,19 +90,48 @@ export async function POST(req: NextRequest) {
         if ((key === 'joining_date' || key === 'date_of_birth') && !val) continue
         if (key === 'contact') { updateData.contact = String(val || '').replace(/\D/g, ''); continue }
         if (key === 'employee_id') { updateData.employee_id = String(val || '').replace(/\D/g, ''); continue }
+        if (key === 'country_code') { updateData.country_code = val; continue }
         updateData[key] = val
       }
+
+      // Always set full_name from profiles
+      if (body.full_name) {
+        updateData.full_name = body.full_name
+      }
+
       const { error } = await supabaseAdmin.from('employees').update(updateData).eq('user_id', body.id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+      // Update profile full_name
+      if (body.full_name) {
+        await supabaseAdmin.from('profiles').update({ full_name: body.full_name, updated_at: new Date().toISOString() }).eq('id', body.id)
+      }
+
+      // Update email in auth if changed and employee was created by admin
+      if (newEmail && existingEmp && existingEmp.created_by_admin) {
+        const oldEmail = (existingEmp.email || '').toLowerCase()
+        if (newEmail !== oldEmail) {
+          // Update auth email
+          const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(body.id, { email: newEmail })
+          if (authError) return NextResponse.json({ error: `Failed to update auth email: ${authError.message}` }, { status: 500 })
+          // Update email in employees table
+          await supabaseAdmin.from('employees').update({ email: newEmail }).eq('user_id', body.id)
+          // Update email in profiles table
+          await supabaseAdmin.from('profiles').update({ email: newEmail }).eq('id', body.id)
+        }
+      }
+
       await logAudit(supabase, auth.user.id, 'updated', 'employee', body.id)
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true, message: 'Employee updated successfully.' })
     }
 
+    // Creating a new employee
     if (!body.password) {
       return NextResponse.json({ error: 'Password is required to create a new employee' }, { status: 400 })
     }
 
     const email = body.email.trim().toLowerCase()
+    const contactDigits = (body.contact || '').replace(/\D/g, '')
 
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -108,7 +141,8 @@ export async function POST(req: NextRequest) {
         full_name: body.full_name,
         role: 'employee',
         employee_id: (body.employee_id || '').replace(/\D/g, ''),
-        contact: (body.contact || '').replace(/\D/g, ''),
+        contact: contactDigits,
+        country_code: body.country_code || '+1',
         designation: body.designation || '',
         joining_date: body.joining_date || '',
       },
@@ -116,6 +150,12 @@ export async function POST(req: NextRequest) {
 
     if (createError) return NextResponse.json({ error: createError.message }, { status: 400 })
     const userId = userData.user.id
+
+    // Mark as admin-created in the employees table
+    await supabaseAdmin.from('employees').update({
+      created_by_admin: true,
+      country_code: body.country_code || '+1',
+    }).eq('user_id', userId)
 
     await logAudit(supabase, auth.user.id, 'employee_created', 'employee', userId)
 
