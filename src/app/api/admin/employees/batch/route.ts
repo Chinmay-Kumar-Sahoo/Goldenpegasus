@@ -66,14 +66,17 @@ export async function DELETE(req: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  // Delete from auth, then clean up profiles and employees tables
+  // Clean up references in related tables before deleting
+  await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).in('owner_id', ids)
+  await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).in('backup_employee_id', ids)
+  await supabaseAdmin.from('marketing_records').update({ owner_id: null }).in('owner_id', ids)
+  await supabaseAdmin.from('marketing_reminder_logs').update({ owner_id: null }).in('owner_id', ids)
+
+  // Delete from auth
   for (const id of ids) {
     const { error } = await supabaseAdmin.auth.admin.deleteUser(id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
-
-  await supabaseAdmin.from('profiles').delete().in('id', ids)
-  await supabaseAdmin.from('employees').delete().in('user_id', ids)
 
   await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'employee', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))
 

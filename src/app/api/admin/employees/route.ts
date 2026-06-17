@@ -201,12 +201,14 @@ export async function DELETE(req: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
+    // Clean up references in related tables before deleting the user
+    await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).eq('owner_id', id)
+    await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).eq('backup_employee_id', id)
+    await supabaseAdmin.from('marketing_records').update({ owner_id: null }).eq('owner_id', id)
+    await supabaseAdmin.from('marketing_reminder_logs').update({ owner_id: null }).eq('owner_id', id)
+
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(id)
     if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
-
-    // Clean up profiles and employees tables
-    await supabaseAdmin.from('profiles').delete().eq('id', id)
-    await supabaseAdmin.from('employees').delete().eq('user_id', id)
 
     await logAudit(supabase, auth.user.id, 'deleted', 'employee', id)
     return NextResponse.json({ success: true })
