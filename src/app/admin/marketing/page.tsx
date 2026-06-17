@@ -88,11 +88,7 @@ export default async function AdminMarketingPage() {
     }
   }
 
-  // Filter out records whose candidate status is Closed (by name+technology)
-  const closedCandidateKeys = new Set((candidatesResult.data || []).filter((c: any) => c.status === 'Closed').map((c: any) => (c.Candidate_name + '|' + (c.technology || '')).toLowerCase().trim()))
-  const activeRecords = records.filter(r => !closedCandidateKeys.has(((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()))
-
-  const enrichedRecords = activeRecords.map(r => {
+  const enrichedRecords = records.map(r => {
     const lookupKey = normalize((r as any).name || '') + '|' + normalize((r as any).technology || '')
     return {
       ...r,
