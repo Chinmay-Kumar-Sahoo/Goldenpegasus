@@ -134,11 +134,17 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.id) {
-    if (!isAdminUser) return NextResponse.json({ error: 'Only admin can edit candidate details' }, { status: 403 })
-    const updateData: any = { ...recordData, updated_at: new Date().toISOString() }
-    if (selectedEmployeeId) updateData.owner_id = selectedEmployeeId
-    if (backupEmployeeId !== undefined) updateData.backup_employee_id = backupEmployeeId || null
-    if (backupName !== null) updateData.backup_employee_name = backupName
+    const updateData: any = { updated_at: new Date().toISOString() }
+    if (isAdminUser) {
+      Object.assign(updateData, recordData)
+      if (selectedEmployeeId) updateData.owner_id = selectedEmployeeId
+      if (backupEmployeeId !== undefined) updateData.backup_employee_id = backupEmployeeId || null
+      if (backupName !== null) updateData.backup_employee_name = backupName
+    } else {
+      if (recordData.Candidate_email !== undefined) updateData.Candidate_email = recordData.Candidate_email
+      if (recordData.client_phone !== undefined) updateData.client_phone = recordData.client_phone
+      if (recordData.country_code !== undefined) updateData.country_code = recordData.country_code
+    }
 
     const { error } = await supabase
       .from('Candidate_records')

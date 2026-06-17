@@ -72,7 +72,7 @@ const TableRow = memo(function TableRow({
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.Candidate_name}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.technology || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.client_phone || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{`${(rec as any).country_code || ''}${rec.client_phone || ''}` || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.employee_name || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.backup_employee_name || '—'}</td>
       <td className="px-4 py-3">
@@ -361,10 +361,17 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
 
   const hasTextFilter = Object.values(textFilters).some(v => v.length > 0)
 
+  const visibleRecords = useMemo(() => {
+    if (!isAdmin && !readOnly) {
+      return records.filter(r => r.status !== 'Closed')
+    }
+    return records
+  }, [records, isAdmin, readOnly])
+
   const filtered = useMemo(() => {
     const hasSearch = !!query
-    if (!hasSearch && !hasTextFilter) return records
-    return records.filter(r => {
+    if (!hasSearch && !hasTextFilter) return visibleRecords
+    return visibleRecords.filter(r => {
       for (const [header, selected] of Object.entries(textFilters)) {
         if (selected.length === 0) continue
         const fieldKey = TEXT_FILTER_COLUMNS[header]
@@ -381,7 +388,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
         wordScore(r.address, query) > 0 ||
         wordScore(r.notes, query) > 0
     })
-  }, [records, query, textFilters, hasTextFilter])
+  }, [visibleRecords, query, textFilters, hasTextFilter])
 
   const sorted = useMemo(() => {
     const fieldKey = SORT_FIELDS[sortBy]
@@ -693,7 +700,6 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
               {[
                 { label: 'Candidate Name *', name: 'Candidate_name', type: 'text', required: true },
                 { label: 'Technology', name: 'technology', type: 'text' },
-                { label: 'Email', name: 'Candidate_email', type: 'email' },
                 { label: 'Address', name: 'address', type: 'text' },
               ].map(field => (
                 <div key={field.name}>
@@ -705,18 +711,21 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                 </div>
               ))}
               <div>
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Email</label>
+                <input type="email" value={form.Candidate_email || ''} onChange={e => setForm({ ...form, Candidate_email: e.target.value })}
+                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Phone</label>
                 <div className="flex gap-2">
                   <select value={form.country_code} onChange={e => setForm({ ...form, country_code: e.target.value })}
-                    disabled={!!editing && !isAdmin}
-                    className={`w-[130px] shrink-0 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    className="w-[130px] shrink-0 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     {COUNTRY_CODES.filter((c, i, arr) => arr.findIndex(x => x.code === c.code) === i).map(cc => (
                       <option key={`${cc.code}-${cc.country}`} value={cc.code}>{cc.label}</option>
                     ))}
                   </select>
                   <input type="text" inputMode="numeric" value={form.client_phone} onChange={e => setForm({ ...form, client_phone: e.target.value })}
-                    disabled={!!editing && !isAdmin}
-                    className={`flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                    className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 </div>
               </div>
               <div>

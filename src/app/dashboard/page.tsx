@@ -33,11 +33,12 @@ export default async function DashboardPage() {
     projectCount = count ?? 0
   }
 
-  // Count Candidate_records where user is owner OR backup (matches My Marketing Profile)
+  // Count Candidate_records where user is owner OR backup (matches My Marketing Profile), excluding Closed
   const { data: clientCandidates, count: clientCount } = await lookupClient
     .from('Candidate_records')
     .select('*', { count: 'exact', head: false })
     .or(`owner_id.eq.${uid},backup_employee_id.eq.${uid}`)
+    .neq('status', 'Closed')
   const clientDedup = new Set((clientCandidates || []).map((c: any) => ((c.Candidate_name || '') + '|' + (c.technology || '')).toLowerCase().trim()).filter(Boolean))
   const clientDedupCount = clientDedup.size
 
