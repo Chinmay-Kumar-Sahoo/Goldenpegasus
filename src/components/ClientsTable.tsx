@@ -704,9 +704,9 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                 <div key={field.name}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
                   <input type={field.type} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} required={field.required}
-                    disabled={!!editing && !isAdmin}
-                    className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`} />
-                  {field.name === 'Candidate_name' && !!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can edit candidate name</p>}
+                    disabled={!!editing}
+                    className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${!!editing ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                  {field.name === 'Candidate_name' && !!editing && <p className="text-[10px] text-[#71717a] mt-1">Candidate name cannot be changed</p>}
                 </div>
               ))}
               <div>
