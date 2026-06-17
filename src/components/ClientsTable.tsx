@@ -684,7 +684,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                   disabled={!!editing && !isAdmin}
                   className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <option value="">No Backup Employee</option>
-                  {employeeOptions.filter(emp => emp.id !== (editing ? (selectedEmployeeId || editing.owner_id) : selectedEmployeeId)).map(emp => (
+                  {employeeOptions.filter(emp => emp.id !== (editing ? (selectedEmployeeId || editing.owner_id) : (selectedEmployeeId || currentUserIdRef.current))).map(emp => (
                     <option key={emp.id} value={emp.id}>{emp.full_name}</option>
                   ))}
                 </select>
