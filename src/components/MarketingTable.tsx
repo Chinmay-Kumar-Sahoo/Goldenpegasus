@@ -1265,8 +1265,8 @@ export default function MarketingPage({
                     ))}
                   </select>
                 ) : (
-                  <input type="text" value={form.technology} onChange={e => setForm({ ...form, technology: e.target.value })}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                  <input type="text" value={form.technology} disabled
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
                 )}
               </div>
               {[
@@ -1285,7 +1285,7 @@ export default function MarketingPage({
                 { label: 'Comments', name: 'notes', type: 'textarea', span: 2 },
               ].map(field => {
                 const locked = field.name === 'date'
-                  ? !editing
+                  ? false
                   : (!!editing && (LOCKABLE_FIELDS.has(field.name) && !!form[field.name as keyof typeof form]))
                 return (
                 <div key={field.name} className={field.span === 2 ? 'col-span-2' : ''}>

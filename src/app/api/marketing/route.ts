@@ -404,7 +404,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { date, employee_name: _, ...updatableFields } = recordData
+    const { employee_name: _, name, technology, ...updatableFields } = recordData
     // Non-admin should not update employee meta fields
     if (!isAdminUser) {
       delete updatableFields.backup_employee_name
@@ -413,11 +413,6 @@ export async function POST(req: NextRequest) {
     // Normalize company name fields on edit
     if (updatePayload.organization_name) updatePayload.organization_name = normalizeCompanyName(updatePayload.organization_name)
     if (updatePayload.implementation_partner) updatePayload.implementation_partner = normalizeCompanyName(updatePayload.implementation_partner)
-
-    // Admin can edit date
-    if (isAdminUser && date !== undefined) {
-      updatePayload.date = date || null
-    }
 
     // Admin can edit employee_name on existing records
     if (isAdminUser && employeeName) {
