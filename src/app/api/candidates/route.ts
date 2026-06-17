@@ -152,80 +152,6 @@ export async function POST(req: NextRequest) {
       .eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    // Get candidate name for syncing marketing records
-    const { data: candidate } = await supabase
-      .from('Candidate_records')
-      .select('Candidate_name, owner_id')
-      .eq('id', body.id)
-      .single()
-
-    if (candidate?.Candidate_name) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-      const supabaseAdmin = serviceRoleKey
-        ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-        : null
-
-      // Sync owner_id change to all related marketing records (match by name + technology)
-      if (selectedEmployeeId) {
-        const [pResult, eResult] = await Promise.all([
-          supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId).maybeSingle(),
-          supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId).maybeSingle(),
-        ])
-        const empName = pResult.data?.full_name || eResult.data?.full_name || ''
-
-        const client = supabaseAdmin || supabase
-        const mktQ = client.from('marketing_records').update({ owner_id: selectedEmployeeId, employee_name: empName || null, updated_at: new Date().toISOString() }).eq('name', candidate.Candidate_name)
-        if (recordData.technology) {
-          await mktQ.eq('technology', recordData.technology)
-        } else {
-          await mktQ.is('technology', null)
-        }
-      }
-
-      // Sync backup_employee change to related marketing records (match by name + technology)
-      if (backupEmployeeId !== undefined) {
-        const client = supabaseAdmin || supabase
-        const mktQ = client.from('marketing_records').update({ backup_employee_name: backupName, updated_at: new Date().toISOString() }).eq('name', candidate.Candidate_name)
-        if (recordData.technology) {
-          await mktQ.eq('technology', recordData.technology)
-        } else {
-          await mktQ.is('technology', null)
-        }
-      }
-    }
-
-    // Sync updated fields to matching marketing_records
-    if (recordData.Candidate_name) {
-      const adminClient = getAdminClient()
-      if (adminClient) {
-        const mktTech = (recordData.technology || '').toLowerCase().trim()
-        const { data: existingMktRows } = await (adminClient.from('marketing_records') as any)
-          .select('id, technology')
-          .ilike('name', recordData.Candidate_name) as any
-        const existingMkt = (existingMktRows || []).find((m: any) => (m.technology || '').toLowerCase().trim() === mktTech) || null
-        const mktPayload: any = { updated_at: new Date().toISOString() }
-        if (recordData.notes !== undefined) mktPayload.notes = recordData.notes
-        if (recordData.technology !== undefined) mktPayload.technology = recordData.technology
-        if (selectedEmployeeId) mktPayload.owner_id = selectedEmployeeId
-        if (backupEmployeeId !== undefined) mktPayload.backup_employee_id = backupEmployeeId || null
-        if (backupName !== null) mktPayload.backup_employee_name = backupName
-        const [pResult, eResult] = await Promise.all([
-          supabase.from('profiles').select('full_name').eq('id', selectedEmployeeId || effectiveOwnerId).maybeSingle(),
-          supabase.from('employees').select('full_name').eq('user_id', selectedEmployeeId || effectiveOwnerId).maybeSingle(),
-        ])
-        const empName = pResult.data?.full_name || eResult.data?.full_name || null
-        if (empName) mktPayload.employee_name = empName
-        if (existingMkt) {
-          await (adminClient.from('marketing_records') as any).update(mktPayload).eq('id', existingMkt.id)
-        } else {
-          mktPayload.name = recordData.Candidate_name
-          mktPayload.date = new Date().toISOString().split('T')[0]
-          await (adminClient.from('marketing_records') as any).insert(mktPayload)
-        }
-      }
-    }
-
     await supabase.from('audit_logs').insert({
       action: 'updated', entity_type: 'candidate_record', entity_id: body.id,
       user_id: user.id, created_at: new Date().toISOString(),
@@ -261,32 +187,6 @@ export async function POST(req: NextRequest) {
     .select('id')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Sync to marketing_records
-  const adminClient = getAdminClient()
-  if (adminClient && recordData.Candidate_name) {
-    const mktTech = (recordData.technology || '').toLowerCase().trim()
-    const { data: existingMktRows } = await (adminClient.from('marketing_records') as any)
-      .select('id, technology')
-      .ilike('name', recordData.Candidate_name) as any
-    const existingMkt = (existingMktRows || []).find((m: any) => (m.technology || '').toLowerCase().trim() === mktTech) || null
-    const mktPayload: any = {
-      name: recordData.Candidate_name,
-      technology: recordData.technology || null,
-      notes: recordData.notes || null,
-      owner_id: effectiveOwnerId,
-      employee_name: (employee_name || null),
-      updated_at: new Date().toISOString(),
-    }
-    if (backupEmployeeId !== undefined) mktPayload.backup_employee_id = backupEmployeeId || null
-    if (backupName !== null) mktPayload.backup_employee_name = backupName
-    if (existingMkt) {
-      await (adminClient.from('marketing_records') as any).update(mktPayload).eq('id', existingMkt.id)
-    } else {
-      mktPayload.date = new Date().toISOString().split('T')[0]
-      await (adminClient.from('marketing_records') as any).insert(mktPayload)
-    }
-  }
 
   await supabase.from('audit_logs').insert({
     action: 'created', entity_type: 'candidate_record', entity_id: inserted?.id || '',
