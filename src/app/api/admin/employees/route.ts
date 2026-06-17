@@ -201,11 +201,11 @@ export async function DELETE(req: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Clean up references in related tables before deleting the user
-    await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).eq('owner_id', id)
-    await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).eq('backup_employee_id', id)
-    await supabaseAdmin.from('marketing_records').update({ owner_id: null }).eq('owner_id', id)
-    await supabaseAdmin.from('marketing_reminder_logs').delete().eq('owner_id', id)
+    // Clean up references in related tables (best-effort, don't block deletion)
+    try { await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).eq('owner_id', id) } catch {}
+    try { await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).eq('backup_employee_id', id) } catch {}
+    try { await supabaseAdmin.from('marketing_records').update({ owner_id: null }).eq('owner_id', id) } catch {}
+    try { await supabaseAdmin.from('marketing_reminder_logs').delete().eq('owner_id', id) } catch {}
 
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(id)
     if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })

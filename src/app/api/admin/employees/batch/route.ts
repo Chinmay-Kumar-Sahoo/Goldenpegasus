@@ -66,11 +66,11 @@ export async function DELETE(req: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  // Clean up references in related tables before deleting
-  await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).in('owner_id', ids)
-  await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).in('backup_employee_id', ids)
-  await supabaseAdmin.from('marketing_records').update({ owner_id: null }).in('owner_id', ids)
-  await supabaseAdmin.from('marketing_reminder_logs').delete().in('owner_id', ids)
+  // Clean up references in related tables (best-effort, don't block deletion)
+  try { await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).in('owner_id', ids) } catch {}
+  try { await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).in('backup_employee_id', ids) } catch {}
+  try { await supabaseAdmin.from('marketing_records').update({ owner_id: null }).in('owner_id', ids) } catch {}
+  try { await supabaseAdmin.from('marketing_reminder_logs').delete().in('owner_id', ids) } catch {}
 
   // Delete from auth
   for (const id of ids) {
