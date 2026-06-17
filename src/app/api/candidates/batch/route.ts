@@ -13,6 +13,9 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Only admin can edit candidate details' }, { status: 403 })
+
   const { ids, updates } = await req.json()
   if (!Array.isArray(ids) || ids.length === 0) {
     return NextResponse.json({ error: 'No records specified' }, { status: 400 })

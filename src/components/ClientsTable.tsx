@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
+import { COUNTRY_CODES } from '@/lib/countryCodes'
 
 interface CandidateRecord {
   id: string
@@ -102,11 +103,11 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const [editing, setEditing] = useState<CandidateRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', address: '', status: 'Active', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
+  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', country_code: '+1', address: '', status: 'Active', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
-  const [bulkForm, setBulkForm] = useState({ status: '', notes: '', address: '' })
+  const [bulkForm, setBulkForm] = useState({ status: '', address: '' })
   const [bulkSaving, setBulkSaving] = useState(false)
   const [activeTextFilter, setActiveTextFilter] = useState<string | null>(null)
   const [textFilters, setTextFilters] = useState<Record<string, string[]>>({})
@@ -194,11 +195,11 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const openModal = (rec?: CandidateRecord) => {
     if (rec) {
       setEditing(rec)
-      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', address: rec.address || '', status: rec.status || 'Active', notes: rec.notes || '', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '', technology: rec.technology || '' })
+      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', country_code: (rec as any).country_code || '+1', address: rec.address || '', status: rec.status || 'Active', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '', technology: rec.technology || '' })
       setSelectedEmployeeId(rec.owner_id || '')
     } else {
       setEditing(null)
-      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', address: '', status: 'Active', notes: '', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
+      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', country_code: '+1', address: '', status: 'Active', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
       setSelectedEmployeeId('')
     }
     setError('')
@@ -283,7 +284,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
       toast.success(`Updated ${selectedIds.size} records`)
       setShowBulkModal(false)
       setSelectedIds(new Set())
-      setBulkForm({ status: '', notes: '', address: '' })
+            setBulkForm({ status: '', address: '' })
       fetchRecords()
     } catch {
       toast.error('Failed to bulk update')
@@ -479,15 +480,17 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
       {!readOnly && selectedIds.size > 0 && (
         <div className="mb-4 flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5">
           <span className="text-sm text-[#a1a1aa]">{selectedIds.size} selected</span>
-          <button onClick={() => {
-            if (selectedIds.size === 1) {
-              const id = Array.from(selectedIds)[0]
-              const rec = records.find(r => r.id === id) || sorted.find(r => r.id === id)
-              if (rec) { openModal(rec); setSelectedIds(new Set()); return }
-            }
-            setBulkForm({ status: '', notes: '', address: '' }); setShowBulkModal(true)
-          }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
-          {isAdmin && <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>}
+          {isAdmin && <>
+            <button onClick={() => {
+              if (selectedIds.size === 1) {
+                const id = Array.from(selectedIds)[0]
+                const rec = records.find(r => r.id === id) || sorted.find(r => r.id === id)
+                if (rec) { openModal(rec); setSelectedIds(new Set()); return }
+              }
+              setBulkForm({ status: '', address: '' }); setShowBulkModal(true)
+            }} className="text-xs bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/20 px-3 py-1.5 rounded-lg transition-all">Edit Selected</button>
+            <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>
+          </>}
           <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
         </div>
       )}
@@ -681,7 +684,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                   disabled={!!editing && !isAdmin}
                   className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <option value="">No Backup Employee</option>
-                  {employeeOptions.map(emp => (
+                  {employeeOptions.filter(emp => emp.id !== (editing ? (selectedEmployeeId || editing.owner_id) : selectedEmployeeId)).map(emp => (
                     <option key={emp.id} value={emp.id}>{emp.full_name}</option>
                   ))}
                 </select>
@@ -691,15 +694,31 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                 { label: 'Candidate Name *', name: 'Candidate_name', type: 'text', required: true },
                 { label: 'Technology', name: 'technology', type: 'text' },
                 { label: 'Email', name: 'Candidate_email', type: 'email' },
-                { label: 'Phone', name: 'client_phone', type: 'text', inputMode: 'numeric' as const },
                 { label: 'Address', name: 'address', type: 'text' },
               ].map(field => (
                 <div key={field.name}>
                   <label className="block text-xs font-medium text-[#a1a1aa] mb-1">{field.label}</label>
-                  <input type={field.type} inputMode={(field as any).inputMode || 'text'} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} required={field.required}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                  <input type={field.type} value={form[field.name as keyof typeof form] || ''} onChange={e => setForm({ ...form, [field.name]: e.target.value })} required={field.required}
+                    disabled={!!editing && !isAdmin}
+                    className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                  {field.name === 'Candidate_name' && !!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can edit candidate details</p>}
                 </div>
               ))}
+              <div>
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Phone</label>
+                <div className="flex gap-2">
+                  <select value={form.country_code} onChange={e => setForm({ ...form, country_code: e.target.value })}
+                    disabled={!!editing && !isAdmin}
+                    className={`w-[130px] shrink-0 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    {COUNTRY_CODES.filter((c, i, arr) => arr.findIndex(x => x.code === c.code) === i).map(cc => (
+                      <option key={`${cc.code}-${cc.country}`} value={cc.code}>{cc.label}</option>
+                    ))}
+                  </select>
+                  <input type="text" inputMode="numeric" value={form.client_phone} onChange={e => setForm({ ...form, client_phone: e.target.value })}
+                    disabled={!!editing && !isAdmin}
+                    className={`flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Status *</label>
                 <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} required
@@ -712,11 +731,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
                 </select>
                 {!!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can change status</p>}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Notes</label>
-                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2}
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-none" />
-              </div>
+
               {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setError(''); setShowModal(false) }} className="flex-1 border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white py-2.5 rounded-xl text-sm transition-all">Cancel</button>
@@ -738,7 +753,6 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
             <div className="space-y-3">
               {[
                 { label: 'Status', name: 'status', type: 'select', options: ['', 'Active', 'In-active', 'Closed'] },
-                { label: 'Notes', name: 'notes', type: 'textarea' },
                 { label: 'Address', name: 'address', type: 'text' },
               ].map(f => (
                 <div key={f.name}>

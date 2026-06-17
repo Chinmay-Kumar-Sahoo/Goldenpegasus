@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-const CANDIDATE_FIELDS = 'id, Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology, linkedin_url, Candidate_email, client_phone, address, notes, created_at, updated_at'
+const CANDIDATE_FIELDS = 'id, Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology, linkedin_url, Candidate_email, client_phone, country_code, address, notes, created_at, updated_at'
 const PROFILE_FIELDS = 'id, full_name, email'
 
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -134,6 +134,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.id) {
+    if (!isAdminUser) return NextResponse.json({ error: 'Only admin can edit candidate details' }, { status: 403 })
     const updateData: any = { ...recordData, updated_at: new Date().toISOString() }
     if (selectedEmployeeId) updateData.owner_id = selectedEmployeeId
     if (backupEmployeeId !== undefined) updateData.backup_employee_id = backupEmployeeId || null
