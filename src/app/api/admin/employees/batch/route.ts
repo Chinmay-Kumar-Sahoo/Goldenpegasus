@@ -70,7 +70,7 @@ export async function DELETE(req: NextRequest) {
   await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).in('owner_id', ids)
   await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).in('backup_employee_id', ids)
   await supabaseAdmin.from('marketing_records').update({ owner_id: null }).in('owner_id', ids)
-  await supabaseAdmin.from('marketing_reminder_logs').update({ owner_id: null }).in('owner_id', ids)
+  await supabaseAdmin.from('marketing_reminder_logs').delete().in('owner_id', ids)
 
   // Delete from auth
   for (const id of ids) {

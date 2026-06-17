@@ -205,7 +205,7 @@ export async function DELETE(req: NextRequest) {
     await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).eq('owner_id', id)
     await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).eq('backup_employee_id', id)
     await supabaseAdmin.from('marketing_records').update({ owner_id: null }).eq('owner_id', id)
-    await supabaseAdmin.from('marketing_reminder_logs').update({ owner_id: null }).eq('owner_id', id)
+    await supabaseAdmin.from('marketing_reminder_logs').delete().eq('owner_id', id)
 
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(id)
     if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })

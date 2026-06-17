@@ -195,12 +195,12 @@ export default function AdminEmployeesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedIds) }),
       })
-      if (!res.ok) throw new Error('Failed to bulk delete')
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error || 'Failed to bulk delete') }
       toast.success(`Deleted ${selectedIds.size} employees`)
       setSelectedIds(new Set())
       fetchEmployees()
-    } catch {
-      toast.error('Failed to bulk delete')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to bulk delete')
     }
   }
 
