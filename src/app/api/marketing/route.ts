@@ -404,10 +404,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { employee_name: _, name, technology, ...updatableFields } = recordData
+    const { employee_name: _, name, ...updatableFields } = recordData
     // Non-admin should not update employee meta fields
     if (!isAdminUser) {
       delete updatableFields.backup_employee_name
+      delete updatableFields.technology
     }
     const updatePayload: any = { ...updatableFields, updated_at: new Date().toISOString() }
     // Normalize company name fields on edit

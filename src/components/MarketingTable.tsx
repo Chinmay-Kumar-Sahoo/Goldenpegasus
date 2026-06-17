@@ -1265,6 +1265,9 @@ export default function MarketingPage({
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
+                ) : isAdmin ? (
+                  <input type="text" value={form.technology} onChange={e => setForm({ ...form, technology: e.target.value })}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 ) : (
                   <input type="text" value={form.technology} disabled
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
