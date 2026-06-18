@@ -9,24 +9,45 @@ async function checkAdmin(supabase: any) {
   return { user }
 }
 
+// GET: fetch all technologies with nested sub-technologies
 export async function GET() {
   try {
     const supabase = await createClient()
     const auth = await checkAdmin(supabase)
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
-    const { data, error } = await supabase
-      .from('base_table')
+    const { data: techs, error: techErr } = await supabase
+      .from('base_technologies')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('name', { ascending: true })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ records: data || [] })
+    if (techErr) return NextResponse.json({ error: techErr.message }, { status: 500 })
+
+    const { data: subs, error: subErr } = await supabase
+      .from('base_sub_technologies')
+      .select('*')
+      .order('name', { ascending: true })
+
+    if (subErr) return NextResponse.json({ error: subErr.message }, { status: 500 })
+
+    const subMap: Record<string, any[]> = {}
+    for (const s of subs || []) {
+      if (!subMap[s.technology_id]) subMap[s.technology_id] = []
+      subMap[s.technology_id].push(s)
+    }
+
+    const technologies = (techs || []).map(t => ({
+      ...t,
+      sub_technologies: subMap[t.id] || [],
+    }))
+
+    return NextResponse.json({ technologies })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }
 
+// POST: create/update technology or sub-technology
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
@@ -34,57 +55,82 @@ export async function POST(req: NextRequest) {
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
     const body = await req.json()
+    const { kind } = body
 
-    if (body.id) {
-      // Update existing record
-      const updates: Record<string, any> = {}
-      if (body.technology !== undefined) updates.technology = body.technology
-      if (body.sub_technology !== undefined) updates.sub_technology = body.sub_technology || null
-      if (body.comments !== undefined) updates.comments = body.comments || null
-      updates.updated_at = new Date().toISOString()
-
-      const { error } = await supabase.from('base_table').update(updates).eq('id', body.id)
+    if (kind === 'technology') {
+      if (body.id) {
+        const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+        if (body.name !== undefined) updates.name = body.name
+        if (body.comments !== undefined) updates.comments = body.comments || null
+        const { error } = await supabase.from('base_technologies').update(updates).eq('id', body.id)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ success: true })
+      }
+      if (!body.name?.trim()) return NextResponse.json({ error: 'Technology name is required' }, { status: 400 })
+      const { data, error } = await supabase.from('base_technologies').insert({
+        name: body.name.trim(),
+        comments: body.comments?.trim() || null,
+        owner_id: auth.user.id,
+      }).select().single()
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ technology: data }, { status: 201 })
     }
 
-    // Create new record
-    if (!body.technology?.trim()) {
-      return NextResponse.json({ error: 'Technology is required' }, { status: 400 })
+    if (kind === 'sub') {
+      if (body.id) {
+        const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+        if (body.name !== undefined) updates.name = body.name
+        if (body.comments !== undefined) updates.comments = body.comments || null
+        const { error } = await supabase.from('base_sub_technologies').update(updates).eq('id', body.id)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ success: true })
+      }
+      if (!body.technology_id) return NextResponse.json({ error: 'technology_id is required' }, { status: 400 })
+      if (!body.name?.trim()) return NextResponse.json({ error: 'Sub-technology name is required' }, { status: 400 })
+      const { data, error } = await supabase.from('base_sub_technologies').insert({
+        technology_id: body.technology_id,
+        name: body.name.trim(),
+        comments: body.comments?.trim() || null,
+        owner_id: auth.user.id,
+      }).select().single()
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ sub_technology: data }, { status: 201 })
     }
 
-    const { data, error } = await supabase.from('base_table').insert({
-      technology: body.technology.trim(),
-      sub_technology: body.sub_technology?.trim() || null,
-      comments: body.comments?.trim() || null,
-      owner_id: auth.user.id,
-    }).select().single()
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ record: data }, { status: 201 })
+    return NextResponse.json({ error: 'Invalid kind. Use "technology" or "sub".' }, { status: 400 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }
 
+// DELETE: delete technology(s) or sub-technology(s)
 export async function DELETE(req: NextRequest) {
   try {
     const supabase = await createClient()
     const auth = await checkAdmin(supabase)
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
-    const { id, ids } = await req.json()
+    const body = await req.json()
+    const { kind } = body
 
-    if (ids && Array.isArray(ids)) {
-      const { error } = await supabase.from('base_table').delete().in('id', ids)
+    if (kind === 'technology') {
+      const ids = body.ids || (body.id ? [body.id] : [])
+      if (!ids.length) return NextResponse.json({ error: 'id(s) required' }, { status: 400 })
+      // CASCADE deletes sub-technologies automatically
+      const { error } = await supabase.from('base_technologies').delete().in('id', ids)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ success: true, deleted: ids.length })
     }
 
-    if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
-    const { error } = await supabase.from('base_table').delete().eq('id', id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ success: true })
+    if (kind === 'sub') {
+      const ids = body.ids || (body.id ? [body.id] : [])
+      if (!ids.length) return NextResponse.json({ error: 'id(s) required' }, { status: 400 })
+      const { error } = await supabase.from('base_sub_technologies').delete().in('id', ids)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ success: true, deleted: ids.length })
+    }
+
+    return NextResponse.json({ error: 'Invalid kind. Use "technology" or "sub".' }, { status: 400 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }

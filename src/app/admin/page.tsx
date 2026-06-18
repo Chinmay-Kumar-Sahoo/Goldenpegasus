@@ -14,7 +14,7 @@ export default async function AdminPage() {
       supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'admin'),
       supabase.from('marketing_records').select('*', { count: 'exact', head: true }),
       supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }),
-      supabase.from('base_table').select('*', { count: 'exact', head: true }),
+      supabase.from('base_technologies').select('*', { count: 'exact', head: true }),
       supabase.from('audit_logs').select('action, entity_type, entity_id, created_at, user_id, profiles(full_name)').gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()).order('created_at', { ascending: false }),
       supabase.from('Candidate_records').select('Candidate_name, technology'),
     ])

@@ -11,8 +11,8 @@ BEGIN
   -- Nullify owner references in marketing_records
   UPDATE public.marketing_records SET owner_id = NULL WHERE owner_id = old.id;
 
-  -- Nullify owner references in marketing_reminder_logs
-  UPDATE public.marketing_reminder_logs SET owner_id = NULL WHERE owner_id = old.id;
+  -- Delete reminder logs for this owner (owner_id is NOT NULL)
+  DELETE FROM public.marketing_reminder_logs WHERE owner_id = old.id;
 
   -- Delete from employees and profiles last
   DELETE FROM public.employees WHERE user_id = old.id;
