@@ -8,15 +8,17 @@ export const metadata = { title: 'Admin Dashboard | GoldenPegasus' }
 export default async function AdminPage() {
   const supabase = await createClient()
 
-  const [{ count: employeeCount }, { count: adminCount }, { count: mktCount }, { count: clientCount }, { count: tableCount }, { data: recentLogs }] =
+  const [{ count: employeeCount }, { count: adminCount }, { count: mktCount }, { count: tableCount }, { data: recentLogs }, { data: clientRaw }] =
     await Promise.all([
       supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'employee'),
       supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'admin'),
       supabase.from('marketing_records').select('*', { count: 'exact', head: true }),
-      supabase.from('Candidate_records').select('*', { count: 'exact', head: true }),
       supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }),
       supabase.from('audit_logs').select('action, entity_type, entity_id, created_at, user_id, profiles(full_name)').gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()).order('created_at', { ascending: false }),
+      supabase.from('Candidate_records').select('Candidate_name, technology'),
     ])
+  const uniqueClients = new Set((clientRaw || []).map((r: any) => ((r.Candidate_name || '') + '|' + (r.technology || '')).toLowerCase().trim()).filter(Boolean))
+  const clientCount = uniqueClients.size
 
   const entityNames: Record<string, string> = {}
   const employeeIds = [...new Set((recentLogs || []).filter(l => l.entity_type === 'employee').map(l => l.entity_id).filter(Boolean))]
