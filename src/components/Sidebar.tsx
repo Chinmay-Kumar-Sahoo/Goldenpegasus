@@ -26,6 +26,7 @@ const adminNav: NavItem[] = [
   { label: 'All Project Records', href: '/admin/projects', icon: '🗂️' },
   { label: 'Dynamic Tables', href: '/admin/tables', icon: '🏗️' },
   { label: 'Audit Log History', href: '/admin/audit', icon: '📋' },
+  { label: 'Base Table', href: '/admin/base-table', icon: '📋' },
   { label: 'Register Admin', href: '/admin/register', icon: '➕' },
   { label: 'Personal Details', href: '/admin/profile', icon: '👤' },
 ]
