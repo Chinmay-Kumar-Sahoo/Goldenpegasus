@@ -1355,16 +1355,22 @@ export default function MarketingPage({
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Sub Technology</label>
                 {isAdmin || !editing ? (() => {
                   const matchedTech = technologies.find(t => t.name.trim().toLowerCase() === (form.technology || '').trim().toLowerCase())
-                  const baseSubs = matchedTech?.sub_technologies || []
-                  const subOptions = baseSubs.map(s => s.name)
+                  const subOptions = matchedTech
+                    ? matchedTech.sub_technologies.map(s => s.name)
+                    : technologies.flatMap(t => t.sub_technologies.map(s => s.name))
                   return (
-                    <select value={form.sub_technology} onChange={e => setForm(prev => ({ ...prev, sub_technology: e.target.value }))}
-                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-                      <option value="">No Sub Technology</option>
-                      {subOptions.map(st => (
-                        <option key={st} value={st}>{st}</option>
-                      ))}
-                    </select>
+                    <>
+                      <select value={form.sub_technology} onChange={e => setForm(prev => ({ ...prev, sub_technology: e.target.value }))}
+                        className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                        <option value="">No Sub Technology</option>
+                        {subOptions.map(st => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
+                      {form.sub_technology && !subOptions.includes(form.sub_technology) && (
+                        <p className="text-xs text-[#a1a1aa] mt-1">Current value: {form.sub_technology}</p>
+                      )}
+                    </>
                   )
                 })() : (
                   <input type="text" value={form.sub_technology || ''} disabled
