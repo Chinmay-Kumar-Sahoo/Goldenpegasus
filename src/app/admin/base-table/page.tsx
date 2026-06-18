@@ -28,6 +28,7 @@ export default function AdminBaseTablePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)
@@ -93,6 +94,30 @@ export default function AdminBaseTablePage() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (!confirm(`Delete ${selectedIds.size} records?`)) return
+    try {
+      const res = await fetch('/api/admin/base-table', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      })
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error || 'Bulk delete failed') }
+      toast.success(`Deleted ${selectedIds.size} records`)
+      setSelectedIds(new Set())
+      fetchRecords()
+    } catch (err: any) {
+      toast.error(err.message || 'Bulk delete failed')
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => prev.size === filtered.length ? new Set() : new Set(filtered.map(r => r.id)))
+  }
+
   const q = search.toLowerCase().trim()
   const filtered = q
     ? records.filter(r =>
@@ -120,11 +145,23 @@ export default function AdminBaseTablePage() {
         </div>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="mb-4 flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5">
+          <span className="text-sm text-[#a1a1aa]">{selectedIds.size} selected</span>
+          <button onClick={handleBulkDelete} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">Delete Selected</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717a] hover:text-white ml-auto transition-colors">Clear selection</button>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col bg-[#111111] border border-[#2a2a2a] rounded-2xl overflow-hidden">
         <div className="flex-1 overflow-auto">
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
+                <th className="text-left px-2 py-3 w-10">
+                  <input type="checkbox" checked={selectedIds.size === filtered.length && filtered.length > 0} onChange={toggleSelectAll}
+                    className="accent-[#22c55e] cursor-pointer" />
+                </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">Technology</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">Sub Technology</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-[#71717a] uppercase tracking-wide">Comments</th>
@@ -135,16 +172,20 @@ export default function AdminBaseTablePage() {
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: 4 }).map((_, j) => (
+                    {Array.from({ length: 5 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-12 text-center text-[#71717a] text-sm">No records found.</td></tr>
               ) : (
                 filtered.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
+                    <td className="px-2 py-3">
+                      <input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)}
+                        className="accent-[#22c55e] cursor-pointer" />
+                    </td>
                     <td className="px-4 py-3 text-sm text-white font-medium">{rec.technology}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.sub_technology || '—'}</td>
                     <td className="px-4 py-3 text-sm text-[#a1a1aa] max-w-md truncate">{rec.comments || '—'}</td>
