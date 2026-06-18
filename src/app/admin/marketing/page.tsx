@@ -14,21 +14,30 @@ export default async function AdminMarketingPage() {
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : supabase
 
-  const [recordsResult, employeeProfiles, allProfiles, employeesFromTable, candidatesResult, adminProfiles] = await Promise.all([
+  const [recordsResult, employeeProfiles, allProfiles, employeesFromTable, candidatesResult, adminProfiles, baseTechs, baseSubs] = await Promise.all([
     lookupClient.from('marketing_records').select('*').order('created_at', { ascending: false }).limit(2000),
     lookupClient.from('profiles').select('id, full_name, email').neq('role', 'admin').not('role', 'is', null),
     lookupClient.from('profiles').select('id, full_name, email'),
     lookupClient.from('employees').select('user_id, full_name, email'),
     lookupClient.from('Candidate_records').select('id, Candidate_name, owner_id, status, technology, linkedin_url, backup_employee_id, backup_employee_name'),
     lookupClient.from('profiles').select('id').eq('role', 'admin'),
+    lookupClient.from('base_technologies').select('id, name').order('name', { ascending: true }),
+    lookupClient.from('base_sub_technologies').select('id, technology_id, name').order('name', { ascending: true }),
   ])
+
+  const subMap: Record<string, any[]> = {}
+  for (const s of (baseSubs?.data || [])) {
+    if (!subMap[s.technology_id]) subMap[s.technology_id] = []
+    subMap[s.technology_id].push(s)
+  }
+  const technologies = (baseTechs?.data || []).map(t => ({ ...t, sub_technologies: subMap[t.id] || [] }))
 
   const adminIds = new Set((adminProfiles?.data || []).map((p: any) => p.id))
 
   const records = (recordsResult.data || []).map(r => ({ ...r, status: (r as any).status || 'Telephone Call' }))
 
   if (!records || records.length === 0) {
-    return <MarketingTable isAdmin={true} readOnly={false} currentUserId={user?.id ?? null} />
+    return <MarketingTable isAdmin={true} readOnly={false} currentUserId={user?.id ?? null} technologies={technologies} />
   }
 
   const ownerIds = Array.from(new Set(records.map(r => r.owner_id).filter(Boolean)))
@@ -108,6 +117,7 @@ export default async function AdminMarketingPage() {
       initialOwnerNames={ownerNames}
       employeeOptions={employeeOptions}
       candidateOptions={candidateOptions}
+      technologies={technologies}
     />
   )
 }

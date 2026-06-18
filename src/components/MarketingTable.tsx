@@ -231,6 +231,7 @@ export default function MarketingPage({
   initialOwnerNames: serverOwnerNames = {},
   employeeOptions = [],
   candidateOptions = [],
+  technologies: initialTechnologies = [],
 }: {
   isAdmin?: boolean
   readOnly?: boolean
@@ -239,6 +240,7 @@ export default function MarketingPage({
   initialOwnerNames?: Record<string, string>
   employeeOptions?: Array<{ id: string; full_name: string }>
   candidateOptions?: Array<{ id: string; name: string; owner_id: string; owner_name?: string | null; status: string | null; backup_employee_id?: string | null; backup_employee_name?: string | null; technology?: string | null; sub_technology?: string | null }>
+  technologies?: Array<{ id: string; name: string; sub_technologies: Array<{ id: string; name: string }> }>
 }) {
   const showPrimaryEmployeeColumn = true
   const showBackupEmployeeColumn = true
@@ -287,7 +289,7 @@ export default function MarketingPage({
     implementation_poc_email: '', interviewer_email: '', notes: '',
     employee_name: '', backup_employee_name: '', technology: '', sub_technology: '',
   })
-  const [technologies, setTechnologies] = useState<Array<{ id: string; name: string; sub_technologies: Array<{ id: string; name: string }> }>>([])
+  const [technologies, setTechnologies] = useState<Array<{ id: string; name: string; sub_technologies: Array<{ id: string; name: string }> }>>(initialTechnologies)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)

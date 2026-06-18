@@ -131,6 +131,19 @@ export default async function MyMarketingPage() {
     }
   }
 
+  // Fetch Base Table technologies (use admin client to bypass RLS)
+  const techQueryClient = supabaseAdmin || supabase
+  const [{ data: baseTechs }, { data: baseSubs }] = await Promise.all([
+    techQueryClient.from('base_technologies').select('id, name').order('name', { ascending: true }),
+    techQueryClient.from('base_sub_technologies').select('id, technology_id, name').order('name', { ascending: true }),
+  ])
+  const subMap: Record<string, any[]> = {}
+  for (const s of (baseSubs || [])) {
+    if (!subMap[s.technology_id]) subMap[s.technology_id] = []
+    subMap[s.technology_id].push(s)
+  }
+  const technologies = (baseTechs || []).map(t => ({ ...t, sub_technologies: subMap[t.id] || [] }))
+
   // Build owner names from all records
   const ownerIds = Array.from(new Set(mergedRecords.map(r => r.owner_id).filter(Boolean)))
   let ownerNames: Record<string, string> = {}
@@ -213,6 +226,7 @@ export default async function MyMarketingPage() {
       initialOwnerNames={ownerNames}
       employeeOptions={employeeOptions}
       candidateOptions={candidateOptions}
+      technologies={technologies}
     />
   )
 }
