@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import PageHeader from '@/components/PageHeader'
+import CleanupButton from '@/components/CleanupButton'
 import Link from 'next/link'
 import { formatDateTime } from '@/lib/format'
 
@@ -86,6 +87,7 @@ export default async function AdminPage() {
                 <span className="ml-auto text-[#3a3a3a] group-hover:text-[#22c55e] transition-colors">→</span>
               </Link>
             ))}
+            <CleanupButton />
           </div>
         </div>
 

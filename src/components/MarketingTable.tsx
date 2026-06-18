@@ -130,6 +130,8 @@ const normalizeCompanyName = (value: string | null): string | null => {
   const key = trimmed.toLowerCase()
   return COMPANY_VARIATIONS[key] || trimmed
 }
+const normalizeName = (v: string | null) => v ? v.trim().replace(/\s+/g, ' ') : v
+const normalizeTech = (v: string | null) => v ? v.trim() : v
 
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'name',
@@ -457,7 +459,11 @@ export default function MarketingPage({
     e.preventDefault()
     setSaving(true)
     setError('')
-    const cleanForm = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
+    const cleanForm: Record<string, any> = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null]))
+    if (cleanForm.name) cleanForm.name = normalizeName(cleanForm.name)
+    if (cleanForm.technology) cleanForm.technology = normalizeTech(cleanForm.technology)
+    if (cleanForm.organization_name) cleanForm.organization_name = normalizeCompanyName(cleanForm.organization_name)
+    if (cleanForm.implementation_partner) cleanForm.implementation_partner = normalizeCompanyName(cleanForm.implementation_partner)
     // Client-side email validation
     const emailFields = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
     const isValidEmail = (v: string) => !v || /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(v)
@@ -865,6 +871,10 @@ export default function MarketingPage({
           let normalized = String(val).trim()
           if (fieldKey === 'organization_name' || fieldKey === 'implementation_partner') {
             normalized = normalizeCompanyName(normalized) || normalized
+          } else if (fieldKey === 'name') {
+            normalized = normalizeName(normalized) || normalized
+          } else if (fieldKey === 'technology') {
+            normalized = normalizeTech(normalized) || normalized
           }
           values.add(normalized)
         }
@@ -891,6 +901,10 @@ export default function MarketingPage({
         if (!fieldVal && fieldKey === 'status') fieldVal = 'Telephone Call'
         if (fieldKey === 'organization_name' || fieldKey === 'implementation_partner') {
           fieldVal = normalizeCompanyName(fieldVal) || fieldVal
+        } else if (fieldKey === 'name') {
+          fieldVal = normalizeName(fieldVal) || fieldVal
+        } else if (fieldKey === 'technology') {
+          fieldVal = normalizeTech(fieldVal) || fieldVal
         }
         if (!selected.includes(fieldVal)) return false
       }

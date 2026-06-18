@@ -61,6 +61,10 @@ const normalizeCompanyName = (value: string | null): string | null => {
   return COMPANY_VARIATIONS[key] || trimmed
 }
 
+const norm = (v: any) => String(v ?? '').toLowerCase().trim()
+const normalizeName = (v: string | null) => v ? v.trim().replace(/\s+/g, ' ') : v
+const normalizeTech = (v: string | null) => v ? v.trim() : v
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -74,62 +78,114 @@ export async function POST(req: NextRequest) {
   if (!serviceRoleKey) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
   const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
 
-  const { data: records } = await adminClient
-    .from('marketing_records')
-    .select('id, organization_name, implementation_partner, recruiter_email, client_email, implementation_poc_email, interviewer_email')
-
-  if (!records?.length) return NextResponse.json({ updated: 0, emailCleared: 0 })
-
+  let companyNameUpdated = 0
   let nameUpdated = 0
+  let techUpdated = 0
   let emailCleared = 0
-  const EMAIL_FIELDS = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
+  let mktDupesRemoved = 0
+  let candDupesRemoved = 0
+  let candNameUpdated = 0
+  let candTechUpdated = 0
 
-  for (const rec of records) {
-    const updates: Record<string, any> = {}
-    const org = normalizeCompanyName(rec.organization_name)
-    if (org !== rec.organization_name) {
-      updates.organization_name = org
-      nameUpdated++
-    }
-    const imp = normalizeCompanyName(rec.implementation_partner)
-    if (imp !== rec.implementation_partner) {
-      updates.implementation_partner = imp
-      nameUpdated++
-    }
-    for (const field of EMAIL_FIELDS) {
-      const val = (rec as any)[field]
-      if (val && !isValidEmail(val)) {
-        updates[field] = null
-        emailCleared++
+  // ── 1. Normalize marketing_records ─────────────────────────────────────
+  const { data: mktRecs } = await adminClient
+    .from('marketing_records')
+    .select('id, name, technology, organization_name, implementation_partner, recruiter_email, client_email, implementation_poc_email, interviewer_email')
+
+  if (mktRecs?.length) {
+    const EMAIL_FIELDS = ['recruiter_email', 'client_email', 'implementation_poc_email', 'interviewer_email']
+    for (const rec of mktRecs) {
+      const updates: Record<string, any> = {}
+
+      const newName = normalizeName(rec.name)
+      if (newName !== rec.name) { updates.name = newName; nameUpdated++ }
+
+      const newTech = normalizeTech(rec.technology)
+      if (newTech !== rec.technology) { updates.technology = newTech; techUpdated++ }
+
+      const org = normalizeCompanyName(rec.organization_name)
+      if (org !== rec.organization_name) { updates.organization_name = org; companyNameUpdated++ }
+
+      const imp = normalizeCompanyName(rec.implementation_partner)
+      if (imp !== rec.implementation_partner) { updates.implementation_partner = imp; companyNameUpdated++ }
+
+      for (const field of EMAIL_FIELDS) {
+        const val = (rec as any)[field]
+        if (val && !isValidEmail(val)) {
+          updates[field] = null
+          emailCleared++
+        }
       }
-    }
-    if (Object.keys(updates).length > 0) {
-      updates.updated_at = new Date().toISOString()
-      await adminClient.from('marketing_records').update(updates).eq('id', rec.id)
+      if (Object.keys(updates).length > 0) {
+        updates.updated_at = new Date().toISOString()
+        await adminClient.from('marketing_records').update(updates).eq('id', rec.id)
+      }
     }
   }
 
-  // --- Remove duplicate records (same values across key user-facing fields + same owner_id) ---
-  // Excluding date fields and notes as those commonly vary between otherwise identical records
-  const dedupFields = ['name', 'technology', 'recruiter_email', 'implementation_partner']
-  const buildKey = (r: any) => dedupFields.map(f => ((r[f] ?? '') + '').toLowerCase().trim()).join('|||') + '|||' + (r.owner_id || '')
-  let removedDupes = 0
-  const { data: allRecords } = await adminClient
+  // ── 2. Normalize Candidate_records ─────────────────────────────────────
+  const { data: candRecs } = await adminClient
+    .from('Candidate_records')
+    .select('id, Candidate_name, technology')
+
+  if (candRecs?.length) {
+    for (const rec of candRecs) {
+      const updates: Record<string, any> = {}
+      const newName = normalizeName(rec.Candidate_name)
+      if (newName !== rec.Candidate_name) { updates.Candidate_name = newName; candNameUpdated++ }
+      const newTech = normalizeTech(rec.technology)
+      if (newTech !== rec.technology) { updates.technology = newTech; candTechUpdated++ }
+      if (Object.keys(updates).length > 0) {
+        updates.updated_at = new Date().toISOString()
+        await adminClient.from('Candidate_records').update(updates).eq('id', rec.id)
+      }
+    }
+  }
+
+  // ── 3. Dedup marketing_records after normalization ─────────────────────
+  // Use normalized (trimmed, collapsed) values for comparison.
+  // Keep the earliest-created record for each unique key.
+  const MKT_DEDUP_FIELDS = ['name', 'technology', 'recruiter_email', 'implementation_partner']
+  const mktBuildKey = (r: any) =>
+    MKT_DEDUP_FIELDS.map(f => norm(r[f])).join('|||') + '|||' + norm(r.owner_id)
+  const { data: allMkt } = await adminClient
     .from('marketing_records')
     .select('id, created_at, name, technology, recruiter_email, organization_name, implementation_partner, end_client, client_name, client_email, implementation_poc_email, interviewer_email, owner_id')
     .order('created_at', { ascending: true })
-  if (allRecords?.length) {
+  if (allMkt?.length) {
     const seen = new Map<string, string>()
-    for (const rec of allRecords) {
-      const key = buildKey(rec)
+    for (const rec of allMkt) {
+      const key = mktBuildKey(rec)
       if (seen.has(key)) {
         await adminClient.from('marketing_records').delete().eq('id', rec.id)
-        removedDupes++
+        mktDupesRemoved++
       } else {
         seen.set(key, rec.id)
       }
     }
   }
 
-  return NextResponse.json({ updated: nameUpdated, emailCleared, removedDupes })
+  // ── 4. Dedup Candidate_records after normalization ─────────────────────
+  // Keep the earliest-created record for each (Candidate_name, technology).
+  const { data: allCand } = await adminClient
+    .from('Candidate_records')
+    .select('id, created_at, Candidate_name, technology, owner_id')
+    .order('created_at', { ascending: true })
+  if (allCand?.length) {
+    const seen = new Set<string>()
+    for (const rec of allCand) {
+      const key = norm(rec.Candidate_name) + '|' + norm(rec.technology)
+      if (seen.has(key)) {
+        await adminClient.from('Candidate_records').delete().eq('id', rec.id)
+        candDupesRemoved++
+      } else {
+        seen.add(key)
+      }
+    }
+  }
+
+  return NextResponse.json({
+    marketing: { companyNameUpdated, nameUpdated, techUpdated, emailCleared, dupesRemoved: mktDupesRemoved },
+    candidates: { nameUpdated: candNameUpdated, techUpdated: candTechUpdated, dupesRemoved: candDupesRemoved },
+  })
 }
