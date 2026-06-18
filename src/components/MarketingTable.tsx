@@ -820,7 +820,7 @@ export default function MarketingPage({
   }, [filteredCandidates])
 
   const handleCandidateSelect = (candidateName: string) => {
-    setForm(prev => ({ ...prev, name: candidateName, technology: '', employee_name: '', backup_employee_name: '' }))
+    setForm(prev => ({ ...prev, name: candidateName, technology: '', sub_technology: '', employee_name: '', backup_employee_name: '' }))
     if (isAdmin) setSelectedEmployeeId('')
   }
 
@@ -1349,7 +1349,7 @@ export default function MarketingPage({
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Sub Technology</label>
-                {isAdmin ? (
+                {isAdmin || !editing ? (
                   <select value={form.sub_technology} onChange={e => setForm(prev => ({ ...prev, sub_technology: e.target.value }))}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">No Sub Technology</option>
