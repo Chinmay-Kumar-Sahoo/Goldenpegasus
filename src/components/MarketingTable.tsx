@@ -1353,7 +1353,10 @@ export default function MarketingPage({
                   <select value={form.sub_technology} onChange={e => setForm(prev => ({ ...prev, sub_technology: e.target.value }))}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                     <option value="">No Sub Technology</option>
-                    {form.technology && (technologies.find(t => t.name === form.technology)?.sub_technologies || []).map(st => (
+                    {form.sub_technology && ![...(technologies.find(t => t.name === form.technology)?.sub_technologies || [])].some(st => st.name === form.sub_technology) && (
+                      <option value={form.sub_technology}>{form.sub_technology}</option>
+                    )}
+                    {(technologies.find(t => t.name === form.technology)?.sub_technologies || []).map(st => (
                       <option key={st.id} value={st.name}>{st.name}</option>
                     ))}
                   </select>
