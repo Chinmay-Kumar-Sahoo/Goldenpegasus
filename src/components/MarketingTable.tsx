@@ -556,13 +556,15 @@ export default function MarketingPage({
   }
 
   const handleCleanup = async () => {
-    if (!confirm('Normalize company names, clean invalid emails, and remove duplicate records?')) return
+    if (!confirm('Normalize names/technologies/company names, clean invalid emails, and remove duplicate records?')) return
     setCleaningUp(true)
     try {
       const res = await fetch('/api/admin/marketing-cleanup', { method: 'POST' })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Cleanup failed')
-      toast.success(`Updated ${result.updated} fields, cleared ${result.emailCleared} invalid emails, removed ${result.removedDupes} duplicates`)
+      const m = result.marketing || {}
+      const c = result.candidates || {}
+      toast.success(`Marketing: ${m.nameUpdated ?? 0} names, ${m.techUpdated ?? 0} tech, ${m.companyNameUpdated ?? 0} companies, ${m.emailCleared ?? 0} emails, ${m.dupesRemoved ?? 0} dupes. Candidates: ${c.nameUpdated ?? 0} names, ${c.techUpdated ?? 0} tech, ${c.dupesRemoved ?? 0} dupes.`)
       fetchRecords()
     } catch (err: any) {
       toast.error(err.message || 'Cleanup failed')
