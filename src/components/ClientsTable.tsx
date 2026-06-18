@@ -20,6 +20,7 @@ interface CandidateRecord {
   backup_employee_id?: string | null
   backup_employee_name?: string | null
   technology?: string | null
+  sub_technology?: string | null
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,6 +35,7 @@ const STATUS_COLORS: Record<string, string> = {
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'Candidate_name',
   'Technology': 'technology',
+  'Sub Technology': 'sub_technology',
   'Email': 'Candidate_email',
   'Primary Employee': 'employee_name',
   'Backup Employee': 'backup_employee_name',
@@ -73,6 +75,7 @@ const TableRow = memo(function TableRow({
       {!readOnly && <td className="px-2 py-3" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>}
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.Candidate_name}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.technology || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.sub_technology || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.Candidate_email || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{`${(rec as any).country_code || ''}${rec.client_phone || ''}` || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.address || '—'}</td>
@@ -114,7 +117,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const [editing, setEditing] = useState<CandidateRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', country_code: '+1', address: '', status: 'Active', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
+  const [form, setForm] = useState({ Candidate_name: '', Candidate_email: '', client_phone: '', country_code: '+1', address: '', status: 'Active', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '', sub_technology: '' })
+  const [technologies, setTechnologies] = useState<Array<{ id: string; name: string; sub_technologies: Array<{ id: string; name: string }> }>>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
@@ -170,6 +174,10 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     }
   }, [fetchRecords])
 
+  useEffect(() => {
+    fetch('/api/technologies').then(r => r.ok && r.json()).then(d => { if (d?.technologies) setTechnologies(d.technologies) }).catch(() => {})
+  }, [])
+
   const handleSearchChange = useCallback((value: string) => {
     setSearchInput(value)
     clearTimeout(searchDebounceRef.current)
@@ -206,11 +214,11 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const openModal = (rec?: CandidateRecord) => {
     if (rec) {
       setEditing(rec)
-      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', country_code: (rec as any).country_code || '+1', address: rec.address || '', status: rec.status || 'Active', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '', technology: rec.technology || '' })
+      setForm({ Candidate_name: rec.Candidate_name, Candidate_email: rec.Candidate_email || '', client_phone: rec.client_phone || '', country_code: (rec as any).country_code || '+1', address: rec.address || '', status: rec.status || 'Active', employee_name: rec.employee_name || '', backup_employee_id: rec.backup_employee_id || '', backup_employee_name: rec.backup_employee_name || '', technology: rec.technology || '', sub_technology: rec.sub_technology || '' })
       setSelectedEmployeeId(rec.owner_id || '')
     } else {
       setEditing(null)
-      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', country_code: '+1', address: '', status: 'Active', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '' })
+      setForm({ Candidate_name: '', Candidate_email: '', client_phone: '', country_code: '+1', address: '', status: 'Active', employee_name: '', backup_employee_id: '', backup_employee_name: '', technology: '', sub_technology: '' })
       setSelectedEmployeeId('')
     }
     setError('')
@@ -322,8 +330,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   }
 
   const exportCSV = () => {
-    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Notes']
-    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email, r.client_phone, r.address || '', r.employee_name, r.backup_employee_name, r.notes])
+    const headers = ['Candidate Name', 'Technology', 'Sub Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Notes']
+    const rows = filtered.map(r => [r.Candidate_name, r.technology || '', r.sub_technology || '', r.Candidate_email, r.client_phone, r.address || '', r.employee_name, r.backup_employee_name, r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -336,8 +344,8 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Notes']
-    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.Candidate_email || '', r.client_phone || '', r.address || '', r.employee_name || '', r.backup_employee_name || '', r.notes || ''])
+    const headers = ['Candidate Name', 'Technology', 'Sub Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Notes']
+    const data = filtered.map(r => [r.Candidate_name, r.technology || '', r.sub_technology || '', r.Candidate_email || '', r.client_phone || '', r.address || '', r.employee_name || '', r.backup_employee_name || '', r.notes || ''])
 
     autoTable(doc, {
       head: [headers],
@@ -393,6 +401,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
       if (!hasSearch) return true
       return         wordScore(r.Candidate_name, query) > 0 ||
         wordScore(r.technology, query) > 0 ||
+        wordScore(r.sub_technology, query) > 0 ||
         wordScore(r.Candidate_email, query) > 0 ||
         wordScore(r.client_phone, query) > 0 ||
         wordScore(r.employee_name, query) > 0 ||
@@ -410,6 +419,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
         const score = Math.max(
           wordScore(r.Candidate_name, query),
           wordScore(r.technology, query),
+          wordScore(r.sub_technology, query),
           wordScore(r.Candidate_email, query),
           wordScore(r.client_phone, query),
           wordScore(r.employee_name, query),
@@ -518,7 +528,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Status', ...(!readOnly ? ['Actions'] : [])].map(h => {
+                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Sub Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Status', ...(!readOnly ? ['Actions'] : [])].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -605,13 +615,13 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: readOnly ? 8 : 10 }).map((_, j) => (
+                    {Array.from({ length: readOnly ? 9 : 11 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
-              ) : sorted.length === 0 ? (
-                <tr><td colSpan={readOnly ? 8 : 10} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                ) : sorted.length === 0 ? (
+                <tr><td colSpan={readOnly ? 9 : 11} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 paginated.map(rec => (
                   <TableRow key={rec.id} rec={rec} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} onEdit={readOnly ? undefined : () => openModal(rec)} onDelete={isAdmin ? handleDelete : undefined} />
@@ -716,10 +726,23 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Technology</label>
-                <input type="text" value={form.technology || ''} onChange={e => setForm({ ...form, technology: e.target.value })}
+                <select value={form.technology} onChange={e => { setForm({ ...form, technology: e.target.value, sub_technology: '' }) }}
                   disabled={!!editing && !isAdmin}
-                  className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                  className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <option value="">Select Technology</option>
+                  {technologies.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                </select>
                 {!!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can change technology</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Sub Technology</label>
+                <select value={form.sub_technology} onChange={e => setForm({ ...form, sub_technology: e.target.value })}
+                  disabled={!form.technology || (!!editing && !isAdmin)}
+                  className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!form.technology || (!!editing && !isAdmin)) ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <option value="">No Sub Technology</option>
+                  {(technologies.find(t => t.name === form.technology)?.sub_technologies || []).map(st => <option key={st.id} value={st.name}>{st.name}</option>)}
+                </select>
+                {!!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can change sub technology</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Email</label>

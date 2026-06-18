@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-const CANDIDATE_FIELDS = 'id, Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology, linkedin_url, Candidate_email, client_phone, country_code, address, notes, created_at, updated_at'
+const CANDIDATE_FIELDS = 'id, Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology, sub_technology, linkedin_url, Candidate_email, client_phone, country_code, address, notes, created_at, updated_at'
 const PROFILE_FIELDS = 'id, full_name, email'
 
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
