@@ -851,7 +851,7 @@ export default function MarketingPage({
         }
       }
     }
-    let empName = '', backupName = '', empId = '', subTech = ''
+    let empName = '', backupName = '', empId = ''
     if (candidate) {
       if (candidate.owner_name) {
         empName = candidate.owner_name
@@ -861,9 +861,8 @@ export default function MarketingPage({
       }
       backupName = candidate.backup_employee_name || ''
       empId = candidate.owner_id || ''
-      subTech = (candidate as any).sub_technology || ''
     }
-    setForm(prev => ({ ...prev, technology: tech, sub_technology: subTech, employee_name: empName, backup_employee_name: backupName }))
+    setForm(prev => ({ ...prev, technology: tech, sub_technology: '', employee_name: empName, backup_employee_name: backupName }))
     if (isAdmin) setSelectedEmployeeId(empId)
   }
 
@@ -1355,16 +1354,14 @@ export default function MarketingPage({
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Sub Technology</label>
                 {isAdmin || !editing ? (() => {
-                  const baseSubs = technologies.find(t => t.name === form.technology)?.sub_technologies || []
-                  const candidateSubs = form.name && form.technology
-                    ? [...new Set(allCandidateOptions.filter(c => c.name === form.name && c.technology === form.technology).map(c => (c as any).sub_technology).filter(Boolean))]
-                    : []
-                  const allSubs = [...new Set([...candidateSubs, ...baseSubs.map(s => s.name)])]
+                  const matchedTech = technologies.find(t => t.name.trim().toLowerCase() === (form.technology || '').trim().toLowerCase())
+                  const baseSubs = matchedTech?.sub_technologies || []
+                  const subOptions = baseSubs.map(s => s.name)
                   return (
                     <select value={form.sub_technology} onChange={e => setForm(prev => ({ ...prev, sub_technology: e.target.value }))}
                       className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
                       <option value="">No Sub Technology</option>
-                      {allSubs.map(st => (
+                      {subOptions.map(st => (
                         <option key={st} value={st}>{st}</option>
                       ))}
                     </select>
