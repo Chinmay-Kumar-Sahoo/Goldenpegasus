@@ -291,6 +291,9 @@ export async function POST(req: NextRequest) {
   if (recordData.organization_name) recordData.organization_name = normalizeCompanyName(recordData.organization_name)
   if (recordData.implementation_partner) recordData.implementation_partner = normalizeCompanyName(recordData.implementation_partner)
 
+  // Normalize candidate name: trim, collapse internal whitespace (case preserved for display)
+  if (recordData.name) recordData.name = recordData.name.trim().replace(/\s+/g, ' ')
+
   // When creating a new record with candidate name + technology, auto-fill from Candidate_records
   if (!body.id && recordData.name) {
     const { data: candidates } = await supabase
@@ -370,6 +373,41 @@ export async function POST(req: NextRequest) {
     employeeName = pResult.data?.full_name || eResult.data?.full_name || null
   }
 
+  // ── Shared duplicate check ──────────────────────────────────────────────
+  // Returns error response if a duplicate exists, or null if ok.
+  // Applies normalizeCompanyName to company fields on both sides for fair comparison.
+  async function checkDuplicate(candidateName: string, technology: string | null, excludeId?: string): Promise<NextResponse | null> {
+    const adminClient = getAdminClient()
+    if (!adminClient || !candidateName) return null
+    const dupFields = ['recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'notes', 'interview_type', 'project_start_date', 'project_end_date', 'interview_date']
+    const norm = (v: any) => String(v ?? '').toLowerCase().trim()
+    // Build normalized signature for the incoming record
+    const makeSig = (obj: any) => dupFields.map((f: string) => {
+      const raw = obj[f]
+      // Normalize company-name fields before comparison
+      if (f === 'organization_name' || f === 'implementation_partner') {
+        return norm(normalizeCompanyName(raw) ?? raw)
+      }
+      return norm(raw)
+    }).join('|||')
+    const newSig = makeSig(recordData)
+    const { data: existing } = await (adminClient as any)
+      .from('marketing_records')
+      .select('id, technology, ' + dupFields.join(', '))
+      .ilike('name', candidateName)
+    if (!existing) return null
+    const techNorm = (v: any) => (v ?? '').toLowerCase().trim()
+    const dup = (existing as any[]).find((r: any) => {
+      if (excludeId && r.id === excludeId) return false
+      if (techNorm(r.technology) !== techNorm(technology)) return false
+      return makeSig(r) === newSig
+    })
+    if (dup) {
+      return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
+    }
+    return null
+  }
+
   if (body.id) {
     // --- EDITING EXISTING RECORD ---
       const { data: existingRecord } = await supabase
@@ -406,6 +444,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Technology "${recordData.technology}" is not assigned to this candidate in Candidate Records` }, { status: 400 })
       }
     }
+
+    // Dedup check on edit (exclude current record)
+    const candidateName = recordData.name || existingRecord.name
+    const techVal = recordData.technology !== undefined ? recordData.technology : existingRecord.technology
+    const dupErr = await checkDuplicate(candidateName, techVal, body.id)
+    if (dupErr) return dupErr
 
     let client = supabase
     if (!isAdminUser) {
@@ -475,25 +519,10 @@ export async function POST(req: NextRequest) {
   delete insertData.selectedEmployeeId
   delete insertData.id
 
-  // --- Dedup: block exact duplicates (all meaningful fields match for same name+technology, any owner) ---
+  // Dedup check on create
   if (insertData.name) {
-    const adminClient = getAdminClient()
-    if (adminClient) {
-      const dupFields = ['recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'notes', 'interview_type', 'project_start_date', 'project_end_date', 'interview_date']
-      const norm = (v: any) => String(v ?? '').toLowerCase().trim()
-      const newKey = dupFields.map(f => norm(insertData[f])).join('|||')
-      const { data: existing } = await (adminClient as any)
-        .from('marketing_records')
-        .select('id, technology, ' + dupFields.join(', '))
-        .ilike('name', insertData.name)
-      if (existing) {
-        const techMatch = (r: any) => norm(r.technology) === norm(insertData.technology)
-        const isDuplicate = (existing as any[]).some((r: any) => techMatch(r) && dupFields.map((f: string) => norm((r as any)[f])).join('|||') === newKey)
-        if (isDuplicate) {
-          return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
-        }
-      }
-    }
+    const dupErr = await checkDuplicate(insertData.name, insertData.technology)
+    if (dupErr) return dupErr
   }
 
   const { data: inserted, error } = await supabase
