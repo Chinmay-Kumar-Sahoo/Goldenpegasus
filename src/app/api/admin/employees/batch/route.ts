@@ -43,42 +43,50 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = await createServerClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { ids } = await req.json()
-  if (!Array.isArray(ids) || ids.length === 0) {
-    return NextResponse.json({ error: 'No records specified' }, { status: 400 })
+    const { ids } = await req.json()
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: 'No records specified' }, { status: 400 })
+    }
+
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+    if (!serviceRoleKey) {
+      return NextResponse.json({ error: 'Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is missing' }, { status: 500 })
+    }
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+
+    // Clean up references in related tables (best-effort, don't block deletion)
+    try { await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).in('owner_id', ids) } catch {}
+    try { await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).in('backup_employee_id', ids) } catch {}
+    try { await supabaseAdmin.from('marketing_records').update({ owner_id: null }).in('owner_id', ids) } catch {}
+    try { await supabaseAdmin.from('marketing_reminder_logs').delete().in('owner_id', ids) } catch {}
+
+    // Delete from auth (and clean up stale profiles/employees rows)
+    for (const id of ids) {
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(id)
+      if (error && !error.message?.toLowerCase().includes('not found')) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      try { await supabaseAdmin.from('profiles').delete().eq('id', id) } catch {}
+      try { await supabaseAdmin.from('employees').delete().eq('user_id', id) } catch {}
+    }
+
+    await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'employee', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
-
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-  if (!serviceRoleKey) {
-    return NextResponse.json({ error: 'Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is missing' }, { status: 500 })
-  }
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    serviceRoleKey,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-
-  // Clean up references in related tables (best-effort, don't block deletion)
-  try { await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).in('owner_id', ids) } catch {}
-  try { await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).in('backup_employee_id', ids) } catch {}
-  try { await supabaseAdmin.from('marketing_records').update({ owner_id: null }).in('owner_id', ids) } catch {}
-  try { await supabaseAdmin.from('marketing_reminder_logs').delete().in('owner_id', ids) } catch {}
-
-  // Delete from auth
-  for (const id of ids) {
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  await supabase.from('audit_logs').insert(ids.map(id => ({ action: 'batch_deleted', entity_type: 'employee', entity_id: id, user_id: user.id, created_at: new Date().toISOString() })))
-
-  return NextResponse.json({ success: true })
 }

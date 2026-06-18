@@ -207,8 +207,15 @@ export async function DELETE(req: NextRequest) {
     try { await supabaseAdmin.from('marketing_records').update({ owner_id: null }).eq('owner_id', id) } catch {}
     try { await supabaseAdmin.from('marketing_reminder_logs').delete().eq('owner_id', id) } catch {}
 
+    // Try to delete from auth (may already be gone — that's ok)
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(id)
-    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
+    if (deleteError && !deleteError.message?.toLowerCase().includes('not found')) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 })
+    }
+
+    // Remove the profile row so it doesn't reappear as a stale record
+    try { await supabaseAdmin.from('profiles').delete().eq('id', id) } catch {}
+    try { await supabaseAdmin.from('employees').delete().eq('user_id', id) } catch {}
 
     await logAudit(supabase, auth.user.id, 'deleted', 'employee', id)
     return NextResponse.json({ success: true })
