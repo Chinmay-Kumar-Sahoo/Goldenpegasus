@@ -395,6 +395,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Admin changing technology must pick one that exists in Candidate_records for this candidate
+    if (isAdminUser && recordData.technology && existingRecord.name) {
+      const { data: candidateTechs } = await supabase
+        .from('Candidate_records')
+        .select('technology')
+        .ilike('Candidate_name', existingRecord.name)
+      const validTechs = new Set((candidateTechs || []).map((c: any) => (c.technology || '').toLowerCase().trim()))
+      if (!validTechs.has((recordData.technology || '').toLowerCase().trim())) {
+        return NextResponse.json({ error: `Technology "${recordData.technology}" is not assigned to this candidate in Candidate Records` }, { status: 400 })
+      }
+    }
+
     let client = supabase
     if (!isAdminUser) {
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY

@@ -1266,8 +1266,16 @@ export default function MarketingPage({
                     ))}
                   </select>
                 ) : isAdmin ? (
-                  <input type="text" value={form.technology} onChange={e => setForm({ ...form, technology: e.target.value })}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                  <select value={form.technology} onChange={e => handleTechnologySelect(e.target.value)} required={!!form.name}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                    <option value="">Select Technology</option>
+                    {form.name && [...new Set([
+                      ...allCandidateOptions.filter(c => c.name === form.name).map(c => c.technology).filter((t): t is string => !!t),
+                      ...records.filter(r => r.name === form.name).map(r => r.technology).filter((t): t is string => !!t),
+                    ])].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                 ) : (
                   <input type="text" value={form.technology} disabled
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
