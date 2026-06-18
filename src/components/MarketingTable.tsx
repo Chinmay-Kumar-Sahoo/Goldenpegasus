@@ -306,7 +306,12 @@ export default function MarketingPage({
 
   useEffect(() => { currentUserIdRef.current = propUserId }, [propUserId])
   useEffect(() => { serverOwnerNamesRef.current = serverOwnerNames }, [serverOwnerNames])
-  useEffect(() => { fetch('/api/technologies').then(r => r.ok && r.json()).then(d => { if (d?.technologies) setTechnologies(d.technologies) }).catch(() => {}) }, [])
+  useEffect(() => {
+    fetch('/api/technologies').then(r => r.json()).then(d => {
+      if (d?.technologies) setTechnologies(d.technologies)
+      else console.warn('Tech fetch: no technologies', d)
+    }).catch((e) => console.warn('Tech fetch error', e))
+  }, [])
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
@@ -1349,18 +1354,22 @@ export default function MarketingPage({
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Sub Technology</label>
-                {isAdmin || !editing ? (
-                  <select value={form.sub_technology} onChange={e => setForm(prev => ({ ...prev, sub_technology: e.target.value }))}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-                    <option value="">No Sub Technology</option>
-                    {form.sub_technology && ![...(technologies.find(t => t.name === form.technology)?.sub_technologies || [])].some(st => st.name === form.sub_technology) && (
-                      <option value={form.sub_technology}>{form.sub_technology}</option>
-                    )}
-                    {(technologies.find(t => t.name === form.technology)?.sub_technologies || []).map(st => (
-                      <option key={st.id} value={st.name}>{st.name}</option>
-                    ))}
-                  </select>
-                ) : (
+                {isAdmin || !editing ? (() => {
+                  const baseSubs = technologies.find(t => t.name === form.technology)?.sub_technologies || []
+                  const candidateSubs = form.name && form.technology
+                    ? [...new Set(allCandidateOptions.filter(c => c.name === form.name && c.technology === form.technology).map(c => (c as any).sub_technology).filter(Boolean))]
+                    : []
+                  const allSubs = [...new Set([...candidateSubs, ...baseSubs.map(s => s.name)])]
+                  return (
+                    <select value={form.sub_technology} onChange={e => setForm(prev => ({ ...prev, sub_technology: e.target.value }))}
+                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
+                      <option value="">No Sub Technology</option>
+                      {allSubs.map(st => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
+                  )
+                })() : (
                   <input type="text" value={form.sub_technology || ''} disabled
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white opacity-50 cursor-not-allowed" />
                 )}
