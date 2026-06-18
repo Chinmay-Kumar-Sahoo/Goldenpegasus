@@ -2,7 +2,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
-const MARKETING_FIELDS = 'id, owner_id, name, date, date_locked, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, status, technology, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, employee_name, backup_employee_name, created_at, updated_at'
+const MARKETING_FIELDS = 'id, owner_id, name, date, date_locked, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, status, technology, sub_technology, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, employee_name, backup_employee_name, created_at, updated_at'
 const CANDIDATE_FIELDS = 'Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology'
 
 let _adminClient: ReturnType<typeof createAdminClient> | null = null
