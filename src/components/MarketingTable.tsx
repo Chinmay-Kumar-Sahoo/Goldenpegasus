@@ -750,7 +750,7 @@ export default function MarketingPage({
     const seen = new Set<string>()
     const merged = [...candidateOptions, ...clientCandidates]
     return merged.filter(c => {
-      const key = c.name + '|' + c.owner_id
+      const key = c.name + '|' + c.owner_id + '|' + (c.technology || '')
       if (seen.has(key)) return false
       seen.add(key)
       return true
