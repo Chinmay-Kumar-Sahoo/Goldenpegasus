@@ -257,6 +257,7 @@ export default function MarketingPage({
   const [bulkForm, setBulkForm] = useState({ status: '', notes: '', recruiter_name: '', organization_name: '', implementation_partner: '', implementation_poc_email: '', end_client: '', interviewer_email: '' })
   const [bulkSaving, setBulkSaving] = useState(false)
   const [cleaningUp, setCleaningUp] = useState(false)
+  const [candidateRefreshKey, setCandidateRefreshKey] = useState(0)
   const [sortBy, setSortBy] = useState('Candidate Name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
@@ -322,9 +323,9 @@ export default function MarketingPage({
     return () => { abortRef.current?.abort() }
   }, [fetchRecords])
 
-  // Fetch candidates from API if server-side options are empty (skip for read-only views)
+  // Fetch candidates from API to keep technology dropdown up to date (skip for read-only views)
   useEffect(() => {
-    if (candidateOptions.length > 0 || readOnly) return
+    if (readOnly) return
     const controller = new AbortController()
     fetch('/api/candidates?limit=2000', { signal: controller.signal })
       .then(res => res.ok ? res.json() : null)
@@ -344,7 +345,7 @@ export default function MarketingPage({
       })
       .catch(() => {})
     return () => controller.abort()
-  }, [candidateOptions.length])
+  }, [candidateRefreshKey])
 
   const handleSearchChange = useCallback((value: string) => {
     setSearchInput(value)
@@ -453,6 +454,7 @@ export default function MarketingPage({
       setSaving(false)
       setShowModal(false)
       fetchRecords()
+      setCandidateRefreshKey(k => k + 1)
     } catch (err: any) {
       setError(err.message)
       setSaving(false)
