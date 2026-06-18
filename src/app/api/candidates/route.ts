@@ -212,22 +212,20 @@ export async function DELETE(req: NextRequest) {
     ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : supabase
 
-  // Fetch candidate name before deleting, for sync
-  const { data: candidate } = await deleteClient.from('Candidate_records').select('Candidate_name').eq('id', id).maybeSingle()
+  // Fetch candidate name + technology before deleting, for sync
+  const { data: candidate } = await deleteClient.from('Candidate_records').select('Candidate_name, technology').eq('id', id).maybeSingle()
   if (!candidate) return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
 
-  const { error } = await deleteClient.from('Candidate_records').delete().eq('id', id)
+  // Delete ALL records with same (Candidate_name, technology) to cover dedup duplicates
+  const { error } = await deleteClient.from('Candidate_records').delete()
+    .ilike('Candidate_name', candidate.Candidate_name)
+    .eq('technology', (candidate.technology || '') === '' ? null : candidate.technology)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Also delete from marketing_records if no other Candidate_records reference this candidate
-  if (candidate?.Candidate_name) {
-    const adminClient = getAdminClient()
-    if (adminClient) {
-      const { data: remaining } = await (adminClient.from('Candidate_records') as any).select('id').ilike('Candidate_name', candidate.Candidate_name).limit(1)
-      if (!remaining || remaining.length === 0) {
-        await (adminClient.from('marketing_records') as any).delete().ilike('name', candidate.Candidate_name)
-      }
-    }
+  // Also delete from marketing_records
+  const adminClient = getAdminClient()
+  if (adminClient) {
+    await (adminClient.from('marketing_records') as any).delete().ilike('name', candidate.Candidate_name).ilike('technology', candidate.technology || '')
   }
 
   await supabase.from('audit_logs').insert({

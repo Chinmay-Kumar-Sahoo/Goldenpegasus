@@ -59,13 +59,14 @@ function wordScore(val: string | null | undefined, q: string): number {
 }
 
 const TableRow = memo(function TableRow({
-  rec, readOnly, selectedIds, toggleSelect, onEdit
+  rec, readOnly, selectedIds, toggleSelect, onEdit, onDelete
 }: {
   rec: CandidateRecord
   readOnly: boolean
   selectedIds: Set<string>
   toggleSelect: (id: string) => void
   onEdit?: () => void
+  onDelete?: (id: string) => void
 }) {
   return (
     <tr className={`border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors ${!readOnly ? 'cursor-pointer' : ''}`} onClick={() => onEdit?.()}>
@@ -82,7 +83,15 @@ const TableRow = memo(function TableRow({
           {rec.status || 'Active'}
         </span>
       </td>
-
+      {!readOnly && (
+        <td className="px-2 py-3 text-right" onClick={e => e.stopPropagation()}>
+          <button onClick={() => onDelete?.(rec.id)} className="text-[#71717a] hover:text-red-400 transition-colors p-1" title="Delete candidate">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </td>
+      )}
     </tr>
   )
 })
@@ -253,15 +262,16 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this candidate record?')) return
     try {
-      await fetch('/api/candidates', {
+      const res = await fetch('/api/candidates', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       })
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error || 'Failed to delete') }
       toast.success('Candidate deleted')
       fetchRecords()
-    } catch {
-      toast.error('Failed to delete candidate')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete candidate')
     }
   }
 
@@ -508,7 +518,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-[#111111]">
               <tr className="border-b border-[#2a2a2a]">
-                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Status'].map(h => {
+                {[...(!readOnly ? ['SELECT'] : []), 'Candidate Name', 'Technology', 'Email', 'Phone', 'Address', 'Primary Employee', 'Backup Employee', 'Status', ...(!readOnly ? ['Actions'] : [])].map(h => {
                   if (h === 'SELECT') {
                     return (
                       <th key="select" className="text-left px-2 py-3 w-10">
@@ -595,16 +605,16 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-b border-[#1a1a1a]">
-                    {Array.from({ length: readOnly ? 8 : 9 }).map((_, j) => (
+                    {Array.from({ length: readOnly ? 8 : 10 }).map((_, j) => (
                       <td key={j} className="px-4 py-4"><div className="skeleton h-4 w-full" /></td>
                     ))}
                   </tr>
                 ))
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={readOnly ? 8 : 9} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
+                <tr><td colSpan={readOnly ? 8 : 10} className="px-4 py-12 text-center text-[#71717a] text-sm">No candidate records found.</td></tr>
               ) : (
                 paginated.map(rec => (
-                  <TableRow key={rec.id} rec={rec} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} onEdit={readOnly ? undefined : () => openModal(rec)} />
+                  <TableRow key={rec.id} rec={rec} readOnly={readOnly} selectedIds={selectedIds} toggleSelect={toggleSelect} onEdit={readOnly ? undefined : () => openModal(rec)} onDelete={isAdmin ? handleDelete : undefined} />
                 ))
               )}
             </tbody>
