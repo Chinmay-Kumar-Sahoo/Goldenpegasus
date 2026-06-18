@@ -101,6 +101,36 @@ const DATE_COLUMNS: Record<string, string> = {
   'Project End Date': 'project_end_date',
 }
 
+const COMPANY_VARIATIONS: Record<string, string> = {
+  'techm': 'Tech Mahindra', 'tech mahindra': 'Tech Mahindra', 'tech mahindra limited': 'Tech Mahindra', 'mahindra': 'Tech Mahindra',
+  'infosys': 'Infosys', 'infy': 'Infosys',
+  'tcs': 'TCS', 'tata consultancy services': 'TCS', 'tata consultancy': 'TCS',
+  'wipro': 'Wipro', 'wipro limited': 'Wipro', 'wipro technologies': 'Wipro',
+  'hcl': 'HCL', 'hcl technologies': 'HCL', 'hcl tech': 'HCL',
+  'accenture': 'Accenture', 'accenture technology': 'Accenture', 'accenture technologies': 'Accenture',
+  'cognizant': 'Cognizant', 'cognizant technology solutions': 'Cognizant', 'cts': 'Cognizant',
+  'ibm': 'IBM', 'i.b.m.': 'IBM',
+  'capgemini': 'Capgemini', 'capg': 'Capgemini',
+  'lti': 'LTI', 'l&t infotech': 'LTI', 'larsen & toubro infotech': 'LTI',
+  'mindtree': 'Mindtree', 'ltimindtree': 'LTI Mindtree',
+  'dell': 'Dell', 'dell technologies': 'Dell',
+  'deloitte': 'Deloitte', 'deloitte consulting': 'Deloitte',
+  'epam': 'EPAM', 'epam systems': 'EPAM',
+  'mphasis': 'Mphasis',
+  'hexaware': 'Hexaware', 'hexaware technologies': 'Hexaware',
+  'persistent': 'Persistent', 'persistent systems': 'Persistent',
+  'synechron': 'Synechron',
+  'teksystems': 'TekSystems', 'tek systems': 'TekSystems',
+  'randstad': 'Randstad', 'randstad technologies': 'Randstad',
+}
+const normalizeCompanyName = (value: string | null): string | null => {
+  if (!value) return null
+  const trimmed = value.trim().replace(/\s+/g, ' ')
+  if (!trimmed) return null
+  const key = trimmed.toLowerCase()
+  return COMPANY_VARIATIONS[key] || trimmed
+}
+
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
   'Candidate Name': 'name',
   'Technology': 'technology',
@@ -169,8 +199,8 @@ const TableRow = memo(function TableRow({
       </td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_name || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_email || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.organization_name || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_partner || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{normalizeCompanyName(rec.organization_name) || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{normalizeCompanyName(rec.implementation_partner) || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_poc_email || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.end_client || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{formatDate(rec.interview_date)}</td>
@@ -831,7 +861,13 @@ export default function MarketingPage({
       for (const rec of records) {
         let val = (rec as any)[fieldKey]
         if (val == null || val === '') val = fieldKey === 'status' ? 'Telephone Call' : null
-        if (val != null) values.add(String(val).trim())
+        if (val != null) {
+          let normalized = String(val).trim()
+          if (fieldKey === 'organization_name' || fieldKey === 'implementation_partner') {
+            normalized = normalizeCompanyName(normalized) || normalized
+          }
+          values.add(normalized)
+        }
       }
       result[header] = Array.from(values).sort((a, b) => a.localeCompare(b))
     }
@@ -853,6 +889,9 @@ export default function MarketingPage({
         const fieldKey = TEXT_FILTER_COLUMNS[header] || header.toLowerCase()
         let fieldVal = String((r as any)[fieldKey] ?? '').trim()
         if (!fieldVal && fieldKey === 'status') fieldVal = 'Telephone Call'
+        if (fieldKey === 'organization_name' || fieldKey === 'implementation_partner') {
+          fieldVal = normalizeCompanyName(fieldVal) || fieldVal
+        }
         if (!selected.includes(fieldVal)) return false
       }
       if (!q) return true
