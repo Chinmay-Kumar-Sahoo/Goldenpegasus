@@ -19,16 +19,16 @@ interface SidebarProps {
 
 const adminNav: NavItem[] = [
   { label: 'Overview', href: '/admin', icon: '📊' },
+  { label: 'Personal Details', href: '/admin/profile', icon: '👤' },
   { label: 'Admin', href: '/admin/admins', icon: '🔑' },
+  { label: 'Register Admin', href: '/admin/register', icon: '➕' },
   { label: 'Employees', href: '/admin/employees', icon: '👥' },
   { label: 'All Marketing Records', href: '/admin/marketing', icon: '📈' },
   { label: 'All Candidate Profiles', href: '/admin/clients', icon: '🤝' },
   { label: 'All Project Records', href: '/admin/projects', icon: '🗂️' },
   { label: 'Dynamic Tables', href: '/admin/tables', icon: '🏗️' },
+  { label: 'Technology Table', href: '/admin/base-table', icon: '📋' },
   { label: 'Audit Log History', href: '/admin/audit', icon: '📋' },
-  { label: 'Base Table', href: '/admin/base-table', icon: '📋' },
-  { label: 'Register Admin', href: '/admin/register', icon: '➕' },
-  { label: 'Personal Details', href: '/admin/profile', icon: '👤' },
 ]
 
 const employeeNav: NavItem[] = [

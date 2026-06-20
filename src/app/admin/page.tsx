@@ -45,7 +45,7 @@ export default async function AdminPage() {
     { label: 'Marketing Records', value: mktCount ?? 0, icon: '📈', href: '/admin/marketing', color: 'green' },
     { label: 'Client Records', value: clientCount ?? 0, icon: '🤝', href: '/admin/clients', color: 'purple' },
     { label: 'Dynamic Tables', value: tableCount ?? 0, icon: '🏗️', href: '/admin/tables', color: 'yellow' },
-    { label: 'Base Table', value: baseCount ?? 0, icon: '📋', href: '/admin/base-table', color: 'blue' },
+    { label: 'Technology Table', value: baseCount ?? 0, icon: '📋', href: '/admin/base-table', color: 'blue' },
   ]
 
   return (

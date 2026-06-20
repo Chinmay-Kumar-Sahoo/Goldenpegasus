@@ -218,7 +218,7 @@ export default function AdminBaseTablePage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <PageHeader title="Base Table" subtitle="Manage Technologies and Sub-Technologies">
+      <PageHeader title="Technology Table" subtitle="Manage Technologies and Sub-Technologies">
         <button onClick={() => openTechModal()} className="bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">
           + Add Technology
         </button>
