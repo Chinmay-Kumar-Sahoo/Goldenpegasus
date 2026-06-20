@@ -12,6 +12,9 @@ export default function ForgotPasswordPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [rootMode, setRootMode] = useState(false);
+  const [rootLoading, setRootLoading] = useState(false);
+  const [rootMessage, setRootMessage] = useState("");
 
   // Initialize page and check for pre-filled email
   useEffect(() => {
@@ -19,6 +22,14 @@ export default function ForgotPasswordPage() {
       if (typeof window === "undefined") return;
 
       let userEmail = "";
+
+      // Store where to redirect after password reset
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("from") === "admin") {
+        localStorage.setItem("reset_redirect", "/admin-login");
+      } else {
+        localStorage.setItem("reset_redirect", "/login");
+      }
 
       // Try to get logged-in user's email from Supabase
       const supabase = createClient();
@@ -165,15 +176,73 @@ export default function ForgotPasswordPage() {
           )}
         </div>
 
-        <p className="text-center text-sm text-[#71717a] mt-6">
-          Remember your password?{" "}
-          <Link
-            href="/login"
-            className="text-[#22c55e] hover:text-[#4ade80] font-medium transition-colors"
-          >
-            Sign in
-          </Link>
-        </p>
+        <div className="mt-6 border-t border-[#2a2a2a] pt-6 text-center">
+          {/* Root Admin Recovery */}
+          {!submitted && (
+            <div className="mb-4">
+              {!rootMode ? (
+                <button
+                  onClick={() => setRootMode(true)}
+                  className="text-xs text-[#71717a] hover:text-red-400 transition-colors"
+                >
+                  Root admin? Reset to default credentials
+                </button>
+              ) : (
+                <div className="bg-[#111111] border border-red-500/10 rounded-xl p-4 text-left">
+                  <p className="text-xs text-[#a1a1aa] mb-2">
+                    This will reset the root admin password to the default credentials configured in the system. Only use this if you cannot access the root admin email.
+                  </p>
+                  {rootMessage && (
+                    <div className={`text-xs mb-2 px-3 py-2 rounded-lg ${rootMessage.includes("success") || rootMessage.includes("Sign in") ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
+                      {rootMessage}
+                    </div>
+                  )}
+                  <button
+                    onClick={async () => {
+                      setRootLoading(true);
+                      setRootMessage("");
+                      try {
+                        const res = await fetch("/api/admin/setup", { method: "POST" });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error);
+                        setRootMessage(`✅ ${data.message} Sign in with the default admin credentials.`);
+                      } catch (err: any) {
+                        setRootMessage(`❌ ${err.message}`);
+                      }
+                      setRootLoading(false);
+                    }}
+                    disabled={rootLoading}
+                    className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-lg transition-colors"
+                  >
+                    {rootLoading ? "Resetting..." : "Reset Root Admin Password"}
+                  </button>
+                  <button
+                    onClick={() => { setRootMode(false); setRootMessage(""); }}
+                    className="mt-2 text-xs text-[#71717a] hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <p className="text-center text-sm text-[#71717a]">
+            Remember your password?{" "}
+            <Link
+              href={(() => {
+                if (typeof window !== "undefined") {
+                  const from = new URLSearchParams(window.location.search).get("from");
+                  return from === "admin" ? "/admin-login" : "/login";
+                }
+                return "/login";
+              })()}
+              className="text-[#22c55e] hover:text-[#4ade80] font-medium transition-colors"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

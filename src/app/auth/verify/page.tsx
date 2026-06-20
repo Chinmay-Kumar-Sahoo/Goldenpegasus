@@ -108,6 +108,21 @@ function VerifyContent() {
           setStatus("Password recovery verified. Redirecting...");
           // Store a flag that password can be reset
           localStorage.setItem("recovery_verified", "true");
+          // Store the correct redirect target based on role
+          let profileRole: string | null = null
+          try {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("role")
+              .eq("id", activeUser.id)
+              .single();
+            profileRole = profile?.role ?? null;
+          } catch { /* ignore */ }
+          if (profileRole === "admin") {
+            localStorage.setItem("reset_redirect", "/admin-login");
+          } else if (!localStorage.getItem("reset_redirect")) {
+            localStorage.setItem("reset_redirect", "/login");
+          }
           setTimeout(() => {
             router.push("/reset-password");
           }, 1000);

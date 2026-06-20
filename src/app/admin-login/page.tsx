@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import BackHomeNav from "@/components/BackHomeNav";
@@ -11,7 +11,16 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const msg = params.get("message");
+    if (msg) {
+      setTimeout(() => setMessage(msg), 0);
+    }
+  }, []);
 
   // Admin must type their credentials manually
 
@@ -127,12 +136,20 @@ export default function AdminLoginPage() {
             </div>
 
             <div>
-              <label
-                className="block text-sm font-medium text-[#a1a1aa] mb-1.5"
-                htmlFor="admin-password"
-              >
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  className="block text-sm font-medium text-[#a1a1aa]"
+                  htmlFor="admin-password"
+                >
+                  Password
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-red-400 hover:text-red-300 font-medium transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <input
                   id="admin-password"
@@ -191,6 +208,12 @@ export default function AdminLoginPage() {
             {error && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">
                 {error}
+              </div>
+            )}
+
+            {message && (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm text-green-400">
+                {message}
               </div>
             )}
 

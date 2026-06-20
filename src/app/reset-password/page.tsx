@@ -86,15 +86,20 @@ export default function ResetPasswordPage() {
         return;
       }
 
+      // Determine where to redirect after password reset
+      const redirectTo = localStorage.getItem("reset_redirect") || "/login";
+      localStorage.removeItem("reset_redirect");
+      const messageParam = encodeURIComponent(
+        "Password reset successfully. Please log in with your new password.",
+      );
+
       setMessage("Password reset successfully! Redirecting to login...");
 
       // Sign out after password reset and redirect
       await supabase.auth.signOut();
 
       setTimeout(() => {
-        router.push(
-          "/login?message=Password reset successfully. Please log in with your new password.",
-        );
+        router.push(`${redirectTo}?message=${messageParam}`);
       }, 2000);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.");
@@ -292,7 +297,14 @@ export default function ResetPasswordPage() {
 
         <p className="text-center text-sm text-[#71717a] mt-6">
           <Link
-            href="/login"
+            href={(() => {
+              if (typeof window !== "undefined") {
+                return localStorage.getItem("reset_redirect") === "/admin-login"
+                  ? "/admin-login"
+                  : "/login";
+              }
+              return "/login";
+            })()}
             className="text-[#22c55e] hover:text-[#4ade80] font-medium transition-colors"
           >
             Back to login
