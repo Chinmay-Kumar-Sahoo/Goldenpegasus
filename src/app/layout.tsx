@@ -7,12 +7,15 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "GoldenPegasus | IT Consulting & Database Management",
   description: "GoldenPegasus IT Consulting & Services LLC — A secure, role-based SaaS platform for managing employee, marketing, and client data with real-time updates.",
 };
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://uhjcnfglspbcgtlwyckh.supabase.co";
 
 export default function RootLayout({
   children,
@@ -21,6 +24,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="preconnect" href={supabaseUrl} />
+        <link rel="dns-prefetch" href={supabaseUrl} />
+      </head>
       <body
         className={`${inter.variable} antialiased bg-black text-white`}
       >

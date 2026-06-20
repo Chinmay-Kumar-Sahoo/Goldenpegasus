@@ -5,7 +5,7 @@ export default function HomePage() {
   return (
     <main className="h-screen bg-[#0a0a0a] text-white flex flex-col relative overflow-hidden">
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <img src="/golden-pegasus-mark.svg" alt="" className="w-[60vw] h-[60vw] max-w-[600px] max-h-[600px] object-contain opacity-[0.04]" />
+        <img src="/golden-pegasus-mark.svg" alt="" loading="lazy" fetchPriority="low" className="w-[60vw] h-[60vw] max-w-[600px] max-h-[600px] object-contain opacity-[0.04]" />
       </div>
       <nav className="relative shrink-0 border-b border-[#2a2a2a] bg-[#0a0a0a]/80 backdrop-blur-md z-10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">

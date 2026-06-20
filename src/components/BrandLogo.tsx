@@ -32,6 +32,7 @@ export default function BrandLogo({
       <img
         src={variant === 'mark' ? '/golden-pegasus-mark.svg' : '/golden-pegasus-logo.svg'}
         alt="Golden Pegasus"
+        loading="lazy"
         className={`${variant === 'mark' ? markSizes[size] : lockupSizes[size]} object-contain ${size === 'lg' ? 'scale-125 origin-bottom' : ''}`}
       />
       {subtitle && variant === 'lockup' && (
