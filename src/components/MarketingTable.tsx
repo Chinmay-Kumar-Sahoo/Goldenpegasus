@@ -291,8 +291,8 @@ export default function MarketingPage({
   const [bulkSaving, setBulkSaving] = useState(false)
   const [cleaningUp, setCleaningUp] = useState(false)
   const [candidateRefreshKey, setCandidateRefreshKey] = useState(0)
-  const [sortBy, setSortBy] = useState('Candidate Name')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [sortBy, setSortBy] = useState('Created Date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(50)
 
