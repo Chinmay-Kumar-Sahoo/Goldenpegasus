@@ -136,20 +136,12 @@ export default function AdminLoginPage() {
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label
-                  className="block text-sm font-medium text-[#a1a1aa]"
-                  htmlFor="admin-password"
-                >
-                  Password
-                </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs text-red-400 hover:text-red-300 font-medium transition-colors"
-                >
-                  Forgot password?
-                </Link>
-              </div>
+              <label
+                className="block text-sm font-medium text-[#a1a1aa] mb-1.5"
+                htmlFor="admin-password"
+              >
+                Password
+              </label>
               <div className="relative">
                 <input
                   id="admin-password"
@@ -202,6 +194,14 @@ export default function AdminLoginPage() {
                     </svg>
                   )}
                 </button>
+              </div>
+              <div className="mt-1.5 text-right">
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-red-400 hover:text-red-300 font-medium transition-colors"
+                >
+                  Forgot password?
+                </Link>
               </div>
             </div>
 
