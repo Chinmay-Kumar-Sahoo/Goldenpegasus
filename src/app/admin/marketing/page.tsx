@@ -80,7 +80,6 @@ export default async function AdminMarketingPage() {
     owner_name: ownerNames[c.owner_id] || null,
     status: c.status,
     technology: (c as any).technology || null,
-    sub_technology: (c as any).sub_technology || null,
     backup_employee_id: (c as any).backup_employee_id,
     backup_employee_name: (c as any).backup_employee_name || ((c as any).backup_employee_id ? ownerNames[(c as any).backup_employee_id] : null) || null,
   }))
