@@ -17,9 +17,6 @@ export default function HomePage() {
             <Link href="/login" className="text-xs bg-[#22c55e] hover:bg-[#16a34a] text-black font-bold px-4 py-2 rounded-lg transition-all duration-200">
               Employee Login
             </Link>
-            <Link href="/signup" className="text-xs border border-[#2a2a2a] hover:border-[#3a3a3a] text-white font-semibold px-4 py-2 rounded-lg transition-all duration-200 ml-1">
-              Get Started
-            </Link>
           </div>
         </div>
       </nav>
