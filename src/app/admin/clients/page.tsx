@@ -61,7 +61,7 @@ export default async function AdminClientsPage() {
     }
   }
 
-  const records = (rawRecords || []).map(r => ({ ...r, employee_name: ownerNames[r.owner_id] || null, backup_employee_name: ((r as any).backup_employee_id ? ownerNames[(r as any).backup_employee_id] : null) || (r as any).backup_employee_name || null }))
+  const records = (rawRecords || []).map(r => ({ ...r, employee_name: ownerNames[r.owner_id] || null, backup_employee_name: (r as any).backup_employee_id ? ((r as any).backup_employee_name || ownerNames[(r as any).backup_employee_id] || null) : null }))
 
   return <ClientsTable isAdmin={true} initialRecords={records} employeeOptions={employeeOptions} initialOwnerNames={ownerNames} currentUserId={null} />
 }
