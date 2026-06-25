@@ -101,7 +101,7 @@ export default async function AdminMarketingPage() {
     const lookupKey = normalize((r as any).name || '') + '|' + normalize((r as any).technology || '')
     return {
       ...r,
-      employee_name: primaryOwnerByCandidate[lookupKey] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
+      employee_name: primaryOwnerByCandidate[lookupKey] || ((r as any).owner_id ? (r as any).employee_name : null) || ownerNames[r.owner_id] || 'Unknown employee',
       backup_employee_name: backupNamesByCandidate[lookupKey] || null,
       technology: (r as any).technology || null,
     }

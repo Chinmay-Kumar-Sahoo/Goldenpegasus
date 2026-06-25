@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
   const enriched = records.map(r => ({
     ...r,
     employee_name: r.owner_id ? (ownerNames[r.owner_id] || null) : null,
-    backup_employee_name: r.backup_employee_name || (r.backup_employee_id ? (ownerNames[r.backup_employee_id] || null) : null),
+    backup_employee_name: r.backup_employee_id ? (r.backup_employee_name || ownerNames[r.backup_employee_id] || null) : null,
   }))
 
   return NextResponse.json({ records: enriched })

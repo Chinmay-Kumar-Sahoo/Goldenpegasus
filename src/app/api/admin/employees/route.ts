@@ -202,6 +202,9 @@ export async function DELETE(req: NextRequest) {
     )
 
     // Clean up references in related tables (best-effort, don't block deletion)
+    try { await supabaseAdmin.from('marketing_records').update({ employee_name: null }).eq('owner_id', id) } catch {}
+    try { await supabaseAdmin.from('marketing_records').update({ backup_employee_name: null }).eq('backup_employee_id', id) } catch {}
+    try { await supabaseAdmin.from('Candidate_records').update({ backup_employee_name: null }).eq('backup_employee_id', id) } catch {}
     try { await supabaseAdmin.from('Candidate_records').update({ owner_id: null }).eq('owner_id', id) } catch {}
     try { await supabaseAdmin.from('Candidate_records').update({ backup_employee_id: null }).eq('backup_employee_id', id) } catch {}
     try { await supabaseAdmin.from('marketing_records').update({ owner_id: null }).eq('owner_id', id) } catch {}

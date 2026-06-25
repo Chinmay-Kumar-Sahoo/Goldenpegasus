@@ -198,8 +198,8 @@ export async function GET(req: NextRequest) {
     return {
       ...r,
       status: (r as any).status || 'Telephone Call',
-      employee_name: primaryOwnerByCandidate[lookupKey] || (r as any).employee_name || ownerNames[r.owner_id] || 'Unknown employee',
-      backup_employee_name: backupNamesByCandidate[lookupKey] || (r as any).backup_employee_name || null,
+      employee_name: primaryOwnerByCandidate[lookupKey] || (r.owner_id ? (r as any).employee_name : null) || ownerNames[r.owner_id] || 'Unknown employee',
+      backup_employee_name: backupNamesByCandidate[lookupKey] || (r.backup_employee_id ? (r as any).backup_employee_name : null) || null,
       technology: (r as any).technology || null,
       last_reminder_sent_at: lastReminderByRecord[r.id] || null,
     }
