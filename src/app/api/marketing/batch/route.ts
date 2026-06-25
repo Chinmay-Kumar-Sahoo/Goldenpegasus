@@ -81,7 +81,7 @@ export async function PUT(req: NextRequest) {
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : null
 
-  const normalize = (s: string) => s.toLowerCase().trim()
+  const normalize = (s: string) => s.toLowerCase().replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, ' ').replace(/\s+/g, ' ').trim()
   const denormalize = (s: string) => s.trim()
 
   const isValidISODate = (s: string | null) => {
@@ -104,7 +104,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // Gather unique candidate names from the import
-  const rawCandidateNames = [...new Set(records.map((r: any) => (r.name || '').trim()).filter(Boolean))] as string[]
+  const rawCandidateNames = [...new Set(records.map((r: any) => normalize(r.name || '')).filter(Boolean))] as string[]
 
   // Fetch Candidate_records by name (case-insensitive ilike)
   const lookupClient = supabaseAdmin || supabase
