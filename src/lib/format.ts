@@ -1,5 +1,7 @@
 function toMMDDYYYY(date: Date): string {
-  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-${date.getFullYear()}`
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${m}-${d}-${date.getFullYear()}`
 }
 
 export function formatDate(value: string | null | undefined): string {
