@@ -81,7 +81,7 @@ export async function PUT(req: NextRequest) {
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : null
 
-  const normalize = (s: string) => s.toLowerCase().replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, ' ').replace(/\s+/g, ' ').trim()
+  const normalize = (s: string) => s.replace(/[\u00A0\u200B\u200C\u200D\uFEFF\u180E\u2060\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
   const denormalize = (s: string) => s.trim()
 
   const isValidISODate = (s: string | null) => {
@@ -103,45 +103,33 @@ export async function PUT(req: NextRequest) {
     }, { status: 400 })
   }
 
-  // Gather unique candidate names from the import
-  const rawCandidateNames = [...new Set(records.map((r: any) => normalize(r.name || '')).filter(Boolean))] as string[]
-
-  // Fetch Candidate_records by name (case-insensitive ilike)
+  // Fetch ALL candidate records (no name pre-filter) — avoids PostgREST .or().ilike() parsing edge cases
   const lookupClient = supabaseAdmin || supabase
-  let candidatesData: any[] = []
-  if (rawCandidateNames.length > 0) {
-    const nameFilters = rawCandidateNames.map(n => `Candidate_name.ilike.${n}`).join(',')
-    const { data } = await lookupClient
-      .from('Candidate_records')
+  const [{ data: candidatesData }, { data: bp }, { data: be }] = await Promise.all([
+    lookupClient.from('Candidate_records')
       .select('Candidate_name, owner_id, backup_employee_id, backup_employee_name, status, technology, linkedin_url')
-      .or(nameFilters)
-    candidatesData = data || []
-  }
+      .limit(2000),
+    lookupClient.from('profiles').select('id, full_name'),
+    lookupClient.from('employees').select('user_id, full_name'),
+  ])
+  const allCandidates = candidatesData || []
+  const profilesData = bp || []
+  const employeesData = be || []
 
-  // Build set of all candidate names that exist (regardless of assignment)
-  const allCandidateNameSet = new Set(candidatesData.map((c: any) => normalize(c.Candidate_name)))
+  // Build set of ALL candidate names that exist (regardless of assignment)
+  const allCandidateNameSet = new Set(allCandidates.map((c: any) => normalize(c.Candidate_name)))
 
   // Determine which candidates are accessible to the current user
   const accessibleRecords = !isAdmin
-    ? candidatesData.filter((c: any) => c.owner_id === user.id || c.backup_employee_id === user.id)
-    : candidatesData
+    ? allCandidates.filter((c: any) => c.owner_id === user.id || c.backup_employee_id === user.id)
+    : allCandidates
 
   const accessibleNameSet = new Set(accessibleRecords.map((c: any) => normalize(c.Candidate_name)))
 
-  // Resolve names for IDs found in Candidate_records (owner_id, backup_employee_id)
-  const allCandIds = [...new Set([
-    ...candidatesData.map((c: any) => c.owner_id).filter(Boolean),
-    ...candidatesData.map((c: any) => c.backup_employee_id).filter(Boolean),
-  ])] as string[]
+  // Resolve names for IDs found in Candidate_records
   const idToName = new Map<string, string>()
-  if (allCandIds.length > 0) {
-    const [{ data: bp }, { data: be }] = await Promise.all([
-      lookupClient.from('profiles').select('id, full_name').in('id', allCandIds),
-      lookupClient.from('employees').select('user_id, full_name').in('user_id', allCandIds),
-    ])
-    for (const p of (bp || [])) if (p.full_name) idToName.set(p.id, p.full_name)
-    for (const e of (be || [])) if (e.full_name) idToName.set(e.user_id, e.full_name)
-  }
+  for (const p of profilesData) if (p.full_name) idToName.set(p.id, p.full_name)
+  for (const e of employeesData) if (e.full_name) idToName.set(e.user_id, e.full_name)
 
   // Build candidate lookups from ACCESSIBLE records only
   const candidateByName = new Map<string, any[]>()
