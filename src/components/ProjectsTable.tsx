@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
+import { formatDate } from '@/lib/format'
 
 interface ProjectRecord {
   id: string
@@ -350,7 +351,7 @@ export default function ProjectsTable({
   const renderFieldValue = (field: string, value: any) => {
     if (!value) return '—'
     if (field === 'created_date' || field === 'project_start_date' || field === 'project_end_date') {
-      return new Date(value).toLocaleDateString()
+      return formatDate(value)
     }
     return String(value)
   }
