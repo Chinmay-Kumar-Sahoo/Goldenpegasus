@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import PageHeader from '@/components/PageHeader'
 import Link from 'next/link'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime } from '@/lib/dates'
 
 export const metadata = { title: 'Admin Dashboard | GoldenPegasus' }
 

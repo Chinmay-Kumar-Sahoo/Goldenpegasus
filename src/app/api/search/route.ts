@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { formatDate } from '@/lib/format'
+import { formatDate } from '@/lib/dates'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import PageHeader from '@/components/PageHeader'
-import { formatDate } from '@/lib/format'
+import { formatDate } from '@/lib/dates'
 import toast from 'react-hot-toast'
 
 interface FieldDef { name: string; label: string; type: string; required: boolean }

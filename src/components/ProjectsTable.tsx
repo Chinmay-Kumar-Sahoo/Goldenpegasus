@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
-import { formatDate } from '@/lib/format'
+import { formatDate } from '@/lib/dates'
 
 interface ProjectRecord {
   id: string

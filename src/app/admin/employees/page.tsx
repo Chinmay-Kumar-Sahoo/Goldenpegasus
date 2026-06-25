@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import PageHeader from '@/components/PageHeader'
-import { formatDate } from '@/lib/format'
+import { formatDate } from '@/lib/dates'
 import { COUNTRY_CODES } from '@/lib/countryCodes'
 import toast from 'react-hot-toast'
 

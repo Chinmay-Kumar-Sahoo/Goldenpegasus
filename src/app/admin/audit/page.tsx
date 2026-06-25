@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import PageHeader from '@/components/PageHeader'
-import { formatDate, formatDateTime } from '@/lib/format'
+import { formatDate, formatDateTime } from '@/lib/dates'
 
 interface AuditLog {
   id: string

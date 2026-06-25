@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import PageHeader from '@/components/PageHeader'
-import { formatDate, formatDateTime } from '@/lib/format'
+import { formatDate, formatDateTime } from '@/lib/dates'
 import toast from 'react-hot-toast'
 
 interface MarketingRecord {
@@ -618,7 +618,12 @@ export default function MarketingPage({
 
     // Try standard Date parsing (handles ISO, MM/DD/YYYY, etc.)
     const parsed = new Date(text)
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
+    if (!Number.isNaN(parsed.getTime())) {
+      const y = parsed.getFullYear()
+      const m = String(parsed.getMonth() + 1).padStart(2, '0')
+      const d = String(parsed.getDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
 
     // --- Format: "DD Month YYYY" (e.g. "17 June 2025") ---
     const dmyText = text.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
