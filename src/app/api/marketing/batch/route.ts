@@ -161,6 +161,18 @@ export async function PUT(req: NextRequest) {
       continue
     }
 
+    // --- Require at least one additional data field ---
+    const dataFields = ['date', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'notes']
+    const hasData = dataFields.some(f => {
+      const v = r[f]
+      return v !== null && v !== undefined && String(v).trim() !== ''
+    })
+    if (!hasData) {
+      issues.push(`Row for "${name}" has no data in any field beyond name`)
+      errors.push({ name, issues })
+      continue
+    }
+
     // --- Step 1: Check Candidate Name exists in All Candidate Profiles ---
     const nameKey = normalize(name)
 
