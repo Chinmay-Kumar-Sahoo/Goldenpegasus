@@ -596,31 +596,34 @@ export default function MarketingPage({
     return `${yy}-${mm}-${dd}`
   }
 
-  const toISTDate = (d: Date): string => {
-    const fmtr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })
-    return fmtr.format(d)
-  }
-
   const formatExcelDate = (value: unknown, XLSX: any): string | null => {
     if (!value) return null
+    // Date objects from SheetJS are midnight UTC — extract using UTC methods
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
-      return toISTDate(value)
+      const y = value.getUTCFullYear()
+      const m = String(value.getUTCMonth() + 1).padStart(2, '0')
+      const d = String(value.getUTCDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
     }
+    // Number (serial) — timezone-independent via SSF
     if (typeof value === 'number') {
       const parsed = XLSX.SSF.parse_date_code(value)
       if (parsed) return toISODate(parsed.y, parsed.m - 1, parsed.d)
     }
+    // String — parse directly without Date constructor to avoid timezone shifts
     let text = String(value).trim()
     if (!text) return null
 
-    // Strip ordinal suffixes: "17th" → "17", "1st" → "1", "2nd" → "2", "3rd" → "3"
+    // Strip ordinal suffixes
     text = text.replace(/(\d+)(st|nd|rd|th)\b/gi, '$1')
 
-    // Try standard Date parsing (handles ISO, MM/DD/YYYY, etc.)
-    const parsed = new Date(text)
-    if (!Number.isNaN(parsed.getTime())) {
-      return toISTDate(parsed)
-    }
+    // ISO: YYYY-MM-DD or YYYY/MM/DD
+    const isoMatch = text.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+    if (isoMatch) return toISODate(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3])
+
+    // US: MM/DD/YYYY, MM-DD-YYYY, MM.DD.YYYY — treat first part as month, second as day
+    const usMatch = text.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})$/)
+    if (usMatch) return toISODate(+usMatch[3], +usMatch[1] - 1, +usMatch[2])
 
     // --- Format: "DD Month YYYY" (e.g. "17 June 2025") ---
     const dmyText = text.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
