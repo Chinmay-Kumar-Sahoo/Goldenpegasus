@@ -376,7 +376,7 @@ export async function POST(req: NextRequest) {
   // ── Shared duplicate check ──────────────────────────────────────────────
   // Returns error response if a duplicate exists, or null if ok.
   // Uses the same dedup fields and key logic as the batch import (/api/marketing/batch/route.ts)
-  async function checkDuplicate(candidateName: string, technology: string | null, excludeId?: string): Promise<NextResponse | null> {
+  async function checkDuplicate(candidateName: string, technology: string | null, compareData: any, excludeId?: string): Promise<NextResponse | null> {
     const adminClient = getAdminClient()
     if (!adminClient || !candidateName) return null
     const norm = (v: any) => String(v ?? '').toLowerCase().trim()
@@ -388,7 +388,7 @@ export async function POST(req: NextRequest) {
       }
       return norm(raw)
     }).join('|||')
-    const newKey = buildFullKey(recordData)
+    const newKey = buildFullKey(compareData)
     const { data: existing } = await (adminClient as any)
       .from('marketing_records')
       .select('id, ' + dedupFields.join(', '))
@@ -445,7 +445,7 @@ export async function POST(req: NextRequest) {
     // Dedup check on edit (exclude current record)
     const candidateName = recordData.name || existingRecord.name
     const techVal = recordData.technology !== undefined ? recordData.technology : existingRecord.technology
-    const dupErr = await checkDuplicate(candidateName, techVal, body.id)
+    const dupErr = await checkDuplicate(candidateName, techVal, { ...recordData, owner_id: existingRecord.owner_id }, body.id)
     if (dupErr) return dupErr
 
     let client = supabase
@@ -518,7 +518,7 @@ export async function POST(req: NextRequest) {
 
   // Dedup check on create
   if (insertData.name) {
-    const dupErr = await checkDuplicate(insertData.name, insertData.technology)
+    const dupErr = await checkDuplicate(insertData.name, insertData.technology, insertData)
     if (dupErr) return dupErr
   }
 
