@@ -598,11 +598,11 @@ export default function MarketingPage({
 
   const formatExcelDate = (value: unknown, XLSX: any): string | null => {
     if (!value) return null
-    // Date objects from SheetJS are midnight UTC — extract using UTC methods
+    // Date objects from SheetJS are created in local timezone — use local methods
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
-      const y = value.getUTCFullYear()
-      const m = String(value.getUTCMonth() + 1).padStart(2, '0')
-      const d = String(value.getUTCDate()).padStart(2, '0')
+      const y = value.getFullYear()
+      const m = String(value.getMonth() + 1).padStart(2, '0')
+      const d = String(value.getDate()).padStart(2, '0')
       return `${y}-${m}-${d}`
     }
     // Number (serial) — timezone-independent via SSF
@@ -713,7 +713,7 @@ export default function MarketingPage({
     try {
       const XLSX = await import('xlsx')
       const buffer = await file.arrayBuffer()
-      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+      const workbook = XLSX.read(buffer, { type: 'array' })
       const firstSheetName = workbook.SheetNames[0]
       const sheet = workbook.Sheets[firstSheetName]
       const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
