@@ -173,5 +173,5 @@ export default async function EmployeeClientsPage() {
     backup_employee_name: (r as any).backup_employee_id ? ((r as any).backup_employee_name || ownerNames[(r as any).backup_employee_id] || null) : null,
   }))
 
-  return <ClientsTable isAdmin={false} initialRecords={records} employeeOptions={employeeOptions} initialOwnerNames={ownerNames} currentUserId={uid} />;
+  return <ClientsTable isAdmin={false} readOnly={true} initialRecords={records} employeeOptions={employeeOptions} initialOwnerNames={ownerNames} currentUserId={uid} />;
 }

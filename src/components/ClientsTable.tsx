@@ -70,7 +70,7 @@ const TableRow = memo(function TableRow({
   onDelete?: (id: string) => void
 }) {
   return (
-    <tr className={`border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors ${!readOnly ? 'cursor-pointer' : ''}`} onClick={() => onEdit?.()}>
+    <tr className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
       {!readOnly && <td className="px-2 py-3" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(rec.id)} onChange={() => toggleSelect(rec.id)} className="accent-[#22c55e] cursor-pointer" /></td>}
       <td className="px-4 py-3 text-sm text-white font-medium">{rec.Candidate_name}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa]">{rec.technology || '—'}</td>
