@@ -621,19 +621,19 @@ export default function MarketingPage({
     const isoMatch = text.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
     if (isoMatch) return toISODate(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3])
 
-    // US: MM/DD/YYYY, MM-DD-YYYY, MM.DD.YYYY — treat first part as month, second as day
-    const usMatch = text.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})$/)
+    // US: MM/DD/YYYY, MM-DD-YYYY, MM.DD.YYYY, MM DD YYYY — month first, day second
+    const usMatch = text.match(/^(\d{1,2})[\/\.\-\s](\d{1,2})[\/\.\-\s](\d{4})$/)
     if (usMatch) return toISODate(+usMatch[3], +usMatch[1] - 1, +usMatch[2])
 
-    // --- Format: "DD Month YYYY" (e.g. "17 June 2025") ---
-    const dmyText = text.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
+    // --- "DD, Month, YYYY" or "DD Month YYYY" (e.g. "17 June 2025", "11, March, 2026") ---
+    const dmyText = text.match(/^(\d{1,2}),?\s+([A-Za-z]+),?\s+(\d{4})$/)
     if (dmyText) {
       const month = MONTH_NAMES[dmyText[2].toLowerCase()]
       if (month !== undefined) return toISODate(+dmyText[3], month, +dmyText[1])
     }
 
-    // --- Format: "Month DD, YYYY" or "Month DD YYYY" (e.g. "June 17, 2025") ---
-    const mdyText = text.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/)
+    // --- "Month, DD, YYYY" or "Month DD, YYYY" (e.g. "June 17, 2025", "March, 11 2026") ---
+    const mdyText = text.match(/^([A-Za-z]+),?\s+(\d{1,2}),?\s+(\d{4})$/)
     if (mdyText) {
       const month = MONTH_NAMES[mdyText[1].toLowerCase()]
       if (month !== undefined) return toISODate(+mdyText[3], month, +mdyText[2])
@@ -651,20 +651,20 @@ export default function MarketingPage({
       if (month !== undefined) return toISODate(+hyphenMon[3], month, +hyphenMon[2])
     }
 
-    // --- Format: "YYYY Mon DD" or "YYYY Month DD" (e.g. "2025 Jun 17", "2025 June 17") ---
-    const ymdText = text.match(/^(\d{4})\s+([A-Za-z]+)\s+(\d{1,2})$/)
+    // --- "YYYY Mon DD" or "YYYY Month, DD" (e.g. "2025 Jun 17", "2025 June, 17") ---
+    const ymdText = text.match(/^(\d{4})\s+([A-Za-z]+),?\s+(\d{1,2})$/)
     if (ymdText) {
       const month = MONTH_NAMES[ymdText[2].toLowerCase()]
       if (month !== undefined) return toISODate(+ymdText[1], month, +ymdText[3])
     }
 
-    // --- Format: "DD Mon YYYY" with single-letter separators like dots or slashes (e.g. "17.Jun.2025") ---
-    const dMonY = text.match(/^(\d{1,2})[\.\/\s]([A-Za-z]+)[\.\/\s](\d{4})$/)
+    // --- "DD Mon YYYY" with dots, slashes, commas, or spaces (e.g. "17.Jun.2025") ---
+    const dMonY = text.match(/^(\d{1,2})[\.\/\s,]([A-Za-z]+)[\.\/\s,](\d{4})$/)
     if (dMonY) {
       const month = MONTH_NAMES[dMonY[2].toLowerCase()]
       if (month !== undefined) return toISODate(+dMonY[3], month, +dMonY[1])
     }
-    const mDoty = text.match(/^([A-Za-z]+)[\.\/\s](\d{1,2})[\.\/\s](\d{4})$/)
+    const mDoty = text.match(/^([A-Za-z]+)[\.\/\s,](\d{1,2})[\.\/\s,](\d{4})$/)
     if (mDoty) {
       const month = MONTH_NAMES[mDoty[1].toLowerCase()]
       if (month !== undefined) return toISODate(+mDoty[3], month, +mDoty[2])
