@@ -60,9 +60,9 @@ const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDat
   { key: 'date', labels: ['Date', 'Created Date', 'CreatedDate', 'Creation Date', 'Date Created', 'Created On', 'Create Date'], isDate: true },
   { key: 'status', labels: ['Status'] },
 
-  { key: 'recruiter_name', labels: ['Recruiter', 'Recruiter Name', 'Recruiter Organization', 'Recruiter Organisation'] },
+  { key: 'recruiter_name', labels: ['Recruiter', 'Recruiter Name'] },
   { key: 'recruiter_email', labels: ['Recruiter Email'] },
-  { key: 'organization_name', labels: ['Organization', 'Organization Name', '2nd Up Recruiter'] },
+  { key: 'organization_name', labels: ['Organization', 'Organization Name', 'Recruiter Organization', 'Recruiter Organisation'] },
   { key: 'implementation_partner', labels: ['Implementation Partner'] },
   { key: 'end_client', labels: ['End Client'] },
   { key: 'interview_date', labels: ['Interview Date'], isDate: true },
