@@ -275,7 +275,8 @@ export async function PUT(req: NextRequest) {
     }, { status: 400 })
   }
 
-  // --- Dedup: skip records where ALL data fields match an existing record ---
+  // --- Dedup: skip duplicate records within the import batch only ---
+  // DB-wide dedup is handled by the admin marketing-cleanup endpoint
   const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology', 'owner_id']
   const buildFullKey = (r: any) => {
     const parts = dedupFields.map(f => normalize(String(r[f] ?? '') || ''))
@@ -283,8 +284,6 @@ export async function PUT(req: NextRequest) {
   }
   let skippedCount = 0
   if (insertRecords.length > 0) {
-    const existingKeys = new Set<string>()
-    // Dedup within the import batch first
     const batchDeduped: typeof insertRecords = []
     const batchSeen = new Set<string>()
     for (const r of insertRecords) {
@@ -298,36 +297,6 @@ export async function PUT(req: NextRequest) {
     }
     insertRecords.length = 0
     insertRecords.push(...batchDeduped)
-    // Dedup against existing DB records
-    if (insertRecords.length > 0) {
-      const uniqueNameOwner = [...new Set(insertRecords.map(r => (r.name || '').trim() + '|||' + (r.owner_id || '')))]
-      const allExistingRecords: any[] = []
-      for (const pair of uniqueNameOwner) {
-        const [n, oid] = pair.split('|||')
-        if (!n || !oid) continue
-        const { data: existing } = await supabase
-          .from('marketing_records')
-          .select(`name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, technology, employee_name, backup_employee_name, owner_id`)
-          .ilike('name', n)
-          .eq('owner_id', oid)
-        if (existing) allExistingRecords.push(...existing)
-      }
-      for (const ex of allExistingRecords) {
-        existingKeys.add(buildFullKey(ex))
-      }
-      const dbDeduped: typeof insertRecords = []
-      for (const r of insertRecords) {
-        const key = buildFullKey(r)
-        if (existingKeys.has(key)) {
-          skippedCount++
-        } else {
-          existingKeys.add(key)
-          dbDeduped.push(r)
-        }
-      }
-      insertRecords.length = 0
-      insertRecords.push(...dbDeduped)
-    }
   }
 
   const insertedList: Array<{ id: string; name: string; owner_id: string }> = []
