@@ -596,13 +596,15 @@ export default function MarketingPage({
     return `${yy}-${mm}-${dd}`
   }
 
+  const toISTDate = (d: Date): string => {
+    const fmtr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })
+    return fmtr.format(d)
+  }
+
   const formatExcelDate = (value: unknown, XLSX: any): string | null => {
     if (!value) return null
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
-      const y = value.getFullYear()
-      const m = String(value.getMonth() + 1).padStart(2, '0')
-      const d = String(value.getDate()).padStart(2, '0')
-      return `${y}-${m}-${d}`
+      return toISTDate(value)
     }
     if (typeof value === 'number') {
       const parsed = XLSX.SSF.parse_date_code(value)
@@ -617,10 +619,7 @@ export default function MarketingPage({
     // Try standard Date parsing (handles ISO, MM/DD/YYYY, etc.)
     const parsed = new Date(text)
     if (!Number.isNaN(parsed.getTime())) {
-      const y = parsed.getFullYear()
-      const m = String(parsed.getMonth() + 1).padStart(2, '0')
-      const d = String(parsed.getDate()).padStart(2, '0')
-      return `${y}-${m}-${d}`
+      return toISTDate(parsed)
     }
 
     // --- Format: "DD Month YYYY" (e.g. "17 June 2025") ---
