@@ -375,32 +375,29 @@ export async function POST(req: NextRequest) {
 
   // ── Shared duplicate check ──────────────────────────────────────────────
   // Returns error response if a duplicate exists, or null if ok.
-  // Applies normalizeCompanyName to company fields on both sides for fair comparison.
+  // Uses the same dedup fields and key logic as the batch import (/api/marketing/batch/route.ts)
   async function checkDuplicate(candidateName: string, technology: string | null, excludeId?: string): Promise<NextResponse | null> {
     const adminClient = getAdminClient()
     if (!adminClient || !candidateName) return null
-    const dupFields = ['recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'notes', 'interview_type', 'project_start_date', 'project_end_date', 'interview_date']
     const norm = (v: any) => String(v ?? '').toLowerCase().trim()
-    // Build normalized signature for the incoming record
-    const makeSig = (obj: any) => dupFields.map((f: string) => {
+    const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology', 'owner_id']
+    const buildFullKey = (obj: any) => dedupFields.map((f: string) => {
       const raw = obj[f]
-      // Normalize company-name fields before comparison
       if (f === 'organization_name' || f === 'implementation_partner') {
         return norm(normalizeCompanyName(raw) ?? raw)
       }
       return norm(raw)
     }).join('|||')
-    const newSig = makeSig(recordData)
+    const newKey = buildFullKey(recordData)
     const { data: existing } = await (adminClient as any)
       .from('marketing_records')
-      .select('id, technology, ' + dupFields.join(', '))
+      .select('id, ' + dedupFields.join(', '))
       .ilike('name', candidateName)
     if (!existing) return null
-    const techNorm = (v: any) => (v ?? '').toLowerCase().trim()
     const dup = (existing as any[]).find((r: any) => {
       if (excludeId && r.id === excludeId) return false
-      if (techNorm(r.technology) !== techNorm(technology)) return false
-      return makeSig(r) === newSig
+      if (norm(r.technology) !== norm(technology)) return false
+      return buildFullKey(r) === newKey
     })
     if (dup) {
       return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
