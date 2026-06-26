@@ -73,7 +73,7 @@ const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDat
   { key: 'client_email', labels: ['Client Email'] },
   { key: 'implementation_poc_email', labels: ['Implementation POC Email'] },
   { key: 'interviewer_email', labels: ['Interviewer Email'] },
-  { key: 'notes', labels: ['Notes', 'Comments'] },
+  { key: 'notes', labels: ['Notes', 'Comments', 'Comment', 'Note', 'Remarks', 'Additional Notes'] },
   { key: 'employee_name', labels: ['Primary Employee', 'Employee', 'Employee Name', 'Primary Owner'] },
   { key: 'backup_employee_name', labels: ['Backup Employee', 'Backup Employee Name', 'Secondary Employee'] },
 ]
@@ -732,6 +732,7 @@ export default function MarketingPage({
       }
 
       const dateFields = new Set(IMPORT_COLUMNS.filter(column => column.isDate).map(column => column.key))
+      const rawRowCount = rows.length
       const importRows = rows.map(row => {
         const normalizedRow = new Map<MarketingImportField, unknown>()
         for (const [header, value] of Object.entries(row)) {
@@ -748,7 +749,8 @@ export default function MarketingPage({
         })) as Record<MarketingImportField, string | null>
 
         return { ...record, name: record.name || '' }
-      })
+      }).filter(row => row.name.trim().length > 0)
+      const emptyRowCount = rawRowCount - importRows.length
 
       const batchRecords = importRows.map(row => {
         const payload: Record<string, any> = { name: row.name || '' }
@@ -773,9 +775,10 @@ export default function MarketingPage({
         throw new Error(`${result.error || 'Failed to import records'}${detail}`)
       }
 
-      const parts: string[] = [`Imported ${result.imported} record${result.imported === 1 ? '' : 's'}`]
+      const parts: string[] = [`Imported ${result.imported} record${result.imported === 1 ? '' : 's'} (of ${result.total} in file)`]
       if (result.closed > 0) parts.push(`${result.closed} for Closed candidates (hidden)`)
       if (result.skipped > 0) parts.push(`${result.skipped} duplicate${result.skipped === 1 ? '' : 's'} skipped`)
+      if (emptyRowCount > 0) parts.push(`${emptyRowCount} empty row${emptyRowCount === 1 ? '' : 's'} skipped`)
       const summary = parts.join(', ')
       const errors = result.errors || []
       if (errors.length > 0) {
