@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoldenPegasus - Website Flow Diagram</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body { background: #1e1e2e; margin: 0; padding: 20px; }
+  .mermaid { max-width: 100%; }
+</style>
+</head>
+<body>
+<div class="mermaid">
+flowchart TB
+    LANDING["🏠 Landing Page
+    /"] --> ADMIN_LOGIN["🔑 Admin Login
+    /admin-login"]
+    LANDING --> EMP_LOGIN["👤 Employee Login
+    /login"]
+    LANDING --> SIGNUP["📝 Employee Sign Up
+    /signup"]
+
+    SIGNUP --> VERIFY_EMAIL["📧 Verify Email
+    Sent confirmation link"]
+    VERIFY_EMAIL --> EMP_LOGIN
+
+    ADMIN_LOGIN --> ADMIN_CHECK{"✅ Auth Check
+    • Email confirmed?
+    • Role = admin?
+    • Must change password?"}
+    ADMIN_CHECK -- "No" --> ADMIN_LOGIN
+    ADMIN_CHECK -- "Yes, must change password" --> ADMIN_CHANGE_PW["🔐 Force Password Change
+    /admin-change-password"]
+    ADMIN_CHECK -- "Yes, OK" --> ADMIN
+    ADMIN_CHANGE_PW --> ADMIN
+
+    EMP_LOGIN --> EMP_CHECK{"✅ Auth Check
+    • Email confirmed?
+    • Role = employee?
+    • Not an admin?"}
+    EMP_CHECK -- "No" --> EMP_LOGIN
+    EMP_CHECK -- "Yes" --> DASHBOARD
+
+    AUTH_CALLBACK["🔄 Auth Callback Handler
+    /auth/callback"] --> AUTH_VERIFY["✅ Client-side Token Exchange
+    /auth/verify
+    • Handles OTP, recovery, email confirmation"]
+    AUTH_VERIFY --> ADMIN_LOGIN
+    AUTH_VERIFY --> EMP_LOGIN
+
+    subgraph ADMIN_SECTION["ADMIN PANEL"]
+        ADMIN["📊 Overview
+        /admin
+        Stats: Employees, Admins, Marketing, Clients, Tables"]
+        PERSONAL["👤 Personal Details
+        /admin/profile"]
+        ADMINS["🔑 Admin List
+        /admin/admins"]
+        REGISTER_ADMIN["➕ Register Admin
+        /admin/register"]
+        EMPLOYEES["👥 Employees
+        /admin/employees
+        CRUD, Search, Filter"]
+        ALL_MARKETING["📈 Marketing Records
+        /admin/marketing
+        CRUD, Import Excel, Export CSV/PDF, Bulk Edit, Cleanup"]
+        ALL_CANDIDATES["🤝 Candidate Profiles
+        /admin/clients
+        CRUD, Export, Bulk Edit"]
+        ALL_PROJECTS["🗂️ Project Records
+        /admin/projects
+        CRUD, Export, Bulk Edit"]
+        DYN_TABLES["🏗️ Dynamic Tables
+        /admin/tables
+        Create custom tables, Manage records"]
+        TECH_TABLE["📋 Technology Table
+        /admin/base-table
+        Technologies & Sub-Technologies"]
+        AUDIT["📋 Audit Log
+        /admin/audit
+        Day/week grouped logs"]
+    end
+
+    subgraph EMP_SECTION["EMPLOYEE PANEL"]
+        DASHBOARD["🏠 Overview
+        /dashboard
+        Stats: My Marketing, Tables, Projects, Candidates"]
+        EMP_PERSONAL["👤 Personal Details
+        /dashboard/profile
+        Lock after first save"]
+        ALL_MARKETING_VIEW["📊 All Marketing
+        /dashboard/marketing
+        Read-only, Search, Filter, Export"]
+        MY_MARKETING["📈 My Marketing
+        /dashboard/my-marketing
+        CRUD (no delete), Import, Export"]
+        ALL_CANDIDATES_VIEW["🤝 All Candidates
+        /dashboard/all-marketing-profiles
+        Read-only, deduplicated"]
+        MY_CANDIDATES["👤 My Candidates
+        /dashboard/clients
+        Own + backup, CRUD, Export"]
+        ALL_PROJECTS_VIEW["🗂️ All Projects
+        /dashboard/all-projects
+        Read-only, Export"]
+        MY_PROJECTS["📋 My Projects
+        /dashboard/projects
+        CRUD, Export"]
+        CUSTOM_TABLES["🏗️ Custom Tables
+        /dashboard/tables
+        Manage dynamic table records"]
+    end
+
+    ADMIN --> PERSONAL
+    ADMIN --> ADMINS
+    ADMINS --> REGISTER_ADMIN
+    ADMIN --> EMPLOYEES
+    ADMIN --> ALL_MARKETING
+    ADMIN --> ALL_CANDIDATES
+    ADMIN --> ALL_PROJECTS
+    ADMIN --> DYN_TABLES
+    ADMIN --> TECH_TABLE
+    ADMIN --> AUDIT
+
+    DASHBOARD --> EMP_PERSONAL
+    DASHBOARD --> ALL_MARKETING_VIEW
+    DASHBOARD --> MY_MARKETING
+    DASHBOARD --> ALL_CANDIDATES_VIEW
+    DASHBOARD --> MY_CANDIDATES
+    DASHBOARD --> ALL_PROJECTS_VIEW
+    DASHBOARD --> MY_PROJECTS
+    DASHBOARD --> CUSTOM_TABLES
+
+    subgraph DATA["DATA LAYER"]
+        SUPABASE["🗄️ Supabase
+        Auth + Database + RLS"]
+        API["🌐 Next.js API Routes
+        /api/marketing, candidates, projects, technologies, tables, audit, search"]
+        SRV["🖥️ Server Components
+        Direct Supabase queries"]
+        CLIENT_CLIENT["💻 Client Components
+        Fetch via API routes"]
+    end
+
+    ADMIN_SECTION --> SRV
+    ADMIN_SECTION --> CLIENT_CLIENT
+    EMP_SECTION --> SRV
+    EMP_SECTION --> CLIENT_CLIENT
+    SRV --> SUPABASE
+    CLIENT_CLIENT --> API
+    API --> SUPABASE
+
+    subgraph COMPONENTS["SHARED COMPONENTS"]
+        SIDEBAR["📌 Sidebar
+        Role-based nav"]
+        SESSION_GUARD["🛡️ SessionGuard
+        Cross-tab auth"]
+        MARKETING_TABLE["📊 MarketingTable
+        CRUD, Import/Export, Bulk Actions"]
+        CLIENTS_TABLE["🤝 ClientsTable
+        Candidate CRUD, Export"]
+        PROJECTS_TABLE["🗂️ ProjectsTable
+        Project CRUD, Export"]
+    end
+
+    ALL_MARKETING --> MARKETING_TABLE
+    MY_MARKETING --> MARKETING_TABLE
+    ALL_MARKETING_VIEW --> MARKETING_TABLE
+    ALL_CANDIDATES --> CLIENTS_TABLE
+    ALL_CANDIDATES_VIEW --> CLIENTS_TABLE
+    MY_CANDIDATES --> CLIENTS_TABLE
+    ALL_PROJECTS --> PROJECTS_TABLE
+    ALL_PROJECTS_VIEW --> PROJECTS_TABLE
+    MY_PROJECTS --> PROJECTS_TABLE
+</div>
+</body>
+</html>

@@ -712,11 +712,12 @@ export default function MarketingPage({
 
     try {
       const XLSX = await import('xlsx')
+      console.log('[MARKETING] import v4 — cellDates removed, raw:true')
       const buffer = await file.arrayBuffer()
       const workbook = XLSX.read(buffer, { type: 'array' })
       const firstSheetName = workbook.SheetNames[0]
       const sheet = workbook.Sheets[firstSheetName]
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: true })
 
       if (rows.length === 0) {
         throw new Error('The selected Excel file does not contain any rows.')
