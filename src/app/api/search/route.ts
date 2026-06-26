@@ -34,8 +34,8 @@ export async function GET(request: Request) {
   if (type === 'all' || type === 'marketing_records') {
     let mktQuery = supabase
       .from('marketing_records')
-      .select('id, name, organization_name, end_client, status, date')
-      .or(`name.ilike.%${query}%,organization_name.ilike.%${query}%,end_client.ilike.%${query}%,status.ilike.%${query}%,date.ilike.%${query}%`)
+      .select('id, name, organization_name, end_client, status, date, employee_name, backup_employee_name')
+      .or(`name.ilike.%${query}%,organization_name.ilike.%${query}%,end_client.ilike.%${query}%,status.ilike.%${query}%,date.ilike.%${query}%,employee_name.ilike.%${query}%,backup_employee_name.ilike.%${query}%`)
     
     if (status !== 'all') mktQuery = mktQuery.eq('status', status)
     

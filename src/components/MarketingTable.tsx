@@ -928,7 +928,7 @@ export default function MarketingPage({
         r.organization_name, r.implementation_partner, r.end_client,
         r.interview_type, r.client_name, r.client_email,
         r.implementation_poc_email, r.interviewer_email, r.notes,
-        r.employee_name, r.project_start_date, r.project_end_date, r.interview_date,
+        r.employee_name, r.backup_employee_name, r.project_start_date, r.project_end_date, r.interview_date,
       ]
       return fields.some(f => f && f.toLowerCase().includes(q))
     })
