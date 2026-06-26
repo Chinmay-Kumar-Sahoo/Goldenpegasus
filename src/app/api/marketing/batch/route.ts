@@ -264,7 +264,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // --- Dedup: skip records where ALL data fields match an existing record ---
-  const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'notes', 'technology', 'employee_name', 'backup_employee_name', 'owner_id']
+  const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology', 'owner_id']
   const buildFullKey = (r: any) => {
     const parts = dedupFields.map(f => normalize(String(r[f] ?? '') || ''))
     return parts.join('|||')
