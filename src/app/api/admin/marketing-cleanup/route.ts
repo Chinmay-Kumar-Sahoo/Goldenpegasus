@@ -145,12 +145,13 @@ export async function POST(req: NextRequest) {
   // ── 3. Dedup marketing_records after normalization ─────────────────────
   // Use normalized (trimmed, collapsed) values for comparison.
   // Keep the earliest-created record for each unique key.
-  const MKT_DEDUP_FIELDS = ['name', 'technology', 'recruiter_email', 'implementation_partner']
+  // Must match the fields used in batch import dedup (src/app/api/marketing/batch/route.ts)
+  const MKT_DEDUP_FIELDS = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology']
   const mktBuildKey = (r: any) =>
     MKT_DEDUP_FIELDS.map(f => norm(r[f])).join('|||') + '|||' + norm(r.owner_id)
   const { data: allMkt } = await adminClient
     .from('marketing_records')
-    .select('id, created_at, name, technology, recruiter_email, organization_name, implementation_partner, end_client, client_name, client_email, implementation_poc_email, interviewer_email, owner_id')
+    .select('id, created_at, name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, technology, owner_id')
     .order('created_at', { ascending: true })
   if (allMkt?.length) {
     const seen = new Map<string, string>()
