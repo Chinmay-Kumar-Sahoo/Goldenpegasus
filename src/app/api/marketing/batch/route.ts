@@ -150,6 +150,26 @@ export async function PUT(req: NextRequest) {
   const errors: { name: string; issues: string[] }[] = []
   let closedCount = 0
 
+  // ── DB-wide dedup preparation ─────────────────────────────────────────
+  const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology', 'owner_id']
+  const buildFullKey = (r: any) => {
+    const parts = dedupFields.map(f => normalize(String(r[f] ?? '') || ''))
+    return parts.join('|||')
+  }
+  const importNames = [...new Set(records.map((r: any) => (r.name || '').trim()).filter(Boolean))]
+  let existingDedupKeys = new Set<string>()
+  if (importNames.length > 0) {
+    const { data: existingRecords } = await lookupClient
+      .from('marketing_records')
+      .select(dedupFields.join(', '))
+      .in('name', importNames)
+    if (existingRecords) {
+      for (const r of existingRecords) {
+        existingDedupKeys.add(buildFullKey(r))
+      }
+    }
+  }
+
   for (const r of records) {
     const issues: string[] = []
     const name = (r.name || '').trim()
@@ -237,7 +257,7 @@ export async function PUT(req: NextRequest) {
     const rawStatus = (r.status || '').trim()
     const validStatus = MARKETING_STATUSES.has(rawStatus) ? rawStatus : 'Telephone Call'
 
-    insertRecords.push({
+    const recordToInsert = {
       name,
       date: isValidISODate(r.date) ? r.date : null,
       status: validStatus,
@@ -261,7 +281,17 @@ export async function PUT(req: NextRequest) {
       owner_id: primaryUserId,
       created_at: now,
       updated_at: now,
-    })
+    }
+
+    // Check against existing DB records for duplicates
+    const dedupKey = buildFullKey(recordToInsert)
+    if (existingDedupKeys.has(dedupKey)) {
+      issues.push('Duplicate Profile — a record with identical details already exists in the database')
+      errors.push({ name, issues })
+      continue
+    }
+
+    insertRecords.push(recordToInsert)
   }
 
   // If any validation errors, reject entire batch
@@ -276,12 +306,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // --- Dedup: skip duplicate records within the import batch only ---
-  // DB-wide dedup is handled by the admin marketing-cleanup endpoint
-  const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology', 'owner_id']
-  const buildFullKey = (r: any) => {
-    const parts = dedupFields.map(f => normalize(String(r[f] ?? '') || ''))
-    return parts.join('|||')
-  }
+  // DB-wide dedup is performed above, before any records are inserted
   let skippedCount = 0
   if (insertRecords.length > 0) {
     const batchDeduped: typeof insertRecords = []
