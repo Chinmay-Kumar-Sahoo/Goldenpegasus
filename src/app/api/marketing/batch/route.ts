@@ -263,12 +263,10 @@ export async function PUT(req: NextRequest) {
     }, { status: 400 })
   }
 
-  // --- Dedup: skip records where key fields match an existing record (same owner_id) ---
-  // Excluding date fields, notes, status, recruiter_name, and interview_type which commonly vary
-  const recordFields = ['name', 'technology', 'recruiter_email', 'implementation_partner']
+  // --- Dedup: skip records where ALL data fields match an existing record ---
+  const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'notes', 'technology', 'employee_name', 'backup_employee_name', 'owner_id']
   const buildFullKey = (r: any) => {
-    const parts = recordFields.map(f => normalize(String(r[f] ?? '') || ''))
-    parts.push(r.owner_id || '')
+    const parts = dedupFields.map(f => normalize(String(r[f] ?? '') || ''))
     return parts.join('|||')
   }
   let skippedCount = 0
@@ -297,7 +295,7 @@ export async function PUT(req: NextRequest) {
         if (!n || !oid) continue
         const { data: existing } = await supabase
           .from('marketing_records')
-          .select(`name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, technology, owner_id`)
+          .select(`name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, notes, technology, employee_name, backup_employee_name, owner_id`)
           .ilike('name', n)
           .eq('owner_id', oid)
         if (existing) allExistingRecords.push(...existing)
