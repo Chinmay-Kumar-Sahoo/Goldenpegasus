@@ -162,7 +162,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // --- Require at least one additional data field ---
-    const dataFields = ['date', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'notes']
+    const dataFields = ['date', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'notes', 'technology']
     const hasData = dataFields.some(f => {
       const v = r[f]
       return v !== null && v !== undefined && String(v).trim() !== ''
