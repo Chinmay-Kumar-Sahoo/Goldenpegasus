@@ -29,7 +29,6 @@ interface MarketingRecord {
   created_at: string
   employee_name?: string | null
   backup_employee_name?: string | null
-  last_reminder_sent_at?: string | null
   date_locked?: boolean
 }
 
@@ -151,7 +150,6 @@ const SORT_FIELDS: Record<string, string> = {
   ...TEXT_FILTER_COLUMNS,
   ...DATE_COLUMNS,
   'Comments': 'notes',
-  'Last Reminder': 'last_reminder_sent_at',
 }
 
 const LOCKABLE_FIELDS = new Set(['name', 'employee_name', 'backup_employee_name'])
@@ -205,12 +203,7 @@ const TableRow = memo(function TableRow({
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.interviewer_email || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{formatDate(rec.project_start_date)}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{formatDate(rec.project_end_date)}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] max-w-[200px] truncate" title={rec.notes || ''}>{rec.notes || '—'}</td>
-      {isAdmin && (
-        <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">
-          {rec.last_reminder_sent_at ? formatDateTime(rec.last_reminder_sent_at) : '—'}
-        </td>
-      )}
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-pre-wrap min-w-[200px] max-w-[350px]">{rec.notes || '—'}</td>
     </tr>
   )
 })
@@ -972,8 +965,8 @@ export default function MarketingPage({
   }, [page])
 
   const exportCSV = useCallback(() => {
-    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const rows = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes, ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments']
+    const rows = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -986,8 +979,8 @@ export default function MarketingPage({
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF({ orientation: 'landscape' })
 
-    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments', ...(isAdmin ? ['Last Reminder'] : [])]
-    const data = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || '', ...(isAdmin ? [r.last_reminder_sent_at ? formatDateTime(r.last_reminder_sent_at) : ''] : [])])
+    const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments']
+    const data = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || ''])
 
     autoTable(doc, {
       head: [headers],
