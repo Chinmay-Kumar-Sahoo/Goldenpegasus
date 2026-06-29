@@ -147,7 +147,7 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
     if (!background) setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (!isAdmin && !readOnly && currentUserIdRef.current)
+      if (!isAdmin && currentUserIdRef.current)
         params.set('owner_id', currentUserIdRef.current)
       const qs = params.toString()
       const url = `/api/candidates${qs ? '?' + qs : ''}`
