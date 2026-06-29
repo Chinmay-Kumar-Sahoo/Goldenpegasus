@@ -82,16 +82,16 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
     <aside className={`${collapsed ? 'w-16' : 'w-64'} min-h-screen bg-[#111111] border-r border-[#2a2a2a] flex flex-col transition-all duration-300 flex-shrink-0`}>
       <div className="p-4 border-b border-[#2a2a2a] flex items-center justify-between">
         {!collapsed && (
-          <Link href="/" className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
             <BrandLogo variant="mark" size="md" />
             <div className="space-y-1">
               <div className="font-bold text-white text-xs leading-tight">GoldenPegasus IT Consulting & Services</div>
               <div className="text-[11px] text-[#22c55e] leading-tight font-medium truncate max-w-[140px]">{userName || role}</div>
             </div>
-          </Link>
+          </div>
         )}
         {collapsed && (
-          <BrandLogo href="/" variant="mark" size="md" className="mx-auto" />
+          <BrandLogo variant="mark" size="md" className="mx-auto" />
         )}
         <button onClick={() => setCollapsed(!collapsed)} className="text-[#71717a] hover:text-white ml-auto transition-colors p-1">
           {collapsed ? '→' : '←'}
