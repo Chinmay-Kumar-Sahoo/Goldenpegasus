@@ -23,18 +23,34 @@ function getAdminClient() {
   return _adminClient
 }
 
-async function getTableId(supabase: any, _userId: string): Promise<{ id: string | null; error?: string }> {
+async function getTableId(supabase: any, userId: string): Promise<{ id: string | null; error?: string }> {
   const adminClient = getAdminClient()
   if (adminClient) {
     const { data: found } = await (adminClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
     if (found?.id) return { id: found.id }
-    return { id: null, error: 'Project table is not configured. An admin must create it in Custom Tables.' }
+    const { data: created } = await (adminClient.from('dynamic_tables') as any).insert({
+      table_name: PROJECT_TABLE_NAME,
+      description: 'Employee project records',
+      schema_definition: PROJECT_SCHEMA,
+      is_global: false,
+      owner_id: userId,
+    }).select('id').single()
+    if (created?.id) return { id: created.id }
+    return { id: null, error: 'Failed to create project table entry' }
   }
 
   const { data: existing, error: lookupErr } = await (supabase.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
   if (existing?.id) return { id: existing.id }
   if (lookupErr) return { id: null, error: `Lookup error: ${lookupErr.message}` }
-  return { id: null, error: 'Project table is not configured. An admin must create it in Custom Tables.' }
+  const { data: inserted, error: insertErr } = await (supabase.from('dynamic_tables') as any).insert({
+    table_name: PROJECT_TABLE_NAME,
+    description: 'Employee project records',
+    schema_definition: PROJECT_SCHEMA,
+    is_global: false,
+    owner_id: userId,
+  }).select('id').single()
+  if (inserted?.id) return { id: inserted.id }
+  return { id: null, error: insertErr ? `Insert error (${insertErr.code}): ${insertErr.message}` : 'Unknown error creating table entry' }
 }
 
 export async function GET(req: NextRequest) {
