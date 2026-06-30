@@ -821,21 +821,40 @@ export default function MarketingPage({
     }).map(c => c.name)
   }, [filteredCandidates])
 
+  const techCanonicalMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const t of technologies) {
+      const key = t.name.toLowerCase().trim()
+      if (!map.has(key)) map.set(key, t.name)
+      for (const sub of t.sub_technologies) {
+        const subKey = sub.name.toLowerCase().trim()
+        if (!map.has(subKey)) map.set(subKey, sub.name)
+      }
+    }
+    return map
+  }, [technologies])
+
+  const getCanonicalTech = useCallback((tech: string): string => {
+    return techCanonicalMap.get(tech.toLowerCase().trim()) || tech
+  }, [techCanonicalMap])
+
   const handleCandidateSelect = (candidateName: string) => {
     setForm(prev => ({ ...prev, name: candidateName, technology: '', employee_name: '', backup_employee_name: '' }))
     if (isAdmin) setSelectedEmployeeId('')
   }
 
   const handleTechnologySelect = (tech: string) => {
+    const canonicalTech = getCanonicalTech(tech)
     if (!form.name || !tech) {
-      setForm(prev => ({ ...prev, technology: tech, employee_name: '', backup_employee_name: '' }))
+      setForm(prev => ({ ...prev, technology: canonicalTech, employee_name: '', backup_employee_name: '' }))
       if (isAdmin) setSelectedEmployeeId('')
       return
     }
     const candidatePool = isAdmin ? allCandidateOptions : filteredCandidates
-    let candidate = candidatePool.find(c => c.name === form.name && c.technology === tech)
+    const normTech = (t: string | null | undefined) => (t || '').toLowerCase().trim()
+    let candidate = candidatePool.find(c => c.name === form.name && normTech(c.technology) === normTech(canonicalTech))
     if (!candidate) {
-      const matchingRecord = records.find(r => r.name === form.name && r.technology === tech)
+      const matchingRecord = records.find(r => r.name === form.name && normTech(r.technology) === normTech(canonicalTech))
       if (matchingRecord) {
         candidate = {
           id: matchingRecord.id,
@@ -843,8 +862,8 @@ export default function MarketingPage({
           owner_id: matchingRecord.owner_id,
           owner_name: matchingRecord.employee_name || null,
           status: null,
-          technology: tech,
-          backup_employee_name: matchingRecord.backup_employee_name || null,
+      technology: canonicalTech,
+      backup_employee_name: matchingRecord.backup_employee_name || null,
         }
       }
     }
@@ -859,7 +878,7 @@ export default function MarketingPage({
       backupName = candidate.backup_employee_name || ''
       empId = candidate.owner_id || ''
     }
-    setForm(prev => ({ ...prev, technology: tech, employee_name: empName, backup_employee_name: backupName }))
+    setForm(prev => ({ ...prev, technology: canonicalTech, employee_name: empName, backup_employee_name: backupName }))
     if (isAdmin) setSelectedEmployeeId(empId)
   }
 
@@ -1336,9 +1355,10 @@ export default function MarketingPage({
                     {form.name && [...new Set([
                       ...records.filter(r => r.name === form.name).map(r => r.technology).filter((t): t is string => !!t),
                       ...(isAdmin ? allCandidateOptions : filteredCandidates).filter(c => c.name === form.name).map(c => c.technology).filter((t): t is string => !!t),
-                    ])].map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
+                    ])].map(t => {
+                      const canonical = getCanonicalTech(t)
+                      return (<option key={canonical} value={canonical}>{canonical}</option>)
+                    })}
                   </select>
                 ) : isAdmin ? (
                   <select value={form.technology} onChange={e => handleTechnologySelect(e.target.value)} required={!!form.name}
@@ -1347,9 +1367,10 @@ export default function MarketingPage({
                     {form.name && [...new Set([
                       ...allCandidateOptions.filter(c => c.name === form.name).map(c => c.technology).filter((t): t is string => !!t),
                       ...records.filter(r => r.name === form.name).map(r => r.technology).filter((t): t is string => !!t),
-                    ])].map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
+                    ])].map(t => {
+                      const canonical = getCanonicalTech(t)
+                      return (<option key={canonical} value={canonical}>{canonical}</option>)
+                    })}
                   </select>
                 ) : (
                   <input type="text" value={form.technology} disabled
