@@ -23,34 +23,33 @@ function getAdminClient() {
   return _adminClient
 }
 
-async function getTableId(supabase: any, userId: string): Promise<{ id: string | null; error?: string }> {
+async function getTableId(supabase: any, _userId: string): Promise<{ id: string | null; error?: string }> {
   const adminClient = getAdminClient()
-  if (adminClient) {
-    const { data: found } = await (adminClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
-    if (found?.id) return { id: found.id }
-    const { data: created } = await (adminClient.from('dynamic_tables') as any).insert({
-      table_name: PROJECT_TABLE_NAME,
-      description: 'Employee project records',
-      schema_definition: PROJECT_SCHEMA,
-      is_global: false,
-      owner_id: userId,
-    }).select('id').single()
-    if (created?.id) return { id: created.id }
-    return { id: null, error: 'Failed to create project table entry' }
-  }
-
-  const { data: existing, error: lookupErr } = await (supabase.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
+  const lookupClient = adminClient || supabase
+  const { data: existing, error: lookupErr } = await (lookupClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
   if (existing?.id) return { id: existing.id }
   if (lookupErr) return { id: null, error: `Lookup error: ${lookupErr.message}` }
-  const { data: inserted, error: insertErr } = await (supabase.from('dynamic_tables') as any).insert({
+  return { id: null }
+}
+
+async function ensureTableEntry(userId: string): Promise<{ id: string | null; error?: string }> {
+  const adminClient = getAdminClient()
+  if (!adminClient) return { id: null, error: 'Server misconfigured' }
+  const { data: existing } = await (adminClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
+  if (existing?.id) return { id: existing.id }
+  const { data: created, error: insertErr } = await (adminClient.from('dynamic_tables') as any).insert({
     table_name: PROJECT_TABLE_NAME,
     description: 'Employee project records',
     schema_definition: PROJECT_SCHEMA,
     is_global: false,
     owner_id: userId,
-  }).select('id').single()
-  if (inserted?.id) return { id: inserted.id }
-  return { id: null, error: insertErr ? `Insert error (${insertErr.code}): ${insertErr.message}` : 'Unknown error creating table entry' }
+  }).select('id').maybeSingle()
+  if (created?.id) return { id: created.id }
+  if (insertErr?.code === '23505') {
+    const { data: retry } = await (adminClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
+    if (retry?.id) return { id: retry.id }
+  }
+  return { id: null, error: insertErr ? `Insert error (${insertErr.code}): ${insertErr.message}` : 'Failed to create project table entry' }
 }
 
 export async function GET(req: NextRequest) {
@@ -60,11 +59,13 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const tableId = searchParams.get('table_id')
-  let resolvedId = tableId || undefined
+  let resolvedId: string | null = tableId || null
   if (!resolvedId) {
     const result = await getTableId(supabase, user.id)
-    if (!result.id) return NextResponse.json({ error: result.error || 'Cannot find or create project table' }, { status: 500 })
     resolvedId = result.id
+  }
+  if (!resolvedId) {
+    return NextResponse.json({ records: [] })
   }
 
   const ownerFilter = searchParams.get('owner_id')
@@ -136,11 +137,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let resolvedId = tableId || undefined
+  let resolvedId: string | null = tableId || null
   if (!resolvedId) {
     const result = await getTableId(supabase, user.id)
-    if (!result.id) return NextResponse.json({ error: result.error || 'Cannot find or create project table' }, { status: 500 })
-    resolvedId = result.id
+    if (result.id) {
+      resolvedId = result.id
+    } else {
+      const created = await ensureTableEntry(user.id)
+      if (!created.id) return NextResponse.json({ error: created.error || 'Cannot create project table' }, { status: 500 })
+      resolvedId = created.id
+    }
   }
 
   if (id) {
