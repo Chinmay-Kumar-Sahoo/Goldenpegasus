@@ -23,7 +23,7 @@ export default async function DashboardPage() {
 
   const [{ count: mktCount }, { count: tableCount }, { data: _profileData }, { data: projectTable }] = await Promise.all([
     supabase.from('marketing_records').select('*', { count: 'exact', head: true }).eq('owner_id', uid),
-    supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }).eq('owner_id', uid),
+    supabase.from('dynamic_tables').select('*', { count: 'exact', head: true }).eq('owner_id', uid).neq('table_name', 'My Project Records'),
     supabase.from('profiles').select('full_name, email').eq('id', uid).single(),
     lookupClient.from('dynamic_tables').select('id').eq('table_name', 'My Project Records').maybeSingle(),
   ])

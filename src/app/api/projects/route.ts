@@ -23,49 +23,18 @@ function getAdminClient() {
   return _adminClient
 }
 
-async function getTableId(supabase: any, userId: string): Promise<{ id: string | null; error?: string }> {
-  // 1) Try admin client first — bypasses RLS, can see all rows
+async function getTableId(supabase: any, _userId: string): Promise<{ id: string | null; error?: string }> {
   const adminClient = getAdminClient()
   if (adminClient) {
     const { data: found } = await (adminClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
-    if (found?.id) {
-      // Ensure owner_id is set so the regular user can access it
-      await (adminClient.from('dynamic_tables') as any).update({ owner_id: userId }).eq('id', found.id)
-      return { id: found.id }
-    }
-    const { data: created } = await (adminClient.from('dynamic_tables') as any).insert({
-      table_name: PROJECT_TABLE_NAME,
-      description: 'Employee project records',
-      schema_definition: PROJECT_SCHEMA,
-      is_global: false,
-      owner_id: userId,
-    }).select('id').single()
-    if (created?.id) return { id: created.id }
-    return { id: null, error: 'Admin client could not create table entry' }
+    if (found?.id) return { id: found.id }
+    return { id: null, error: 'Project table is not configured. An admin must create it in Custom Tables.' }
   }
 
-  // 2) No admin client — try with regular authenticated client
   const { data: existing, error: lookupErr } = await (supabase.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
   if (existing?.id) return { id: existing.id }
   if (lookupErr) return { id: null, error: `Lookup error: ${lookupErr.message}` }
-
-  // 3) Try INSERT (may fail if row exists but RLS hides it)
-  const { data: inserted, error: insertErr } = await (supabase.from('dynamic_tables') as any).insert({
-    table_name: PROJECT_TABLE_NAME,
-    description: 'Employee project records',
-    schema_definition: PROJECT_SCHEMA,
-    is_global: false,
-    owner_id: userId,
-  }).select('id').single()
-  if (inserted?.id) return { id: inserted.id }
-
-  // 4) If unique violation (23505), the entry exists but is RLS-hidden
-  //    Try fetching the table name using raw table access
-  if (insertErr?.code === '23505') {
-    return { id: null, error: 'A project table entry already exists but is not accessible. Please ask an admin to run: UPDATE dynamic_tables SET owner_id = \'' + userId + '\' WHERE table_name = \'' + PROJECT_TABLE_NAME + '\';' }
-  }
-
-  return { id: null, error: insertErr ? `Insert error (${insertErr.code}): ${insertErr.message}` : 'Unknown error creating table entry' }
+  return { id: null, error: 'Project table is not configured. An admin must create it in Custom Tables.' }
 }
 
 export async function GET(req: NextRequest) {
