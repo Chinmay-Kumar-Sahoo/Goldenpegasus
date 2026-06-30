@@ -29,16 +29,15 @@ export default async function ProjectsPage() {
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : null
 
-  // Try to find or create the project table entry — use authenticated client first, admin as fallback
+  // Try to find or create the project table entry — use admin client first (avoids RLS / table_id mismatch)
+  const lookupClient = supabaseAdmin || supabase
   let tableId: string | null | undefined
 
-  // 1) Lookup with authenticated client
-  const { data: existing } = await (supabase.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
+  const { data: existing } = await (lookupClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
   tableId = existing?.id
 
-  // 2) Not found — try insert with authenticated client (sets owner_id)
   if (!tableId) {
-    const { data: inserted } = await (supabase.from('dynamic_tables') as any).insert({
+    const { data: inserted } = await (lookupClient.from('dynamic_tables') as any).insert({
       table_name: PROJECT_TABLE_NAME,
       description: 'Employee project records',
       schema_definition: PROJECT_SCHEMA,
@@ -48,30 +47,20 @@ export default async function ProjectsPage() {
     tableId = inserted?.id
   }
 
-  // 3) Fallback to admin client
-  if (!tableId && supabaseAdmin) {
-    const { data: adminExisting } = await (supabaseAdmin.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
-    tableId = adminExisting?.id
-    if (!tableId) {
-      const { data: adminInserted } = await (supabaseAdmin.from('dynamic_tables') as any).insert({
-        table_name: PROJECT_TABLE_NAME,
-        description: 'Employee project records',
-        schema_definition: PROJECT_SCHEMA,
-        is_global: false,
-      }).select('id').single()
-      tableId = adminInserted?.id
-    }
+  // Ensure the user can access it
+  if (tableId && supabaseAdmin) {
+    await (supabaseAdmin.from('dynamic_tables') as any).update({ owner_id: uid }).eq('id', tableId)
   }
 
-  // Fetch project records for this user
+  // Fetch project records — use admin client when available to avoid RLS issues
+  const fetchClient = supabaseAdmin || supabase
   let records: any[] = []
   if (tableId) {
-    const { data } = await supabase.from('dynamic_table_records').select('*').eq('table_id', tableId).eq('owner_id', uid).order('created_at', { ascending: false }).limit(2000)
+    const { data } = await fetchClient.from('dynamic_table_records').select('*').eq('table_id', tableId).eq('owner_id', uid).order('created_at', { ascending: false }).limit(2000)
     records = data || []
   }
 
   // Fetch candidate options for this user (from Candidate_records where owner or backup)
-  const lookupClient = supabaseAdmin || supabase
   let candidateOptions: Array<{ name: string; technology: string | null }> = []
   if (uid) {
     const [{ data: asOwner }, { data: asBackup }] = await Promise.all([

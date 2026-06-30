@@ -200,8 +200,14 @@ export default function ProjectsTable({
     e.preventDefault()
     if (!form.candidate_name?.trim()) { setError('Candidate Name is required'); return }
     if (!editingId) {
-      const dup = records.some(r => String(r.data?.candidate_name ?? '').toLowerCase().trim() === form.candidate_name.toLowerCase().trim())
-      if (dup) { setError('A project record for this candidate already exists'); return }
+      const dup = records.some(r =>
+        String(r.data?.candidate_name ?? '').toLowerCase().trim() === form.candidate_name.toLowerCase().trim() &&
+        String(r.data?.company_name ?? '').toLowerCase().trim() === (form.company_name || '').toLowerCase().trim() &&
+        String(r.data?.project_type ?? '').toLowerCase().trim() === (form.project_type || '').toLowerCase().trim() &&
+        String(r.data?.project_start_date ?? '').toLowerCase().trim() === (form.project_start_date || '').toLowerCase().trim() &&
+        String(r.data?.project_end_date ?? '').toLowerCase().trim() === (form.project_end_date || '').toLowerCase().trim()
+      )
+      if (dup) { setError('An identical project record already exists'); return }
     }
     setSaving(true)
     setError('')

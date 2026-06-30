@@ -164,6 +164,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   }
 
+  // Server-side duplicate check: same candidate + company + type + dates
+  const lookupClient = getAdminClient() || supabase
+  const { data: existing } = await lookupClient.from('dynamic_table_records').select('id, data').eq('table_id', resolvedId)
+  const dup = (existing || []).some((r: any) =>
+    String(r.data?.candidate_name ?? '').toLowerCase().trim() === String(recordData.candidate_name || '').toLowerCase().trim() &&
+    String(r.data?.company_name ?? '').toLowerCase().trim() === String(recordData.company_name || '').toLowerCase().trim() &&
+    String(r.data?.project_type ?? '').toLowerCase().trim() === String(recordData.project_type || '').toLowerCase().trim() &&
+    String(r.data?.project_start_date ?? '').toLowerCase().trim() === String(recordData.project_start_date || '').toLowerCase().trim() &&
+    String(r.data?.project_end_date ?? '').toLowerCase().trim() === String(recordData.project_end_date || '').toLowerCase().trim()
+  )
+  if (dup) return NextResponse.json({ error: 'An identical project record already exists' }, { status: 409 })
+
   const { data: inserted, error } = await supabase.from('dynamic_table_records').insert({
     table_id: resolvedId,
     owner_id: user.id,
