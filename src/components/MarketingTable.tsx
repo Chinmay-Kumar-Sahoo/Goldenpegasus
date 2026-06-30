@@ -832,7 +832,8 @@ export default function MarketingPage({
       if (isAdmin) setSelectedEmployeeId('')
       return
     }
-    let candidate = allCandidateOptions.find(c => c.name === form.name && c.technology === tech)
+    const candidatePool = isAdmin ? allCandidateOptions : filteredCandidates
+    let candidate = candidatePool.find(c => c.name === form.name && c.technology === tech)
     if (!candidate) {
       const matchingRecord = records.find(r => r.name === form.name && r.technology === tech)
       if (matchingRecord) {
@@ -1334,7 +1335,7 @@ export default function MarketingPage({
                     <option value="">{form.name ? 'Select Technology' : 'Select a candidate first'}</option>
                     {form.name && [...new Set([
                       ...records.filter(r => r.name === form.name).map(r => r.technology).filter((t): t is string => !!t),
-                      ...allCandidateOptions.filter(c => c.name === form.name).map(c => c.technology).filter((t): t is string => !!t),
+                      ...(isAdmin ? allCandidateOptions : filteredCandidates).filter(c => c.name === form.name).map(c => c.technology).filter((t): t is string => !!t),
                     ])].map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
