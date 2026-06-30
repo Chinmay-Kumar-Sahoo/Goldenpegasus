@@ -6,17 +6,6 @@ export const metadata = { title: 'My Project Records | GoldenPegasus' }
 export const dynamic = 'force-dynamic'
 
 const PROJECT_TABLE_NAME = 'My Project Records'
-const PROJECT_SCHEMA = [
-  { name: 'candidate_name', label: 'Candidate Name', type: 'text', required: true },
-  { name: 'technology', label: 'Technology', type: 'text', required: false },
-  { name: 'created_date', label: 'Created Date', type: 'date', required: false },
-  { name: 'company_name', label: 'Company Name', type: 'text', required: false },
-  { name: 'project_status', label: 'Project Status', type: 'text', required: false },
-  { name: 'project_type', label: 'Project Type', type: 'text', required: false },
-  { name: 'project_rate', label: 'Project Rate', type: 'text', required: false },
-  { name: 'project_start_date', label: 'Project Start Date', type: 'date', required: false },
-  { name: 'project_end_date', label: 'Project End Date', type: 'date', required: false },
-] as const
 
 export default async function ProjectsPage() {
   const supabase = await createClient()
@@ -29,28 +18,10 @@ export default async function ProjectsPage() {
     ? createAdminClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : null
 
-  // Try to find or create the project table entry — use admin client first (avoids RLS / table_id mismatch)
+  // Only LOOK UP the table — never auto-create (handled by API via getTableId on first POST)
   const lookupClient = supabaseAdmin || supabase
-  let tableId: string | null | undefined
-
   const { data: existing } = await (lookupClient.from('dynamic_tables') as any).select('id').eq('table_name', PROJECT_TABLE_NAME).maybeSingle()
-  tableId = existing?.id
-
-  if (!tableId) {
-    const { data: inserted } = await (lookupClient.from('dynamic_tables') as any).insert({
-      table_name: PROJECT_TABLE_NAME,
-      description: 'Employee project records',
-      schema_definition: PROJECT_SCHEMA,
-      is_global: false,
-      owner_id: uid,
-    }).select('id').single()
-    tableId = inserted?.id
-  }
-
-  // Ensure the user can access it
-  if (tableId && supabaseAdmin) {
-    await (supabaseAdmin.from('dynamic_tables') as any).update({ owner_id: uid }).eq('id', tableId)
-  }
+  const tableId = existing?.id ?? null
 
   // Fetch project records — use admin client when available to avoid RLS issues
   const fetchClient = supabaseAdmin || supabase
