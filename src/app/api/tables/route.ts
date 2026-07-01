@@ -290,7 +290,25 @@ export async function POST(req: NextRequest) {
         .select('data')
         .eq('id', body.id)
         .single()
-      const mergedData = existingRec ? { ...existingRec.data as Record<string, any>, ...body.data } : body.data
+      const existingData = existingRec?.data as Record<string, any> || {}
+      let mergedData = { ...existingData, ...body.data }
+      // Clean up orphaned keys (e.g. field1) that don't match current schema field names
+      if (body.table_id) {
+        const { data: schemaTable } = await supabase.from('dynamic_tables').select('schema_definition').eq('id', body.table_id).single()
+        const schemaFields = (schemaTable?.schema_definition || []) as any[]
+        const validNames = new Set(schemaFields.map((f: any) => f.name))
+        for (const key of Object.keys(mergedData)) {
+          if (validNames.has(key)) continue
+          const m = key.match(/^field(\d+)$/)
+          if (m) {
+            const idx = parseInt(m[1], 10) - 1
+            if (idx >= 0 && idx < schemaFields.length && !(schemaFields[idx].name in mergedData)) {
+              mergedData[schemaFields[idx].name] = mergedData[key]
+            }
+          }
+          delete mergedData[key]
+        }
+      }
       const { error } = await supabase
         .from('dynamic_table_records')
         .update({ data: mergedData, updated_at: new Date().toISOString() })
