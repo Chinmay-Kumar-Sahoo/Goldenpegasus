@@ -68,7 +68,6 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
       if (!fetchedRef.current) {
         fetchedRef.current = true
         fetchTables()
-        try { await api('/api/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'migrate_records' }) }) } catch {}
       }
       try {
         const json = await api('/api/tables?action=profiles')
@@ -169,16 +168,7 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
     }
     if (rec) {
       setEditingRecord(rec)
-      setRecordForm(Object.fromEntries(activeTable.schema_definition.map((f, fi) => {
-        let val = String(rec.data[f.name] || '')
-        if (!val) {
-          const orphanKey = `field${fi + 1}`
-          if (orphanKey in rec.data && !activeTable.schema_definition.some(sf => sf.name === orphanKey)) {
-            val = String(rec.data[orphanKey] || '')
-          }
-        }
-        return [f.name, sanitizeVal(val, f.type)]
-      })))
+      setRecordForm(Object.fromEntries(activeTable.schema_definition.map(f => [f.name, sanitizeVal(String(rec.data[f.name] || ''), f.type)])))
     } else {
       setEditingRecord(null)
       setRecordForm(Object.fromEntries(activeTable.schema_definition.map(f => [f.name, ''])))
@@ -438,15 +428,9 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                                 className="w-4 h-4 accent-[#22c55e] cursor-pointer" />
                             </td>
                           )}
-                          {activeTable.schema_definition.map((f, fi) => {
+                          {activeTable.schema_definition.map(f => {
                             const displayVal = (() => {
-                              let v = String(rec.data[f.name] || '')
-                              if (!v) {
-                                const orphanKey = `field${fi + 1}`
-                                if (orphanKey in rec.data && !activeTable.schema_definition.some(sf => sf.name === orphanKey)) {
-                                  v = String(rec.data[orphanKey] || '')
-                                }
-                              }
+                              const v = String(rec.data[f.name] || '')
                               if (!v) return '—'
                               if (f.type === 'text') return v.replace(/[^a-zA-Z\s]/g, '')
                               if (f.type === 'email') return v.replace(/\s/g, '')
