@@ -96,6 +96,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, cleaned: totalCleaned })
   }
 
+  if (action === 'migrate_records') {
+    const adminClient = getAdminClient()
+    if (!adminClient) return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+    let totalMigrated = 0
+    const { data: tables } = await (adminClient.from('dynamic_tables') as any).select('id, schema_definition')
+    if (!tables) return NextResponse.json({ success: true, migrated: 0 })
+    for (const table of tables) {
+      const schema = (table.schema_definition || []) as any[]
+      const currentFieldNames = new Set(schema.map((f: any) => f.name))
+      const { data: records } = await (adminClient.from('dynamic_table_records') as any).select('id, data').eq('table_id', table.id)
+      if (!records) continue
+      for (const rec of records) {
+        const data = rec.data as Record<string, any> || {}
+        let newData = { ...data }
+        let changed = false
+        for (const key of Object.keys(data)) {
+          if (currentFieldNames.has(key)) continue
+          const m = key.match(/^field(\d+)$/)
+          if (m) {
+            const idx = parseInt(m[1], 10) - 1
+            if (idx >= 0 && idx < schema.length && !newData[schema[idx].name]) {
+              newData[schema[idx].name] = data[key]
+              delete newData[key]
+              changed = true
+            }
+          }
+        }
+        if (changed) {
+          await (adminClient.from('dynamic_table_records') as any).update({ data: newData, updated_at: new Date().toISOString() }).eq('id', rec.id)
+          totalMigrated++
+        }
+      }
+    }
+    return NextResponse.json({ success: true, migrated: totalMigrated })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

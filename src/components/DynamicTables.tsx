@@ -68,6 +68,8 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
       if (!fetchedRef.current) {
         fetchedRef.current = true
         fetchTables()
+        // Migrate orphaned record data keys from old field auto-derive bug
+        try { await api('/api/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'migrate_records' }) }) } catch {}
       }
       try {
         const json = await api('/api/tables?action=profiles')
