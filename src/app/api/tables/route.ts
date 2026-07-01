@@ -141,7 +141,25 @@ export async function POST(req: NextRequest) {
 
   if (action === 'record') {
     if (body.table_id) {
-      const { data: table } = await supabase.from('dynamic_tables').select('schema_definition').eq('id', body.table_id).single()
+      const { data: table } = await supabase.from('dynamic_tables').select('schema_definition, owner_id').eq('id', body.table_id).single()
+      if (!table) return NextResponse.json({ error: 'Table not found' }, { status: 404 })
+
+      // Permission check: owner, admin, or user with 'edit' permission
+      const isOwner = table.owner_id === user.id
+      const isAdminResult = await supabase.rpc('is_admin')
+      const isAdmin = isAdminResult.data ?? false
+      if (!isOwner && !isAdmin) {
+        const { data: perm } = await supabase
+          .from('table_permissions')
+          .select('permission')
+          .eq('table_id', body.table_id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (!perm || perm.permission !== 'edit') {
+          return NextResponse.json({ error: 'Forbidden: you do not have edit permission on this table' }, { status: 403 })
+        }
+      }
+
       if (table?.schema_definition) {
         for (const field of table.schema_definition as any[]) {
           const val = body.data[field.name]
@@ -230,6 +248,27 @@ export async function DELETE(req: NextRequest) {
   }
 
   if (action === 'record') {
+    // Fetch record to verify permission
+    const { data: rec } = await supabase.from('dynamic_table_records').select('table_id').eq('id', body.id).single()
+    if (rec) {
+      const { data: table } = await supabase.from('dynamic_tables').select('owner_id').eq('id', rec.table_id).single()
+      if (table) {
+        const isOwner = table.owner_id === user.id
+        const isAdminResult = await supabase.rpc('is_admin')
+        const isAdmin = isAdminResult.data ?? false
+        if (!isOwner && !isAdmin) {
+          const { data: perm } = await supabase
+            .from('table_permissions')
+            .select('permission')
+            .eq('table_id', rec.table_id)
+            .eq('user_id', user.id)
+            .maybeSingle()
+          if (!perm || perm.permission !== 'edit') {
+            return NextResponse.json({ error: 'Forbidden: you do not have edit permission on this table' }, { status: 403 })
+          }
+        }
+      }
+    }
     const { error } = await supabase.from('dynamic_table_records').delete().eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     await supabase.from('audit_logs').insert({ action: 'deleted', entity_type: 'dynamic_table_record', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })

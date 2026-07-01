@@ -434,6 +434,7 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                               if (!v) return '—'
                               if (f.type === 'text') return v.replace(/[^a-zA-Z\s]/g, '')
                               if (f.type === 'email') return v.replace(/\s/g, '')
+                              if (f.type === 'date') return formatDate(v)
                               return v
                             })()
                             return <td key={f.name} className="px-4 py-3 text-sm text-[#a1a1aa]">{displayVal}</td>
@@ -502,7 +503,7 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
                     <div key={i} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 space-y-2">
                       <div className="flex gap-2 items-start">
                         <div className="flex-1 space-y-1">
-                          <input type="text" value={field.label} onChange={e => { const v = e.target.value; updateField(i, 'label', v); updateField(i, 'name', v.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || `field${i + 1}`) }} placeholder="Field Label"
+                          <input type="text" value={field.label} onChange={e => { const v = e.target.value; const nameVal = v.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || `field${i + 1}`; const updated = [...fields]; updated[i] = { ...updated[i], label: v, name: nameVal }; setFields(updated) }} placeholder="Field Label"
                             className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#22c55e]/60" />
                         </div>
                         <select value={field.type} onChange={e => updateField(i, 'type', e.target.value)}
