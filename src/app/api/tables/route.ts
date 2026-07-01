@@ -235,9 +235,16 @@ export async function POST(req: NextRequest) {
       }
     }
     if (body.id) {
+      // Merge update with existing record data so unfilled fields aren't wiped
+      const { data: existingRec } = await supabase
+        .from('dynamic_table_records')
+        .select('data')
+        .eq('id', body.id)
+        .single()
+      const mergedData = existingRec ? { ...existingRec.data as Record<string, any>, ...body.data } : body.data
       const { error } = await supabase
         .from('dynamic_table_records')
-        .update({ data: body.data, updated_at: new Date().toISOString() })
+        .update({ data: mergedData, updated_at: new Date().toISOString() })
         .eq('id', body.id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       await supabase.from('audit_logs').insert({ action: 'updated', entity_type: 'dynamic_table_record', entity_id: body.id, user_id: user.id, created_at: new Date().toISOString() })
