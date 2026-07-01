@@ -96,16 +96,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, cleaned: totalCleaned })
   }
 
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   if (action === 'migrate_records') {
-    const adminClient = getAdminClient()
-    if (!adminClient) return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
     let totalMigrated = 0
-    const { data: tables } = await (adminClient.from('dynamic_tables') as any).select('id, schema_definition')
+    const { data: tables } = await supabase.from('dynamic_tables').select('id, schema_definition')
     if (!tables) return NextResponse.json({ success: true, migrated: 0 })
     for (const table of tables) {
       const schema = (table.schema_definition || []) as any[]
       const currentFieldNames = new Set(schema.map((f: any) => f.name))
-      const { data: records } = await (adminClient.from('dynamic_table_records') as any).select('id, data').eq('table_id', table.id)
+      const { data: records } = await supabase.from('dynamic_table_records').select('id, data').eq('table_id', table.id)
       if (!records) continue
       for (const rec of records) {
         const data = rec.data as Record<string, any> || {}
@@ -124,17 +126,13 @@ export async function POST(req: NextRequest) {
           }
         }
         if (changed) {
-          await (adminClient.from('dynamic_table_records') as any).update({ data: newData, updated_at: new Date().toISOString() }).eq('id', rec.id)
+          await supabase.from('dynamic_table_records').update({ data: newData, updated_at: new Date().toISOString() }).eq('id', rec.id)
           totalMigrated++
         }
       }
     }
     return NextResponse.json({ success: true, migrated: totalMigrated })
   }
-
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   if (action === 'update_table') {
     const { data: existing } = await supabase
