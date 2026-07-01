@@ -128,6 +128,55 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  if (action === 'fix_orphaned') {
+    let totalFixed = 0
+    const { data: tables } = await supabase.from('dynamic_tables').select('id, schema_definition')
+    if (!tables) return NextResponse.json({ success: true, fixed: 0 })
+    for (const table of tables) {
+      const schema = (table.schema_definition || []) as any[]
+      const validNames = new Set(schema.map((f: any) => f.name))
+      const { data: records } = await supabase.from('dynamic_table_records').select('id, data').eq('table_id', table.id)
+      if (!records) continue
+      for (const rec of records) {
+        const recData = rec.data as Record<string, any> || {}
+        const orphanKeys = Object.keys(recData).filter(k => !validNames.has(k))
+        if (orphanKeys.length === 0) continue
+        const newData = { ...recData }
+        let changed = false
+        // Map orphaned field\d+ keys to current schema field names by position
+        for (let i = 0; i < schema.length; i++) {
+          const fieldName = schema[i].name
+          if (fieldName in newData) continue
+          const match = orphanKeys.find(k => {
+            const m = k.match(/^field(\d+)$/)
+            return m && parseInt(m[1], 10) - 1 === i
+          })
+          if (match) {
+            newData[fieldName] = newData[match]
+            delete newData[match]
+            changed = true
+          }
+        }
+        // Also handle any remaining orphan keys by position order
+        if (!changed && orphanKeys.length > 0) {
+          const remainingOrphans = orphanKeys.sort()
+          for (let i = 0; i < Math.min(schema.length, remainingOrphans.length); i++) {
+            if (!(schema[i].name in newData)) {
+              newData[schema[i].name] = newData[remainingOrphans[i]]
+              delete newData[remainingOrphans[i]]
+              changed = true
+            }
+          }
+        }
+        if (changed) {
+          await supabase.from('dynamic_table_records').update({ data: newData, updated_at: new Date().toISOString() }).eq('id', rec.id)
+          totalFixed++
+        }
+      }
+    }
+    return NextResponse.json({ success: true, fixed: totalFixed })
+  }
+
   if (action === 'update_table') {
     const { data: existing } = await supabase
       .from('dynamic_tables')

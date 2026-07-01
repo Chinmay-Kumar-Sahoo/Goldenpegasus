@@ -68,6 +68,11 @@ export default function DynamicTablesPage({ isAdmin = false, initialTables = [],
       if (!fetchedRef.current) {
         fetchedRef.current = true
         fetchTables()
+        // Permanently fix orphaned record data keys in the database
+        try {
+          const result = await api('/api/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'fix_orphaned' }) })
+          if (result.fixed > 0 && activeTable) openTable(activeTable)
+        } catch {}
       }
       try {
         const json = await api('/api/tables?action=profiles')
