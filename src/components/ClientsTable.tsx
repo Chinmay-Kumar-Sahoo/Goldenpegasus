@@ -724,9 +724,9 @@ export default function CandidatesPage({ isAdmin = false, readOnly = false, init
               <div>
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Candidate Name *</label>
                 <input type="text" value={form.Candidate_name || ''} onChange={e => setForm({ ...form, Candidate_name: e.target.value })} required
-                  disabled={!!editing}
-                  className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${!!editing ? 'opacity-50 cursor-not-allowed' : ''}`} />
-                {!!editing && <p className="text-[10px] text-[#71717a] mt-1">Candidate name cannot be changed</p>}
+                  disabled={!!editing && !isAdmin}
+                  className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 ${(!!editing && !isAdmin) ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                {!!editing && !isAdmin && <p className="text-[10px] text-[#71717a] mt-1">Only admin can change candidate name</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#a1a1aa] mb-1">Technology</label>

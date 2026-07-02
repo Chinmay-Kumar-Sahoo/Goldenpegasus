@@ -137,8 +137,6 @@ export async function POST(req: NextRequest) {
     const updateData: any = { updated_at: new Date().toISOString() }
     if (isAdminUser) {
       Object.assign(updateData, recordData)
-      // Admin cannot change candidate name
-      delete updateData.Candidate_name
       if (selectedEmployeeId) updateData.owner_id = selectedEmployeeId
       if (backupEmployeeId !== undefined) updateData.backup_employee_id = backupEmployeeId || null
       if (backupName !== null) updateData.backup_employee_name = backupName
@@ -212,14 +210,12 @@ export async function DELETE(req: NextRequest) {
     ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     : supabase
 
-  // Fetch candidate name + technology before deleting, for sync
+  // Fetch candidate details before deleting
   const { data: candidate } = await deleteClient.from('Candidate_records').select('Candidate_name, technology').eq('id', id).maybeSingle()
   if (!candidate) return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
 
-  // Delete ALL records with same (Candidate_name, technology) to cover dedup duplicates
-  const { error } = await deleteClient.from('Candidate_records').delete()
-    .ilike('Candidate_name', candidate.Candidate_name)
-    .eq('technology', (candidate.technology || '') === '' ? null : candidate.technology)
+  // Delete the specific record by ID only
+  const { error } = await deleteClient.from('Candidate_records').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Also delete from marketing_records
