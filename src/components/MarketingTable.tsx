@@ -891,11 +891,24 @@ export default function MarketingPage({
     return true
   }
 
+  const deduped = useMemo(() => {
+    const dedupMap = new Map<string, any>()
+    for (const r of records) {
+      const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
+      if (!key) { dedupMap.set(r.id, r); continue }
+      const existing = dedupMap.get(key)
+      if (!existing || (r.created_at || '') < (existing.created_at || '')) {
+        dedupMap.set(key, r)
+      }
+    }
+    return Array.from(dedupMap.values())
+  }, [records])
+
   const uniqueValues = useMemo(() => {
     const result: Record<string, string[]> = {}
     for (const [header, fieldKey] of Object.entries(TEXT_FILTER_COLUMNS)) {
       const values = new Set<string>()
-      for (const rec of records) {
+      for (const rec of deduped) {
         let val = (rec as any)[fieldKey]
         if (val == null || val === '') val = fieldKey === 'status' ? 'Telephone Call' : null
         if (val != null) {
@@ -919,8 +932,8 @@ export default function MarketingPage({
     const q = search.toLowerCase().trim()
     const hasDateFilter = Object.values(dateFilters).some(r => r.start || r.end)
     const hasTextFilter = Object.values(textFilters).some(v => v.length > 0)
-    if (!q && !hasDateFilter && !hasTextFilter) return records
-    return records.filter(r => {
+    if (!q && !hasDateFilter && !hasTextFilter) return deduped
+    return deduped.filter(r => {
       if (!inRange(r.date, dateFilters.date)) return false
       if (!inRange(r.interview_date, dateFilters.interview_date)) return false
       if (!inRange(r.project_start_date, dateFilters.project_start_date)) return false
@@ -949,7 +962,7 @@ export default function MarketingPage({
       ]
       return fields.some(f => f && f.toLowerCase().includes(q))
     })
-  }, [records, search, dateFilters, textFilters])
+  }, [deduped, search, dateFilters, textFilters])
 
   const sorted = useMemo(() => {
     const fieldKey = SORT_FIELDS[sortBy]
@@ -986,7 +999,7 @@ export default function MarketingPage({
 
   const exportCSV = useCallback(() => {
     const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments']
-    const rows = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, formatDate(r.interview_date), r.interviewer_email, formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes])
+    const rows = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), r.date ? formatDate(r.date) : '', r.status || 'Telephone Call', r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date ? formatDate(r.interview_date) : '', r.interviewer_email, r.project_start_date ? formatDate(r.project_start_date) : '', r.project_end_date ? formatDate(r.project_end_date) : '', r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -1000,7 +1013,7 @@ export default function MarketingPage({
     const doc = new jsPDF({ orientation: 'landscape' })
 
     const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments']
-    const data = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), formatDate(r.date), r.status || 'Telephone Call', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', formatDate(r.interview_date), r.interviewer_email || '', formatDate(r.project_start_date), formatDate(r.project_end_date), r.notes || ''])
+    const data = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), r.date ? formatDate(r.date) : '', r.status || 'Telephone Call', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', r.interview_date ? formatDate(r.interview_date) : '', r.interviewer_email || '', r.project_start_date ? formatDate(r.project_start_date) : '', r.project_end_date ? formatDate(r.project_end_date) : '', r.notes || ''])
 
     autoTable(doc, {
       head: [headers],
