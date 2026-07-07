@@ -422,11 +422,11 @@ export default function MarketingPage({
     if (rec) {
       setEditing(rec)
       setForm({
-        name: rec.name, date: rec.date || '', recruiter_name: rec.recruiter_name || '',
+        name: rec.name, date: toDateInputValue(rec.date), recruiter_name: rec.recruiter_name || '',
         recruiter_email: rec.recruiter_email || '', organization_name: rec.organization_name || '',
         implementation_partner: rec.implementation_partner || '', end_client: rec.end_client || '',
-        status: rec.status || 'Telephone Call', project_start_date: rec.project_start_date || '',
-        project_end_date: rec.project_end_date || '', interview_date: rec.interview_date || '',
+        status: rec.status || 'Telephone Call', project_start_date: toDateInputValue(rec.project_start_date),
+        project_end_date: toDateInputValue(rec.project_end_date), interview_date: toDateInputValue(rec.interview_date),
         implementation_poc_email: rec.implementation_poc_email || '',
         interviewer_email: rec.interviewer_email || '', notes: rec.notes || '',
         employee_name: rec.employee_name || '',
@@ -571,7 +571,14 @@ export default function MarketingPage({
     }
   }
 
-  const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const toDateInputValue = (v: string | null | undefined): string => {
+  if (!v) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.split('T')[0]
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0]
+}
+
+const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
 
   const MONTH_NAMES: Record<string, number> = {
     jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
@@ -891,24 +898,11 @@ export default function MarketingPage({
     return true
   }
 
-  const deduped = useMemo(() => {
-    const dedupMap = new Map<string, any>()
-    for (const r of records) {
-      const key = ((r.name || '') + '|' + (r.technology || '')).toLowerCase().trim()
-      if (!key) { dedupMap.set(r.id, r); continue }
-      const existing = dedupMap.get(key)
-      if (!existing || (r.created_at || '') < (existing.created_at || '')) {
-        dedupMap.set(key, r)
-      }
-    }
-    return Array.from(dedupMap.values())
-  }, [records])
-
   const uniqueValues = useMemo(() => {
     const result: Record<string, string[]> = {}
     for (const [header, fieldKey] of Object.entries(TEXT_FILTER_COLUMNS)) {
       const values = new Set<string>()
-      for (const rec of deduped) {
+      for (const rec of records) {
         let val = (rec as any)[fieldKey]
         if (val == null || val === '') val = fieldKey === 'status' ? 'Telephone Call' : null
         if (val != null) {
@@ -932,8 +926,8 @@ export default function MarketingPage({
     const q = search.toLowerCase().trim()
     const hasDateFilter = Object.values(dateFilters).some(r => r.start || r.end)
     const hasTextFilter = Object.values(textFilters).some(v => v.length > 0)
-    if (!q && !hasDateFilter && !hasTextFilter) return deduped
-    return deduped.filter(r => {
+    if (!q && !hasDateFilter && !hasTextFilter) return records
+    return records.filter(r => {
       if (!inRange(r.date, dateFilters.date)) return false
       if (!inRange(r.interview_date, dateFilters.interview_date)) return false
       if (!inRange(r.project_start_date, dateFilters.project_start_date)) return false
@@ -962,7 +956,7 @@ export default function MarketingPage({
       ]
       return fields.some(f => f && f.toLowerCase().includes(q))
     })
-  }, [deduped, search, dateFilters, textFilters])
+  }, [records, search, dateFilters, textFilters])
 
   const sorted = useMemo(() => {
     const fieldKey = SORT_FIELDS[sortBy]

@@ -472,10 +472,12 @@ export async function POST(req: NextRequest) {
     if (existingRecord.date_locked) {
       delete updatePayload.date
     } else if (updatePayload.date !== undefined) {
-      const submitted = updatePayload.date || null
-      const current = existingRecord.date || null
+      const toDate = (v: string | null) => v ? v.split('T')[0] : null
+      const submitted = toDate(updatePayload.date)
+      const current = toDate(existingRecord.date)
       if (submitted !== current) {
         updatePayload.date_locked = true
+        updatePayload.date = submitted
       } else {
         delete updatePayload.date
       }
