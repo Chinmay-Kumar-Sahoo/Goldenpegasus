@@ -151,13 +151,24 @@ export async function PUT(req: NextRequest) {
   let closedCount = 0
 
   // ── DB-wide dedup preparation ─────────────────────────────────────────
-  const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology', 'owner_id']
+  // NOTE: owner_id is intentionally excluded so records with identical
+  // data but different owners (e.g. after candidate reassignment) are
+  // treated as duplicates.
+  const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology']
   const buildFullKey = (r: any) => {
     const parts = dedupFields.map(f => normalize(String(r[f] ?? '') || ''))
     return parts.join('|||')
   }
+  const DATE_FIELDS = new Set(['date', 'project_start_date', 'project_end_date', 'interview_date'])
+  const NON_DATE_FIELDS = dedupFields.filter(f => !DATE_FIELDS.has(f))
+  const buildFullKeyNoDates = (r: any) => {
+    const parts = NON_DATE_FIELDS.map(f => normalize(String(r[f] ?? '') || ''))
+    return parts.join('|||')
+  }
+
   const importNames = [...new Set(records.map((r: any) => (r.name || '').trim()).filter(Boolean))]
   let existingDedupKeys = new Set<string>()
+  let existingDedupKeysNoDates = new Set<string>()
   if (importNames.length > 0) {
     const { data: existingRecords } = await lookupClient
       .from('marketing_records')
@@ -166,6 +177,7 @@ export async function PUT(req: NextRequest) {
     if (existingRecords) {
       for (const r of existingRecords) {
         existingDedupKeys.add(buildFullKey(r))
+        existingDedupKeysNoDates.add(buildFullKeyNoDates(r))
       }
     }
   }
@@ -291,6 +303,17 @@ export async function PUT(req: NextRequest) {
       continue
     }
 
+    // Lenient check: if incoming record has no dates, match by non-date fields
+    const hasNoDates = !recordToInsert.date && !recordToInsert.project_start_date && !recordToInsert.project_end_date && !recordToInsert.interview_date
+    if (hasNoDates) {
+      const noDateKey = buildFullKeyNoDates(recordToInsert)
+      if (existingDedupKeysNoDates.has(noDateKey)) {
+        issues.push('Duplicate Profile — a record with identical details (except date) already exists')
+        errors.push({ name, issues })
+        continue
+      }
+    }
+
     insertRecords.push(recordToInsert)
   }
 
@@ -311,14 +334,25 @@ export async function PUT(req: NextRequest) {
   if (insertRecords.length > 0) {
     const batchDeduped: typeof insertRecords = []
     const batchSeen = new Set<string>()
+    const batchSeenNoDates = new Set<string>()
     for (const r of insertRecords) {
       const key = buildFullKey(r)
       if (batchSeen.has(key)) {
         skippedCount++
-      } else {
-        batchSeen.add(key)
-        batchDeduped.push(r)
+        continue
       }
+      batchSeen.add(key)
+      // Lenient within-batch: skip null-date record if a dated match exists
+      const hasNoDates = !r.date && !r.project_start_date && !r.project_end_date && !r.interview_date
+      if (hasNoDates) {
+        const noDateKey = buildFullKeyNoDates(r)
+        if (batchSeenNoDates.has(noDateKey)) {
+          skippedCount++
+          continue
+        }
+        batchSeenNoDates.add(noDateKey)
+      }
+      batchDeduped.push(r)
     }
     insertRecords.length = 0
     insertRecords.push(...batchDeduped)

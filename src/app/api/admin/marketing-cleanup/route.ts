@@ -145,15 +145,23 @@ export async function POST(req: NextRequest) {
   // ── 3. Dedup marketing_records after normalization ─────────────────────
   // Use normalized (trimmed, collapsed) values for comparison.
   // Keep the earliest-created record for each unique key.
-  // Must match the fields used in batch import dedup (src/app/api/marketing/batch/route.ts)
+  // NOTE: owner_id is intentionally excluded from the dedup key so that
+  // records with identical marketing data but different owners (e.g., from
+  // candidate reassignment) are treated as duplicates. The first-created
+  // record is kept regardless of owner.
   const MKT_DEDUP_FIELDS = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology']
+  const DATE_FIELDS = new Set(['date', 'project_start_date', 'project_end_date', 'interview_date'])
+  const NON_DATE_FIELDS = MKT_DEDUP_FIELDS.filter(f => !DATE_FIELDS.has(f))
   const mktBuildKey = (r: any) =>
-    MKT_DEDUP_FIELDS.map(f => norm(r[f])).join('|||') + '|||' + norm(r.owner_id)
+    MKT_DEDUP_FIELDS.map(f => norm(r[f])).join('|||')
+  const mktBuildKeyNoDates = (r: any) =>
+    NON_DATE_FIELDS.map(f => norm(r[f])).join('|||')
   const { data: allMkt } = await adminClient
     .from('marketing_records')
     .select('id, created_at, name, date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, project_start_date, project_end_date, interview_date, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, technology, owner_id')
     .order('created_at', { ascending: true })
   if (allMkt?.length) {
+    // ── Pass 1: Strict dedup (exact match on all fields) ──────────────
     const seen = new Map<string, string>()
     for (const rec of allMkt) {
       const key = mktBuildKey(rec)
@@ -162,6 +170,34 @@ export async function POST(req: NextRequest) {
         mktDupesRemoved++
       } else {
         seen.set(key, rec.id)
+      }
+    }
+
+    // ── Pass 2: Lenient dedup (null-date vs dated records) ───────────
+    // After strict pass, catch records where one has a date and an
+    // otherwise-identical duplicate has null dates. Re-fetch survivors.
+    const { data: survivors } = await adminClient
+      .from('marketing_records')
+      .select('id, name, date, project_start_date, project_end_date, interview_date, status, recruiter_name, recruiter_email, organization_name, implementation_partner, end_client, interview_type, client_name, client_email, implementation_poc_email, interviewer_email, technology')
+      .order('created_at', { ascending: true })
+    if (survivors?.length) {
+      const byNoDateKey = new Map<string, { datedId: string | null; dateLessId: string | null }>()
+      for (const rec of survivors) {
+        const ndk = mktBuildKeyNoDates(rec)
+        if (!byNoDateKey.has(ndk)) byNoDateKey.set(ndk, { datedId: null, dateLessId: null })
+        const entry = byNoDateKey.get(ndk)!
+        const hasDate = !!rec.date || !!rec.project_start_date || !!rec.project_end_date || !!rec.interview_date
+        if (hasDate) {
+          entry.datedId = rec.id
+        } else {
+          entry.dateLessId = rec.id
+        }
+      }
+      for (const [, { datedId, dateLessId }] of byNoDateKey) {
+        if (datedId && dateLessId) {
+          await adminClient.from('marketing_records').delete().eq('id', dateLessId)
+          mktDupesRemoved++
+        }
       }
     }
   }

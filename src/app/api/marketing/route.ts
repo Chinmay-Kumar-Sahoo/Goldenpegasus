@@ -376,11 +376,15 @@ export async function POST(req: NextRequest) {
   // ── Shared duplicate check ──────────────────────────────────────────────
   // Returns error response if a duplicate exists, or null if ok.
   // Uses the same dedup fields and key logic as the batch import (/api/marketing/batch/route.ts)
+  // NOTE: owner_id is excluded so records with identical data but different
+  // owners (e.g. after candidate reassignment) are treated as duplicates.
   async function checkDuplicate(candidateName: string, technology: string | null, compareData: any, excludeId?: string): Promise<NextResponse | null> {
     if (!candidateName) return null
     const lookupClient = getAdminClient() || supabase
     const norm = (v: any) => String(v ?? '').replace(/[\u00A0\u200B\u200C\u200D\uFEFF\u180E\u2060\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
-    const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology', 'owner_id']
+    const dedupFields = ['name', 'date', 'status', 'recruiter_name', 'recruiter_email', 'organization_name', 'implementation_partner', 'end_client', 'project_start_date', 'project_end_date', 'interview_date', 'interview_type', 'client_name', 'client_email', 'implementation_poc_email', 'interviewer_email', 'technology']
+    const DATE_FIELDS = new Set(['date', 'project_start_date', 'project_end_date', 'interview_date'])
+    const NON_DATE_FIELDS = dedupFields.filter(f => !DATE_FIELDS.has(f))
     const buildFullKey = (obj: any) => dedupFields.map((f: string) => {
       const raw = obj[f]
       if (f === 'organization_name' || f === 'implementation_partner') {
@@ -388,7 +392,16 @@ export async function POST(req: NextRequest) {
       }
       return norm(raw)
     }).join('|||')
+    const buildFullKeyNoDates = (obj: any) => NON_DATE_FIELDS.map((f: string) => {
+      const raw = obj[f]
+      if (f === 'organization_name' || f === 'implementation_partner') {
+        return norm(normalizeCompanyName(raw) ?? raw)
+      }
+      return norm(raw)
+    }).join('|||')
     const newKey = buildFullKey(compareData)
+    const hasNoDates = !compareData.date && !compareData.project_start_date && !compareData.project_end_date && !compareData.interview_date
+    const newKeyNoDates = hasNoDates ? buildFullKeyNoDates(compareData) : null
     const { data: existing } = await (lookupClient as any)
       .from('marketing_records')
       .select('id, ' + dedupFields.join(', '))
@@ -397,7 +410,10 @@ export async function POST(req: NextRequest) {
     const dup = (existing as any[]).find((r: any) => {
       if (excludeId && r.id === excludeId) return false
       if (norm(r.technology) !== norm(technology)) return false
-      return buildFullKey(r) === newKey
+      if (buildFullKey(r) === newKey) return true
+      // Lenient match: if incoming has no dates, match by non-date fields
+      if (hasNoDates && newKeyNoDates && buildFullKeyNoDates(r) === newKeyNoDates) return true
+      return false
     })
     if (dup) {
       return NextResponse.json({ error: 'Duplicate Profile' }, { status: 409 })
