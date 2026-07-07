@@ -166,6 +166,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── 3b. Dedup marketing_records by (name, technology) ────────────────────
+  // Keep the earliest-created record for each (name, technology) pair.
+  // Catches near-duplicates that the all-field dedup above misses.
+  const { data: mktByName } = await adminClient
+    .from('marketing_records')
+    .select('id, created_at, name, technology')
+    .order('created_at', { ascending: true })
+  if (mktByName?.length) {
+    const seen = new Set<string>()
+    for (const rec of mktByName) {
+      const key = norm(rec.name) + '|' + norm(rec.technology)
+      if (seen.has(key)) {
+        await adminClient.from('marketing_records').delete().eq('id', rec.id)
+        mktDupesRemoved++
+      } else {
+        seen.add(key)
+      }
+    }
+  }
+
   // ── 4. Dedup Candidate_records after normalization ─────────────────────
   // Keep the earliest-created record for each (Candidate_name, technology).
   const { data: allCand } = await adminClient
