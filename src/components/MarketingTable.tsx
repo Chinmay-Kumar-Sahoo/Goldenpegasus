@@ -74,7 +74,7 @@ const IMPORT_COLUMNS: Array<{ key: MarketingImportField; labels: string[]; isDat
   { key: 'interviewer_email', labels: ['Interviewer Email'] },
   { key: 'notes', labels: ['Notes', 'Comments', 'Comment', 'Note', 'Remarks', 'Additional Notes'] },
   { key: 'employee_name', labels: ['Primary Employee', 'Employee', 'Employee Name', 'Primary Owner'] },
-  { key: 'backup_employee_name', labels: ['Backup Employee', 'Backup Employee Name', 'Secondary Employee'] },
+  { key: 'backup_employee_name', labels: ['Backup Employee', 'Backup Employee Name', 'Secondary Employee', '2nd Up Recruiter', 'Second Up Recruiter', '2nd Recruiter', 'Second Recruiter'] },
 ]
 
 const STATUS_COLORS: Record<string, string> = {
@@ -755,7 +755,7 @@ const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9
       const batchRecords = importRows.map(row => {
         const payload: Record<string, any> = { name: row.name || '' }
         for (const key of Object.keys(row)) {
-          if (key === 'employee_name' || key === 'backup_employee_name') continue
+          if (key === 'employee_name') continue
           const val = (row as any)[key]
           if (val !== null && val !== '') payload[key] = val
         }

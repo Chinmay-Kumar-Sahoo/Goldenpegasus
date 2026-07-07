@@ -253,7 +253,10 @@ export async function PUT(req: NextRequest) {
     // --- Step 4: Resolve Primary Employee and Backup Employee from the matched row ---
     const primaryUserId = candidateInfo.owner_id || user.id
     const primaryUserName = idToName.get(primaryUserId) || null
-    const backupEmployeeName = candidateInfo.backup_employee_name
+    // Use incoming backup_employee_name if provided, otherwise fall back to Candidate_records
+    const incomingBackupName = (r.backup_employee_name || '').trim() || null
+    const backupEmployeeName = incomingBackupName
+      || candidateInfo.backup_employee_name
       || (candidateInfo.backup_employee_id ? idToName.get(candidateInfo.backup_employee_id) : null)
       || null
 
