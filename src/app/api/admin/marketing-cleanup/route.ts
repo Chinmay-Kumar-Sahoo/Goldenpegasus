@@ -61,9 +61,9 @@ const normalizeCompanyName = (value: string | null): string | null => {
   return COMPANY_VARIATIONS[key] || trimmed
 }
 
-const norm = (v: any) => String(v ?? '').toLowerCase().trim()
-const normalizeName = (v: string | null) => v ? v.trim().replace(/\s+/g, ' ') : v
-const normalizeTech = (v: string | null) => v ? v.trim() : v
+const norm = (v: any) => String(v ?? '').replace(/[\u00A0\u200B\u200C\u200D\uFEFF\u180E\u2060\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+const normalizeName = (v: string | null) => v ? v.replace(/[\u00A0\u200B\u200C\u200D\uFEFF\u180E\u2060\u2028\u2029]/g, ' ').trim().replace(/\s+/g, ' ') : v
+const normalizeTech = (v: string | null) => v ? v.replace(/[\u00A0\u200B\u200C\u200D\uFEFF\u180E\u2060\u2028\u2029]/g, ' ').trim() : v
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
