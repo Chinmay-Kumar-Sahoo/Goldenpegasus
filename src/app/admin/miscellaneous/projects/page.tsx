@@ -4,14 +4,7 @@ export const metadata = { title: 'Project Records | Admin | GoldenPegasus' }
 export const dynamic = 'force-dynamic'
 
 const FIELDS = [
-  { name: 'employee_name', label: 'Employee Name' },
-  { name: 'candidate_name', label: 'Candidate Name' },
-  { name: 'technology', label: 'Technology' },
-  { name: 'company_name', label: 'Company Name' },
-  { name: 'project_status', label: 'Project Status' },
-  { name: 'created_date', label: 'Created Date' },
-  { name: 'project_start_date', label: 'Project Start Date' },
-  { name: 'project_end_date', label: 'Project End Date' },
+  { name: 'content', label: 'Content', type: 'textarea' as const },
 ]
 
 export default function AdminMiscProjectsPage() {

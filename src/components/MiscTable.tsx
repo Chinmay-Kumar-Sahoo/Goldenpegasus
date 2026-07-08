@@ -13,6 +13,7 @@ interface MiscRecord {
 interface MiscField {
   name: string
   label: string
+  type?: 'text' | 'textarea'
 }
 
 const PAGE_SIZES = [25, 50, 100] as const
@@ -244,9 +245,12 @@ export default function MiscTable({
               ) : (
                 paged.map(rec => (
                   <tr key={rec.id} className="border-b border-[#1a1a1a] hover:bg-[#1a1a1a] transition-colors">
-                    {fieldNames.map(f => (
-                      <td key={f} className="px-4 py-3 text-sm text-[#a1a1aa]">{String(rec[f] || '—')}</td>
-                    ))}
+                    {fieldNames.map(f => {
+                      const isTextarea = fields.find(fi => fi.name === f)?.type === 'textarea'
+                      return (
+                        <td key={f} className={`px-4 py-3 text-sm text-[#a1a1aa]${isTextarea ? ' whitespace-pre-wrap' : ''}`}>{String(rec[f] || '—')}</td>
+                      )
+                    })}
                     {isAdmin && (
                       <td className="px-4 py-3 text-xs text-[#71717a] flex gap-1">
                         <button onClick={() => openModal(rec)} className="hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-[#2a2a2a]" title="Edit">✎</button>
@@ -278,8 +282,14 @@ export default function MiscTable({
               {fields.map(f => (
                 <div key={f.name}>
                   <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{f.label}</label>
-                  <input type="text" value={form[f.name] || ''} onChange={e => setForm(p => ({ ...p, [f.name]: e.target.value }))} placeholder={`Enter ${f.label.toLowerCase()}`}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                  {f.type === 'textarea' ? (
+                    <textarea value={form[f.name] || ''} onChange={e => setForm(p => ({ ...p, [f.name]: e.target.value }))} placeholder={`Enter ${f.label.toLowerCase()}`}
+                      rows={6}
+                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-y min-h-[120px]" />
+                  ) : (
+                    <input type="text" value={form[f.name] || ''} onChange={e => setForm(p => ({ ...p, [f.name]: e.target.value }))} placeholder={`Enter ${f.label.toLowerCase()}`}
+                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
+                  )}
                 </div>
               ))}
               {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
