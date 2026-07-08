@@ -86,7 +86,11 @@ export default function MiscTable({
     setError('')
     if (rec) {
       setEditingId(rec.id)
-      setForm({ ...rec })
+      const data: Record<string, string> = {}
+      for (const f of fields) {
+        data[f.name] = rec[f.name] || ''
+      }
+      setForm(data)
     } else {
       setEditingId(null)
       setForm({})
