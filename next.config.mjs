@@ -15,6 +15,22 @@ const nextConfig = {
           },
         ],
       },
+      // Redirect removed project pages to Miscellaneous > Project Records
+      {
+        source: "/dashboard/projects",
+        destination: "/dashboard/miscellaneous/projects",
+        permanent: true,
+      },
+      {
+        source: "/dashboard/all-projects",
+        destination: "/dashboard/miscellaneous/projects",
+        permanent: true,
+      },
+      {
+        source: "/admin/projects",
+        destination: "/admin/miscellaneous/projects",
+        permanent: true,
+      },
     ];
   },
 
