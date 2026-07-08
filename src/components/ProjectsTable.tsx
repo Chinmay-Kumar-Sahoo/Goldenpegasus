@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import PageHeader from '@/components/PageHeader'
 import toast from 'react-hot-toast'
-import { formatDate } from '@/lib/dates'
 
 interface ProjectRecord {
   id: string
@@ -13,27 +12,18 @@ interface ProjectRecord {
   employee_name?: string | null
 }
 
-interface CandidateOption {
-  name: string
-  technology: string | null
-}
-
 const FIELD_LABELS: Record<string, string> = {
+  employee_name: 'Employee Name',
   candidate_name: 'Candidate Name',
   technology: 'Technology',
-  created_date: 'Created Date',
   company_name: 'Company Name',
   project_status: 'Project Status',
-  project_type: 'Project Type',
-  project_rate: 'Project Rate',
+  created_date: 'Created Date',
   project_start_date: 'Project Start Date',
   project_end_date: 'Project End Date',
 }
 
-const FILTER_FIELDS = ['candidate_name', 'technology', 'company_name', 'project_status', 'project_type', 'created_date', 'project_start_date', 'project_end_date']
-
-const PROJECT_STATUSES = ['Active', 'Completed', 'On Hold', 'Cancelled']
-const PROJECT_TYPES = ['Full-time', 'Part-time', 'Contract', 'C2H', 'C2C']
+const FILTER_FIELDS = ['employee_name', 'candidate_name', 'technology', 'company_name', 'project_status', 'created_date', 'project_start_date', 'project_end_date']
 
 const PAGE_SIZES = [25, 50, 100] as const
 
@@ -49,18 +39,17 @@ function wordScore(val: string | null | undefined, q: string): number {
 }
 
 const TEXT_FILTER_COLUMNS: Record<string, string> = {
+  'Employee Name': 'employee_name',
   'Candidate Name': 'candidate_name',
   'Technology': 'technology',
   'Company Name': 'company_name',
   'Project Status': 'project_status',
-  'Project Type': 'project_type',
 }
 
 export default function ProjectsTable({
   currentUserId,
   tableId,
   initialRecords = [],
-  candidateOptions = [],
   isAdmin = false,
   readOnly = false,
   title = 'My Project Records',
@@ -68,7 +57,6 @@ export default function ProjectsTable({
   currentUserId?: string | null
   tableId?: string | null
   initialRecords?: ProjectRecord[]
-  candidateOptions?: CandidateOption[]
   isAdmin?: boolean
   readOnly?: boolean
   title?: string
@@ -92,7 +80,6 @@ export default function ProjectsTable({
   const [textFilters, setTextFilters] = useState<Record<string, string[]>>({})
   const [textFilterSearch, setTextFilterSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [showCandidateDropdown, setShowCandidateDropdown] = useState(false)
 
   const fetchedRef = useRef(false)
   const fetchingRef = useRef(false)
@@ -128,14 +115,6 @@ export default function ProjectsTable({
     }
     return result
   }, [records])
-
-  const candidateMap = useMemo(() => {
-    const map = new Map<string, string | null>()
-    for (const c of candidateOptions) {
-      map.set((c.name + '|' + (c.technology || '')).toLowerCase().trim(), c.technology)
-    }
-    return map
-  }, [candidateOptions])
 
   const fetchRecords = useCallback(async (background = false) => {
     if (fetchingRef.current) return
@@ -186,29 +165,13 @@ export default function ProjectsTable({
       setForm({ ...rec.data })
     } else {
       setEditingId(null)
-      const today = new Date().toISOString().split('T')[0]
-      setForm({ created_date: today, project_status: 'Active' })
+      setForm({})
     }
     setShowModal(true)
   }
 
-  const handleCandidateChange = (candidateName: string, technology?: string | null) => {
-    setForm(prev => ({ ...prev, candidate_name: candidateName, technology: technology || '' }))
-  }
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.candidate_name?.trim()) { setError('Candidate Name is required'); return }
-    if (!editingId) {
-      const dup = records.some(r =>
-        String(r.data?.candidate_name ?? '').toLowerCase().trim() === form.candidate_name.toLowerCase().trim() &&
-        String(r.data?.company_name ?? '').toLowerCase().trim() === (form.company_name || '').toLowerCase().trim() &&
-        String(r.data?.project_type ?? '').toLowerCase().trim() === (form.project_type || '').toLowerCase().trim() &&
-        String(r.data?.project_start_date ?? '').toLowerCase().trim() === (form.project_start_date || '').toLowerCase().trim() &&
-        String(r.data?.project_end_date ?? '').toLowerCase().trim() === (form.project_end_date || '').toLowerCase().trim()
-      )
-      if (dup) { setError('An identical project record already exists'); return }
-    }
     setSaving(true)
     setError('')
     try {
@@ -356,9 +319,6 @@ export default function ProjectsTable({
 
   const renderFieldValue = (field: string, value: any) => {
     if (!value) return '—'
-    if (field === 'created_date' || field === 'project_start_date' || field === 'project_end_date') {
-      return formatDate(value)
-    }
     return String(value)
   }
 
@@ -564,89 +524,13 @@ export default function ProjectsTable({
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-white mb-6">{editingId ? 'Edit Project' : 'Add Project'}</h2>
             <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Candidate Name *</label>
-                <div className="relative">
-                  <button type="button" onClick={() => setShowCandidateDropdown(!showCandidateDropdown)}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-left flex items-center justify-between focus:outline-none focus:border-[#22c55e]/60">
-                    <span className={form.candidate_name ? 'text-white' : 'text-[#3a3a3a]'}>{form.candidate_name || 'Select candidate...'}</span>
-                    <svg className="w-4 h-4 text-[#71717a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  </button>
-                  {showCandidateDropdown && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setShowCandidateDropdown(false)} />
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl z-50 max-h-48 overflow-y-auto shadow-2xl">
-                        <div className="px-4 py-1.5 text-[10px] text-[#71717a] border-b border-[#2a2a2a]">{candidateOptions.length} candidate{candidateOptions.length !== 1 ? 's' : ''} available</div>
-                        {candidateOptions.map(c => (
-                          <button key={c.name + '|' + (c.technology || '')} type="button" onClick={() => { handleCandidateChange(c.name, c.technology); setShowCandidateDropdown(false) }}
-                            className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors flex items-center justify-between">
-                            <span>{c.name}</span>
-                            {c.technology && <span className="text-[10px] text-[#71717a]">{c.technology}</span>}
-                          </button>
-                        ))}
-                        {candidateOptions.length === 0 && (
-                          <div className="px-4 py-3 text-xs text-[#71717a]">No candidates assigned to you</div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Technology</label>
-                <input type="text" value={form.technology || ''} onChange={e => setForm(p => ({ ...p, technology: e.target.value }))} placeholder="Auto-filled from candidate"
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Created Date</label>
-                <input type="date" value={form.created_date || ''} disabled
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-[#71717a] focus:outline-none cursor-not-allowed opacity-70" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Company Name</label>
-                <input type="text" value={form.company_name || ''} onChange={e => setForm(p => ({ ...p, company_name: e.target.value }))} placeholder="e.g. Tech Mahindra, TCS"
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Status</label>
-                  <select value={form.project_status || 'Active'} onChange={e => setForm(p => ({ ...p, project_status: e.target.value }))}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-                    {PROJECT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Type</label>
-                  <select value={form.project_type || ''} onChange={e => setForm(p => ({ ...p, project_type: e.target.value }))}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-                    <option value="">Select type</option>
-                    {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Rate</label>
-                <input type="text" value={form.project_rate || ''} onChange={e => setForm(p => ({ ...p, project_rate: e.target.value }))} placeholder="e.g. $60/hr"
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Start Date</label>
-                  <input type="date" value={form.project_start_date || ''} onChange={e => setForm(p => ({ ...p, project_start_date: e.target.value }))}
+              {Object.entries(FIELD_LABELS).map(([key, label]) => (
+                <div key={key}>
+                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{label}</label>
+                  <input type="text" value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} placeholder={`Enter ${label.toLowerCase()}`}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project End Date</label>
-                  <input type="date" value={form.project_end_date || ''} onChange={e => setForm(p => ({ ...p, project_end_date: e.target.value }))}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
-                </div>
-              </div>
+              ))}
 
               {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
 
@@ -665,46 +549,13 @@ export default function ProjectsTable({
             <h2 className="text-lg font-bold text-white mb-2">Bulk Edit ({selectedIds.size} records)</h2>
             <p className="text-xs text-[#71717a] mb-6">Only filled fields will be updated.</p>
             <form onSubmit={handleBulkSave} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Company Name</label>
-                <input type="text" value={bulkForm.company_name || ''} onChange={e => setBulkForm(p => ({ ...p, company_name: e.target.value }))} placeholder="Leave blank to keep current"
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Status</label>
-                  <select value={bulkForm.project_status || ''} onChange={e => setBulkForm(p => ({ ...p, project_status: e.target.value }))}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-                    <option value="">No change</option>
-                    {PROJECT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Type</label>
-                  <select value={bulkForm.project_type || ''} onChange={e => setBulkForm(p => ({ ...p, project_type: e.target.value }))}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60">
-                    <option value="">No change</option>
-                    {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Rate</label>
-                <input type="text" value={bulkForm.project_rate || ''} onChange={e => setBulkForm(p => ({ ...p, project_rate: e.target.value }))} placeholder="Leave blank to keep current"
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project Start Date</label>
-                  <input type="date" value={bulkForm.project_start_date || ''} onChange={e => setBulkForm(p => ({ ...p, project_start_date: e.target.value }))}
+              {Object.entries(FIELD_LABELS).map(([key, label]) => (
+                <div key={key}>
+                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">{label}</label>
+                  <input type="text" value={bulkForm[key] || ''} onChange={e => setBulkForm(p => ({ ...p, [key]: e.target.value }))} placeholder="Leave blank to keep current"
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#a1a1aa] mb-1.5">Project End Date</label>
-                  <input type="date" value={bulkForm.project_end_date || ''} onChange={e => setBulkForm(p => ({ ...p, project_end_date: e.target.value }))}
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
-                </div>
-              </div>
+              ))}
               {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowBulkModal(false)} className="flex-1 border border-[#2a2a2a] hover:bg-[#1a1a1a] text-white py-2.5 rounded-xl text-sm transition-all">Cancel</button>

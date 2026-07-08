@@ -11,13 +11,39 @@ interface NavItem {
   icon: string
 }
 
+interface NavGroup {
+  label: string
+  icon: string
+  children: NavItem[]
+}
+
+type NavEntry = NavItem | NavGroup
+
 interface SidebarProps {
   role: 'admin' | 'employee'
   userName?: string
   userEmail?: string
 }
 
-const adminNav: NavItem[] = [
+const miscGroup: NavGroup = {
+  label: 'Miscellaneous Record',
+  icon: '📋',
+  children: [
+    { label: 'Project Records', href: '/dashboard/miscellaneous/projects', icon: '📁' },
+    { label: 'Marketed By', href: '/dashboard/miscellaneous/marketed-by', icon: '📌' },
+  ],
+}
+
+const miscGroupAdmin: NavGroup = {
+  label: 'Miscellaneous Record',
+  icon: '📋',
+  children: [
+    { label: 'Project Records', href: '/admin/miscellaneous/projects', icon: '📁' },
+    { label: 'Marketed By', href: '/admin/miscellaneous/marketed-by', icon: '📌' },
+  ],
+}
+
+const adminNav: NavEntry[] = [
   { label: 'Overview', href: '/admin', icon: '📊' },
   { label: 'Personal Details', href: '/admin/profile', icon: '👤' },
   { label: 'Admin', href: '/admin/admins', icon: '🔑' },
@@ -29,9 +55,10 @@ const adminNav: NavItem[] = [
   { label: 'Technology Table', href: '/admin/base-table', icon: '📋' },
   { label: 'Dynamic Tables', href: '/admin/tables', icon: '🏗️' },
   { label: 'Audit Log History', href: '/admin/audit', icon: '📋' },
+  miscGroupAdmin,
 ]
 
-const employeeNav: NavItem[] = [
+const employeeNav: NavEntry[] = [
   { label: 'Overview', href: '/dashboard', icon: '🏠' },
   { label: 'Personal Details', href: '/dashboard/profile', icon: '👤' },
   { label: 'All Marketing Records', href: '/dashboard/marketing', icon: '📊' },
@@ -41,7 +68,12 @@ const employeeNav: NavItem[] = [
   { label: 'All Project Records', href: '/dashboard/all-projects', icon: '🗂️' },
   { label: 'My Project Records', href: '/dashboard/projects', icon: '📋' },
   { label: 'Custom Tables', href: '/dashboard/tables', icon: '🏗️' },
+  miscGroup,
 ]
+
+function isNavGroup(entry: NavEntry): entry is NavGroup {
+  return 'children' in entry
+}
 
 const NavItemLink = memo(function NavItemLink({ item, active, collapsed }: { item: NavItem; active: boolean; collapsed: boolean }) {
   return (
@@ -60,6 +92,43 @@ const NavItemLink = memo(function NavItemLink({ item, active, collapsed }: { ite
   )
 })
 
+function NavGroupSection({ group, collapsed, pathname }: { group: NavGroup; collapsed: boolean; pathname: string }) {
+  const [expanded, setExpanded] = useState(() => group.children.some(c => pathname.startsWith(c.href)))
+
+  const active = group.children.some(c => pathname.startsWith(c.href))
+
+  return (
+    <div>
+      <button
+        onClick={() => !collapsed && setExpanded(!expanded)}
+        title={collapsed ? group.label : undefined}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+          active
+            ? 'bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20'
+            : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'
+        }`}
+      >
+        <span className="text-base flex-shrink-0">{group.icon}</span>
+        {!collapsed && (
+          <>
+            <span className="flex-1 text-left">{group.label}</span>
+            <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </>
+        )}
+      </button>
+      {!collapsed && expanded && (
+        <div className="ml-2 mt-1 space-y-1 border-l border-[#2a2a2a] pl-2">
+          {group.children.map((item) => (
+            <NavItemLink key={item.href} item={item} active={pathname.startsWith(item.href)} collapsed={false} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
@@ -68,11 +137,17 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
 
   const activeMap = useMemo(() => {
     const map: Record<string, boolean> = {}
-    for (const item of nav) {
-      if (item.href === '/admin' || item.href === '/dashboard') {
-        map[item.href] = pathname === item.href
+    for (const entry of nav) {
+      if (isNavGroup(entry)) {
+        for (const item of entry.children) {
+          map[item.href] = pathname.startsWith(item.href)
+        }
       } else {
-        map[item.href] = pathname.startsWith(item.href)
+        if (entry.href === '/admin' || entry.href === '/dashboard') {
+          map[entry.href] = pathname === entry.href
+        } else {
+          map[entry.href] = pathname.startsWith(entry.href)
+        }
       }
     }
     return map
@@ -99,15 +174,18 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {nav.map((item) => (
-          <NavItemLink key={item.href} item={item} active={activeMap[item.href]} collapsed={collapsed} />
-        ))}
+        {nav.map((entry) => {
+          if (isNavGroup(entry)) {
+            return <NavGroupSection key={entry.label} group={entry} collapsed={collapsed} pathname={pathname} />
+          }
+          return <NavItemLink key={entry.href} item={entry} active={activeMap[entry.href]} collapsed={collapsed} />
+        })}
       </nav>
 
       <div className="p-3 border-t border-[#2a2a2a]">
         {collapsed ? (
           <div className="flex flex-col items-center mb-2 gap-2">
-            <div 
+            <div
               title={userName || (role === 'admin' ? 'Administrator' : 'Employee')}
               className="w-8 h-8 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-[10px] font-bold text-[#22c55e]"
             >

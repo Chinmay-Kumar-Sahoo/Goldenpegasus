@@ -4,15 +4,14 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const PROJECT_TABLE_NAME = 'My Project Records'
 const PROJECT_SCHEMA = [
-  { name: 'candidate_name', label: 'Candidate Name', type: 'text', required: true },
+  { name: 'employee_name', label: 'Employee Name', type: 'text', required: false },
+  { name: 'candidate_name', label: 'Candidate Name', type: 'text', required: false },
   { name: 'technology', label: 'Technology', type: 'text', required: false },
-  { name: 'created_date', label: 'Created Date', type: 'date', required: false },
   { name: 'company_name', label: 'Company Name', type: 'text', required: false },
   { name: 'project_status', label: 'Project Status', type: 'text', required: false },
-  { name: 'project_type', label: 'Project Type', type: 'text', required: false },
-  { name: 'project_rate', label: 'Project Rate', type: 'text', required: false },
-  { name: 'project_start_date', label: 'Project Start Date', type: 'date', required: false },
-  { name: 'project_end_date', label: 'Project End Date', type: 'date', required: false },
+  { name: 'created_date', label: 'Created Date', type: 'text', required: false },
+  { name: 'project_start_date', label: 'Project Start Date', type: 'text', required: false },
+  { name: 'project_end_date', label: 'Project End Date', type: 'text', required: false },
 ] as const
 
 let _adminClient: ReturnType<typeof createAdminClient> | null = null
@@ -118,24 +117,7 @@ export async function POST(req: NextRequest) {
   const { id, data: recordData } = body
   const tableId = body.table_id
 
-  // Validate candidate_name — admin can assign any, employee only their assigned
-  const candidateName = (recordData?.candidate_name || '').trim()
-  if (!candidateName) return NextResponse.json({ error: 'Candidate Name is required' }, { status: 400 })
   const isAdmin = await isAdminUser(supabase, user.id)
-  if (!isAdmin) {
-    const lookupClient = getAdminClient() || supabase
-    const [{ data: asOwner }, { data: asBackup }] = await Promise.all([
-      lookupClient.from('Candidate_records').select('Candidate_name').eq('owner_id', user.id),
-      lookupClient.from('Candidate_records').select('Candidate_name').eq('backup_employee_id', user.id),
-    ])
-    const validNames = new Set([
-      ...(asOwner || []).map((c: any) => (c.Candidate_name || '').toLowerCase().trim()),
-      ...(asBackup || []).map((c: any) => (c.Candidate_name || '').toLowerCase().trim()),
-    ])
-    if (!validNames.has(candidateName.toLowerCase())) {
-      return NextResponse.json({ error: 'Candidate is not assigned to you' }, { status: 403 })
-    }
-  }
 
   let resolvedId: string | null = tableId || null
   if (!resolvedId) {
@@ -150,22 +132,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (id) {
-    const { error: updateErr } = await supabase.from('dynamic_table_records').update({ data: recordData, updated_at: new Date().toISOString() }).eq('id', id).eq('owner_id', user.id)
+    let query = supabase.from('dynamic_table_records').update({ data: recordData, updated_at: new Date().toISOString() }).eq('id', id)
+    if (!isAdmin) query = query.eq('owner_id', user.id)
+    const { error: updateErr } = await query
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
     return NextResponse.json({ success: true })
   }
-
-  // Server-side duplicate check: same candidate + company + type + dates
-  const lookupClient = getAdminClient() || supabase
-  const { data: existing } = await lookupClient.from('dynamic_table_records').select('id, data').eq('table_id', resolvedId)
-  const dup = (existing || []).some((r: any) =>
-    String(r.data?.candidate_name ?? '').toLowerCase().trim() === String(recordData.candidate_name || '').toLowerCase().trim() &&
-    String(r.data?.company_name ?? '').toLowerCase().trim() === String(recordData.company_name || '').toLowerCase().trim() &&
-    String(r.data?.project_type ?? '').toLowerCase().trim() === String(recordData.project_type || '').toLowerCase().trim() &&
-    String(r.data?.project_start_date ?? '').toLowerCase().trim() === String(recordData.project_start_date || '').toLowerCase().trim() &&
-    String(r.data?.project_end_date ?? '').toLowerCase().trim() === String(recordData.project_end_date || '').toLowerCase().trim()
-  )
-  if (dup) return NextResponse.json({ error: 'An identical project record already exists' }, { status: 409 })
 
   const { data: inserted, error } = await supabase.from('dynamic_table_records').insert({
     table_id: resolvedId,

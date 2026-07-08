@@ -42,18 +42,11 @@ export default async function AllProjectsPage() {
     employee_name: ownerNames[r.owner_id] || null,
   }))
 
-  const { data: allCandidates } = await lookupClient.from('Candidate_records').select('Candidate_name, technology').limit(2000)
-  const candidateOptions = (allCandidates || []).map((c: any) => ({
-    name: c.Candidate_name,
-    technology: c.technology || null,
-  }))
-
   return (
     <ProjectsTable
       currentUserId={user?.id ?? null}
       tableId={tableId}
       initialRecords={enriched}
-      candidateOptions={candidateOptions}
       readOnly={true}
       title="All Project Records"
     />
