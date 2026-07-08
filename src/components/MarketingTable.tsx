@@ -195,7 +195,7 @@ const TableRow = memo(function TableRow({
         </span>
       </td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_email || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{normalizeCompanyName(rec.organization_name) || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{normalizeCompanyName(rec.organization_name) || normalizeCompanyName(rec.backup_employee_name ?? null) || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{normalizeCompanyName(rec.implementation_partner) || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_poc_email || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.end_client || '—'}</td>
@@ -562,7 +562,7 @@ export default function MarketingPage({
       if (!res.ok) throw new Error(result.error || 'Cleanup failed')
       const m = result.marketing || {}
       const c = result.candidates || {}
-      toast.success(`Marketing: ${m.nameUpdated ?? 0} names, ${m.techUpdated ?? 0} tech, ${m.companyNameUpdated ?? 0} companies, ${m.emailCleared ?? 0} emails, ${m.dupesRemoved ?? 0} dupes. Candidates: ${c.nameUpdated ?? 0} names, ${c.techUpdated ?? 0} tech, ${c.dupesRemoved ?? 0} dupes.`)
+      toast.success(`Marketing: ${m.nameUpdated ?? 0} names, ${m.techUpdated ?? 0} tech, ${m.companyNameUpdated ?? 0} companies, ${m.emailCleared ?? 0} emails, ${m.dupesRemoved ?? 0} dupes${m.backupMigrated ? `, ${m.backupMigrated} org names migrated` : ''}. Candidates: ${c.nameUpdated ?? 0} names, ${c.techUpdated ?? 0} tech, ${c.dupesRemoved ?? 0} dupes.`)
       fetchRecords()
     } catch (err: any) {
       toast.error(err.message || 'Cleanup failed')
@@ -993,7 +993,7 @@ const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9
 
   const exportCSV = useCallback(() => {
     const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments']
-    const rows = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), r.date ? formatDate(r.date) : '', r.status || 'Telephone Call', r.recruiter_email, r.organization_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date ? formatDate(r.interview_date) : '', r.interviewer_email, r.project_start_date ? formatDate(r.project_start_date) : '', r.project_end_date ? formatDate(r.project_end_date) : '', r.notes])
+    const rows = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name] : []), r.date ? formatDate(r.date) : '', r.status || 'Telephone Call', r.recruiter_email, r.organization_name || r.backup_employee_name, r.implementation_partner, r.implementation_poc_email, r.end_client, r.interview_date ? formatDate(r.interview_date) : '', r.interviewer_email, r.project_start_date ? formatDate(r.project_start_date) : '', r.project_end_date ? formatDate(r.project_end_date) : '', r.notes])
     const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -1007,7 +1007,7 @@ const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9
     const doc = new jsPDF({ orientation: 'landscape' })
 
     const headers = ['Candidate Name', 'Technology', ...(showEmployeeColumn ? ['Employee'] : []), ...(showPrimaryEmployeeColumn ? ['Primary Employee'] : []), ...(showBackupEmployeeColumn ? ['Backup Employee'] : []), 'Created Date', 'Status', 'Recruiter Email', '2nd Up Recruiter', 'Implementation Partner', 'Implementation Partner Email', 'End Client', 'Interview Date', 'Interviewer Email', 'Project Start Date', 'Project End Date', 'Comments']
-    const data = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), r.date ? formatDate(r.date) : '', r.status || 'Telephone Call', r.recruiter_email || '', r.organization_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', r.interview_date ? formatDate(r.interview_date) : '', r.interviewer_email || '', r.project_start_date ? formatDate(r.project_start_date) : '', r.project_end_date ? formatDate(r.project_end_date) : '', r.notes || ''])
+    const data = sorted.map(r => [r.name, r.technology || '', ...(showEmployeeColumn ? [currentUserName] : []), ...(showPrimaryEmployeeColumn ? [r.employee_name || ''] : []), ...(showBackupEmployeeColumn ? [r.backup_employee_name || ''] : []), r.date ? formatDate(r.date) : '', r.status || 'Telephone Call', r.recruiter_email || '', r.organization_name || r.backup_employee_name || '', r.implementation_partner || '', r.implementation_poc_email || '', r.end_client || '', r.interview_date ? formatDate(r.interview_date) : '', r.interviewer_email || '', r.project_start_date ? formatDate(r.project_start_date) : '', r.project_end_date ? formatDate(r.project_end_date) : '', r.notes || ''])
 
     autoTable(doc, {
       head: [headers],

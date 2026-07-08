@@ -5,8 +5,7 @@ export const dynamic = 'force-dynamic'
 
 const FIELDS = [
   { name: 'name', label: 'Name' },
-  { name: 'company', label: 'Company' },
-  { name: 'date', label: 'Date' },
+  { name: 'date', label: 'Date', type: 'date' as const },
   { name: 'notes', label: 'Notes' },
 ]
 

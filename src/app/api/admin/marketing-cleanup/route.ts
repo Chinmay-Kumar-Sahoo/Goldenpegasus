@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
   let candDupesRemoved = 0
   let candNameUpdated = 0
   let candTechUpdated = 0
+  let backupMigrated = 0
 
   // ── 1. Normalize marketing_records ─────────────────────────────────────
   const { data: mktRecs } = await adminClient
@@ -119,6 +120,25 @@ export async function POST(req: NextRequest) {
       if (Object.keys(updates).length > 0) {
         updates.updated_at = new Date().toISOString()
         await adminClient.from('marketing_records').update(updates).eq('id', rec.id)
+      }
+    }
+  }
+
+  // ── 1b. Migrate backup_employee_name → organization_name for records ────
+  // that were incorrectly imported during a bug window where '2nd Up Recruiter'
+  // was mapped to backup_employee_name instead of organization_name.
+  // Only migrate when organization_name is null and backup_employee_name has data.
+  const { data: migrateRecs } = await adminClient
+    .from('marketing_records')
+    .select('id, organization_name, backup_employee_name')
+    .is('organization_name', null)
+    .not('backup_employee_name', 'is', null)
+
+  if (migrateRecs?.length) {
+    for (const rec of migrateRecs) {
+      if (rec.backup_employee_name && !rec.organization_name) {
+        await adminClient.from('marketing_records').update({ organization_name: rec.backup_employee_name, updated_at: new Date().toISOString() }).eq('id', rec.id)
+        backupMigrated++
       }
     }
   }
@@ -222,7 +242,7 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    marketing: { companyNameUpdated, nameUpdated, techUpdated, emailCleared, dupesRemoved: mktDupesRemoved },
+    marketing: { companyNameUpdated, nameUpdated, techUpdated, emailCleared, dupesRemoved: mktDupesRemoved, backupMigrated },
     candidates: { nameUpdated: candNameUpdated, techUpdated: candTechUpdated, dupesRemoved: candDupesRemoved },
   })
 }

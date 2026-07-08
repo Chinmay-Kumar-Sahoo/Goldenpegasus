@@ -51,7 +51,6 @@ const adminNav: NavEntry[] = [
   { label: 'Employees', href: '/admin/employees', icon: '👥' },
   { label: 'All Marketing Records', href: '/admin/marketing', icon: '📈' },
   { label: 'All Candidate Profiles', href: '/admin/clients', icon: '🤝' },
-  { label: 'All Project Records', href: '/admin/projects', icon: '🗂️' },
   { label: 'Technology Table', href: '/admin/base-table', icon: '📋' },
   { label: 'Dynamic Tables', href: '/admin/tables', icon: '🏗️' },
   { label: 'Audit Log History', href: '/admin/audit', icon: '📋' },
@@ -65,8 +64,6 @@ const employeeNav: NavEntry[] = [
   { label: 'My Marketing Records', href: '/dashboard/my-marketing', icon: '📈' },
   { label: 'All Candidate Profiles', href: '/dashboard/all-marketing-profiles', icon: '🤝' },
   { label: 'My Candidate Profile', href: '/dashboard/clients', icon: '👤' },
-  { label: 'All Project Records', href: '/dashboard/all-projects', icon: '🗂️' },
-  { label: 'My Project Records', href: '/dashboard/projects', icon: '📋' },
   { label: 'Custom Tables', href: '/dashboard/tables', icon: '🏗️' },
   miscGroup,
 ]

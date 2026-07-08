@@ -13,7 +13,7 @@ interface MiscRecord {
 interface MiscField {
   name: string
   label: string
-  type?: 'text' | 'textarea'
+  type?: 'text' | 'textarea' | 'number' | 'date'
 }
 
 const PAGE_SIZES = [25, 50, 100] as const
@@ -286,8 +286,14 @@ export default function MiscTable({
                     <textarea value={form[f.name] || ''} onChange={e => setForm(p => ({ ...p, [f.name]: e.target.value }))} placeholder={`Enter ${f.label.toLowerCase()}`}
                       rows={6}
                       className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60 resize-y min-h-[120px]" />
+                  ) : f.type === 'date' ? (
+                    <input type="date" value={form[f.name] || ''} onChange={e => setForm(p => ({ ...p, [f.name]: e.target.value }))}
+                      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                   ) : (
-                    <input type="text" value={form[f.name] || ''} onChange={e => setForm(p => ({ ...p, [f.name]: e.target.value }))} placeholder={`Enter ${f.label.toLowerCase()}`}
+                    <input type={f.type === 'number' ? 'number' : 'text'} value={form[f.name] || ''} onChange={e => {
+                      const val = f.type === 'number' ? e.target.value.replace(/\D/g, '') : e.target.value
+                      setForm(p => ({ ...p, [f.name]: val }))
+                    }} placeholder={`Enter ${f.label.toLowerCase()}`}
                       className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#22c55e]/60" />
                   )}
                 </div>
