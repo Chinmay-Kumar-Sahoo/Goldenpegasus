@@ -4,14 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const PROJECT_TABLE_NAME = 'My Project Records'
 const PROJECT_SCHEMA = [
-  { name: 'employee_name', label: 'Employee Name', type: 'text', required: false },
-  { name: 'candidate_name', label: 'Candidate Name', type: 'text', required: false },
-  { name: 'technology', label: 'Technology', type: 'text', required: false },
-  { name: 'company_name', label: 'Company Name', type: 'text', required: false },
-  { name: 'project_status', label: 'Project Status', type: 'text', required: false },
-  { name: 'created_date', label: 'Created Date', type: 'text', required: false },
-  { name: 'project_start_date', label: 'Project Start Date', type: 'text', required: false },
-  { name: 'project_end_date', label: 'Project End Date', type: 'text', required: false },
+  { name: 'content', label: 'Content', type: 'text', required: false },
 ] as const
 
 let _adminClient: ReturnType<typeof createAdminClient> | null = null
