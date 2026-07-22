@@ -195,7 +195,7 @@ const TableRow = memo(function TableRow({
         </span>
       </td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.recruiter_email || '—'}</td>
-      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{normalizeCompanyName(rec.organization_name) || normalizeCompanyName(rec.backup_employee_name ?? null) || '—'}</td>
+      <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{normalizeCompanyName(rec.organization_name) || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{normalizeCompanyName(rec.implementation_partner) || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.implementation_poc_email || '—'}</td>
       <td className="px-4 py-3 text-sm text-[#a1a1aa] whitespace-nowrap">{rec.end_client || '—'}</td>
