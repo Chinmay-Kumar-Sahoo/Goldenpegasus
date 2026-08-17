@@ -30,7 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const displayName = profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Employee'
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a]">
+    <div className="flex h-full bg-[#0a0a0a]">
       <SessionGuard expectedRole="employee" />
       <Sidebar role="employee" userName={displayName} userEmail={profile?.email || user.email} />
       <main className="flex-1 flex flex-col min-h-0">

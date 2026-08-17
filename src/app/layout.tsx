@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import { Toaster } from 'react-hot-toast';
+import Footer from '@/components/Footer';
 import "./globals.css";
 
 const inter = Inter({
@@ -23,13 +24,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark h-full">
       <head>
         <link rel="preconnect" href={supabaseUrl} />
         <link rel="dns-prefetch" href={supabaseUrl} />
       </head>
       <body
-        className={`${inter.variable} antialiased bg-black text-white`}
+        className={`${inter.variable} antialiased bg-black text-white h-full`}
       >
         <Script id="hydration-extension-attribute-cleanup" strategy="beforeInteractive">
           {`
@@ -50,7 +51,12 @@ export default function RootLayout({
           `}
         </Script>
         <Toaster position="top-right" toastOptions={{ style: { background: '#1a1a1a', color: '#fff', border: '1px solid #2a2a2a' } }} />
-        {children}
+        <div className="flex flex-col min-h-full">
+          <div className="flex-1">
+            {children}
+          </div>
+          <Footer />
+        </div>
       </body>
     </html>
   );

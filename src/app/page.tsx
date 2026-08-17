@@ -3,7 +3,7 @@ import BrandLogo from '@/components/BrandLogo'
 
 export default function HomePage() {
   return (
-    <main className="h-screen bg-[#0a0a0a] text-white flex flex-col relative overflow-hidden">
+    <main className="h-full bg-[#0a0a0a] text-white flex flex-col relative">
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <img src="/golden-pegasus-mark.svg" alt="" loading="lazy" fetchPriority="low" className="w-[60vw] h-[60vw] max-w-[600px] max-h-[600px] object-contain opacity-[0.04]" />
       </div>
